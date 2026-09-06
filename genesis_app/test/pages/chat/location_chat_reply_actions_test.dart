@@ -65,6 +65,23 @@ void main() {
       final carousel = find.byKey(
         const ValueKey('inspiration-replies-carousel'),
       );
+      final footer = find.byKey(const ValueKey('inspiration-get-more'));
+      final footerSurface = tester.widget<ChatStableBackdropSurface>(
+        find.descendant(
+          of: footer,
+          matching: find.byType(ChatStableBackdropSurface),
+        ),
+      );
+      expect(footerSurface.sigma, style.bubbleBackdropBlurSigma);
+      final footerContainer = tester.widget<Container>(
+        find.descendant(of: footer, matching: find.byType(Container)),
+      );
+      expect(
+        (footerContainer.decoration! as BoxDecoration).color,
+        chatNarratorMessageBackgroundColor(
+          style,
+        ).withValues(alpha: style.selfBubbleColor.a),
+      );
       for (var index = 0; index < 3; index++) {
         if (index > 0) {
           await tester.drag(carousel, const Offset(-230, 0));
@@ -92,9 +109,18 @@ void main() {
         );
         expect(
           bubble.style!.selfBubbleColor,
-          chatNarratorMessageBackgroundColor(style),
+          chatNarratorMessageBackgroundColor(
+            style,
+          ).withValues(alpha: style.selfBubbleColor.a),
         );
         expect(bubble.onTap, isNotNull);
+        final surface = tester.widget<ChatStableBackdropSurface>(
+          find.descendant(
+            of: card,
+            matching: find.byType(ChatStableBackdropSurface),
+          ),
+        );
+        expect(surface.sigma, style.bubbleBackdropBlurSigma);
       }
       await tester.tap(inspiration);
       await tester.pumpAndSettle();
@@ -141,6 +167,36 @@ void main() {
     final carousel = find.byKey(const ValueKey('inspiration-replies-carousel'));
     await tester.tap(toggle);
     await tester.pumpAndSettle();
+    final activeRight = tester
+        .getRect(find.byKey(const ValueKey('inspiration-reply-card-0')))
+        .right;
+    var current = 0;
+    for (final target in [1, 0, 1, 2, 1, 0]) {
+      // The left preview exposes its edit strip; that must only select it.
+      final tapTarget = find.byKey(
+        ValueKey(
+          target < current
+              ? 'inspiration-edit-$target'
+              : 'inspiration-reply-card-$target',
+        ),
+      );
+      final visible = tester
+          .getRect(tapTarget)
+          .intersect(tester.getRect(carousel));
+      expect(visible.isEmpty, isFalse);
+      await tester.tapAt(visible.center);
+      await tester.pumpAndSettle();
+      expect(sent, isEmpty);
+      expect(edited, isEmpty);
+      expect(carousel, findsOneWidget);
+      expect(
+        tester
+            .getRect(find.byKey(ValueKey('inspiration-reply-card-$target')))
+            .right,
+        closeTo(activeRight, 0.01),
+      );
+      current = target;
+    }
     await tester.tap(find.byKey(const ValueKey('inspiration-reply-card-0')));
     await tester.pumpAndSettle();
     expect(sent, ['Good job!']);
@@ -171,6 +227,70 @@ void main() {
     await tester.pumpAndSettle();
     expect(sent.last, startsWith("You're right to ask for a plan."));
     expect(carousel, findsNothing);
+  });
+  testWidgets('inspiration collapses when a retained chat page is reentered', (
+    tester,
+  ) async {
+    final coordinator = LocationChatScrollCoordinator();
+    addTearDown(coordinator.dispose);
+    final messages = [
+      ChatMessageVm(
+        localId: 'reply',
+        senderId: 'character',
+        senderName: 'Character',
+        text: 'A completed reply.',
+        isMe: false,
+        status: 'sent',
+        senderType: 'character',
+      ),
+    ];
+    Widget host(bool active) => MaterialApp(
+      scrollBehavior: const GenesisScrollBehavior(),
+      home: Scaffold(
+        body: SizedBox(
+          width: 390,
+          height: 600,
+          child: LocationChatAnchoredMessageList(
+            coordinator: coordinator,
+            active: active,
+            messages: messages,
+            topTitle: '',
+            replyActionsMessageId: 'reply',
+            style: kLocationChatStyle,
+          ),
+        ),
+      ),
+    );
+    final carousel = find.byKey(const ValueKey('inspiration-replies-carousel'));
+    await tester.pumpWidget(host(true));
+    await tester.pumpAndSettle();
+    final retainedState = tester.state(
+      find.byType(LocationChatAnchoredMessageList),
+    );
+    for (var visit = 0; visit < 2; visit++) {
+      expect(carousel, findsNothing);
+      await tester.tap(find.bySemanticsLabel('Inspiration'));
+      await tester.pumpAndSettle();
+      expect(carousel, findsOneWidget);
+      await tester.pumpWidget(host(true));
+      await tester.pumpAndSettle();
+      expect(
+        carousel,
+        findsOneWidget,
+        reason: 'An ordinary rebuild must keep it expanded.',
+      );
+      await tester.pumpWidget(host(false));
+      await tester.pumpAndSettle();
+      expect(carousel, findsNothing);
+      await tester.pumpWidget(host(true));
+      await tester.pumpAndSettle();
+      expect(
+        tester.state(find.byType(LocationChatAnchoredMessageList)),
+        same(retainedState),
+      );
+      expect(carousel, findsNothing);
+    }
+    expect(tester.takeException(), isNull);
   });
   testWidgets('inspiration survives recycling its message row', (tester) async {
     final coordinator = LocationChatScrollCoordinator();

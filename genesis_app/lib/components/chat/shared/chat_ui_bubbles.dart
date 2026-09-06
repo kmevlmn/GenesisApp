@@ -62,7 +62,7 @@ class ChatMessageBubble extends StatelessWidget {
       child:
           (usesSelfScenePlate || usesAiScenePlate) &&
               style.bubbleBackdropBlurSigma > 0
-          ? _ChatStableBackdropSurface(
+          ? ChatStableBackdropSurface(
               borderRadius: borderRadius,
               sigma: style.bubbleBackdropBlurSigma,
               child: bubble,
@@ -72,8 +72,9 @@ class ChatMessageBubble extends StatelessWidget {
   }
 }
 
-class _ChatStableBackdropSurface extends StatelessWidget {
-  const _ChatStableBackdropSurface({
+class ChatStableBackdropSurface extends StatelessWidget {
+  const ChatStableBackdropSurface({
+    super.key,
     required this.borderRadius,
     required this.sigma,
     required this.child,

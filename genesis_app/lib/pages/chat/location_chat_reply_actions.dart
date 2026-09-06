@@ -187,6 +187,25 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
 
   static const double _editStripWidth = 27;
 
+  void _handleCardTap(int index, {bool edit = false}) {
+    final controller = _pageController;
+    if (controller == null || !controller.hasClients) return;
+    final page = controller.page ?? _currentPage.toDouble();
+    if (index != _currentPage || (page - index).abs() > 0.001) {
+      controller.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
+    if (edit) {
+      widget.onEdit(replies[index]);
+    } else {
+      widget.onSend(replies[index]);
+    }
+  }
+
   void _configureCarousel(double viewportWidth, double cardWidth) {
     final fraction = viewportWidth <= 0
         ? 1.0
@@ -221,10 +240,12 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = chatNarratorMessageBackgroundColor(
+      style,
+    ).withValues(alpha: style.selfBubbleColor.a);
     final bubbleStyle = style.copyWith(
       bubblePadding: style.bubblePadding.copyWith(right: 8 + _editStripWidth),
-      bubbleBackdropBlurSigma: 0,
-      selfBubbleColor: chatNarratorMessageBackgroundColor(style),
+      selfBubbleColor: backgroundColor,
     );
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -303,7 +324,7 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
                               fit: StackFit.expand,
                               children: [
                                 ChatMessageBubble(
-                                  onTap: () => widget.onSend(replies[index]),
+                                  onTap: () => _handleCardTap(index),
                                   borderRadius: BorderRadius.circular(
                                     style.bubbleBorderRadius,
                                   ),
@@ -329,7 +350,7 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
                                       key: ValueKey('inspiration-edit-$index'),
                                       behavior: HitTestBehavior.opaque,
                                       onTap: () =>
-                                          widget.onEdit(replies[index]),
+                                          _handleCardTap(index, edit: true),
                                       child: Center(
                                         child: SvgPicture.asset(
                                           editSquareIconAsset,
@@ -372,39 +393,45 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
                           behavior: HitTestBehavior.opaque,
                           onTap: () =>
                               showSubscriptionPurchaseBottomSheet(context),
-                          child: Container(
-                            padding: style.bubblePadding,
-                            decoration: BoxDecoration(
-                              color: chatNarratorMessageBackgroundColor(style),
-                              borderRadius: BorderRadius.circular(
-                                style.bubbleBorderRadius,
-                              ),
+                          child: ChatStableBackdropSurface(
+                            borderRadius: BorderRadius.circular(
+                              style.bubbleBorderRadius,
                             ),
-                            child: Text.rich(
-                              TextSpan(
-                                children: [
-                                  const TextSpan(
-                                    text: 'Free inspiration uses left: ',
-                                  ),
-                                  TextSpan(
-                                    text: '"3"',
-                                    style: const TextStyle(
-                                      color: GenesisColors.brand,
-                                    ),
-                                  ),
-                                  const TextSpan(text: '.\n'),
-                                  const TextSpan(
-                                    text: 'Get more >',
-                                    style: TextStyle(
-                                      color: GenesisColors.brand,
-                                    ),
-                                  ),
-                                ],
+                            sigma: style.bubbleBackdropBlurSigma,
+                            child: Container(
+                              padding: style.bubblePadding,
+                              decoration: BoxDecoration(
+                                color: backgroundColor,
+                                borderRadius: BorderRadius.circular(
+                                  style.bubbleBorderRadius,
+                                ),
                               ),
-                              textWidthBasis: TextWidthBasis.longestLine,
-                              textAlign: TextAlign.center,
-                              style: style.bubbleTextStyle.copyWith(
-                                fontSize: 13,
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    const TextSpan(
+                                      text: 'Free inspiration uses left: ',
+                                    ),
+                                    TextSpan(
+                                      text: '"3"',
+                                      style: const TextStyle(
+                                        color: GenesisColors.brand,
+                                      ),
+                                    ),
+                                    const TextSpan(text: '.\n'),
+                                    const TextSpan(
+                                      text: 'Get more >',
+                                      style: TextStyle(
+                                        color: GenesisColors.brand,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                textWidthBasis: TextWidthBasis.longestLine,
+                                textAlign: TextAlign.center,
+                                style: style.bubbleTextStyle.copyWith(
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                           ),

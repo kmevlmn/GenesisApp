@@ -228,6 +228,7 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
     required this.coordinator,
     required this.messages,
     required this.topTitle,
+    this.active = true,
     this.onMessageLongPressStart,
     this.onFailedMessageTap,
     this.onCharactersMovedLocationTap,
@@ -249,6 +250,7 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
   final LocationChatScrollCoordinator coordinator;
   final List<ChatMessageVm> messages;
   final String topTitle;
+  final bool active;
   final ChatMessageLongPressStart? onMessageLongPressStart;
   final ChatMessageTap? onFailedMessageTap;
   final ChatCharacterMovementTap? onCharactersMovedLocationTap;
@@ -321,7 +323,8 @@ class _LocationChatAnchoredMessageListState
   @override
   void didUpdateWidget(LocationChatAnchoredMessageList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.replyActionsMessageId != widget.replyActionsMessageId) {
+    if (oldWidget.active != widget.active ||
+        oldWidget.replyActionsMessageId != widget.replyActionsMessageId) {
       _inspirationExpanded = false;
       _inspirationPage = 0;
     }

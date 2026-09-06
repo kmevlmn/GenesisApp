@@ -190,7 +190,7 @@ class _ChatTickSurface extends StatelessWidget {
       child: GestureDetector(
         onLongPressStart: onLongPressStart,
         child: usesScenePlate
-            ? _ChatStableBackdropSurface(
+            ? ChatStableBackdropSurface(
                 borderRadius: borderRadius,
                 sigma: _tickMessageBlurSigma,
                 child: surface,

@@ -867,6 +867,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
       child: LocationChatAnchoredMessageList(
         key: const ValueKey<String>('location-chat-message-list'),
         coordinator: _scrollCoordinator,
+        active: widget.active,
         messages: displayMessages,
         messageLayoutId: _locationChatMessageLayoutId,
         replyActionsMessageId: replyActionsMessageId,
