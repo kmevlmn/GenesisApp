@@ -42,3 +42,5 @@ const String bottomNavInboxPressIconAsset =
 const String bottomNavMeIconAsset = 'assets/custom-icons/svg/bottom_nav_me.svg';
 const String bottomNavMePressIconAsset =
     'assets/custom-icons/svg/bottom_nav_me_press.svg';
+
+const String editSquareIconAsset = 'assets/custom-icons/svg/edit_square.svg';

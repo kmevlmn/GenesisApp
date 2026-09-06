@@ -920,18 +920,39 @@ class _OriginSetupRoleCardState extends State<_OriginSetupRoleCard>
                           'origin-setup-role-edit-$stableId',
                         ),
                         onTap: widget.busy ? null : _toggleEditing,
-                        child: Icon(
-                          _editing ? Icons.check_rounded : Icons.edit_rounded,
-                          key: ValueKey<String>(
-                            _editing
-                                ? 'origin-setup-role-edit-done-icon-$stableId'
-                                : 'origin-setup-role-edit-icon-$stableId',
-                          ),
-                          size: 16,
-                          color: Colors.white.withValues(
-                            alpha: editActionAvailable ? 0.95 : 0.35,
-                          ),
-                        ),
+                        child: _editing
+                            ? Icon(
+                                Icons.check_rounded,
+                                key: ValueKey<String>(
+                                  'origin-setup-role-edit-done-icon-$stableId',
+                                ),
+                                size: 16,
+                                color: Colors.white.withValues(
+                                  alpha: editActionAvailable ? 0.95 : 0.35,
+                                ),
+                              )
+                            : Center(
+                                child: Transform.scale(
+                                  // Match the previous edit icon within its existing layout slot.
+                                  scale: 32 / 37.36,
+                                  child: SvgPicture.asset(
+                                    editSquareIconAsset,
+                                    key: ValueKey<String>(
+                                      'origin-setup-role-edit-icon-$stableId',
+                                    ),
+                                    width: 16,
+                                    height: 16,
+                                    colorFilter: ColorFilter.mode(
+                                      Colors.white.withValues(
+                                        alpha: editActionAvailable
+                                            ? 0.95
+                                            : 0.35,
+                                      ),
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                   ),

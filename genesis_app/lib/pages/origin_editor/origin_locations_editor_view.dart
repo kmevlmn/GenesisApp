@@ -77,13 +77,17 @@ class _LocationsModeSwitch extends StatelessWidget {
                   color: Color(0xFF4B6192),
                 )
               else
-                SvgPicture.asset(
-                  editPencilLineIconAsset,
-                  width: 16,
-                  height: 16,
-                  colorFilter: const ColorFilter.mode(
-                    Color(0xFF4B6192),
-                    BlendMode.srcIn,
+                Transform.scale(
+                  // Match the previous edit icon within its existing layout slot.
+                  scale: 32 / 37.36,
+                  child: SvgPicture.asset(
+                    editSquareIconAsset,
+                    width: 16,
+                    height: 16,
+                    colorFilter: const ColorFilter.mode(
+                      Color(0xFF4B6192),
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
               const SizedBox(width: 4),
