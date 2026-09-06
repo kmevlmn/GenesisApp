@@ -39,12 +39,14 @@ import '../../network/models/world.dart';
 import '../../platform/device/android_sdk_version.dart';
 import '../../routers/app_router.dart';
 import '../../ui/components/genesis_character_avatar.dart';
+import '../../ui/components/genesis_primary_button.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/components/genesis_static_network_image.dart';
 import '../../ui/components/genesis_tab_bar.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/genesis_image_resource.dart';
 import '../../utils/genesis_ugc_text.dart';
+import '../create/create_form_widgets.dart' show CreateFormDeleteButton;
 import 'location_chat_scroll_coordinator.dart';
 import 'message_parsers/location_chat_message_parsers.dart';
 import '../world/world_constants.dart' show worldCharacterAvatarLogicalSize;
@@ -52,6 +54,7 @@ import '../world/world_constants.dart' show worldCharacterAvatarLogicalSize;
 part 'location_chat_panel_connection.dart';
 part 'location_chat_message_reconciler.dart';
 part 'location_chat_send_actions.dart';
+part 'location_chat_edit_page.dart';
 part 'location_chat_message_window.dart';
 part 'location_chat_mentions.dart';
 part 'location_chat_composer_input.dart';
@@ -372,6 +375,8 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
   ScrollController get _scrollController => _scrollCoordinator.controller;
   late final LocationChatMentionEditingController _textController;
   final _composerFocusNode = FocusNode();
+  final _localMessageEdits = LocationChatLocalMessageEdits();
+  bool _replyEditorOpen = false;
   final Object _rosterTapRegionGroup = Object();
   final BackdropKey _surfaceBackdropKey = BackdropKey();
   final Stopwatch _panelStopwatch = Stopwatch()..start();
@@ -595,6 +600,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         oldWidget.service != widget.service ||
         oldWidget.worldId != widget.worldId ||
         oldWidget.locationId != widget.locationId;
+    if (changedChatTarget) _localMessageEdits.clear();
     final becameActive = !oldWidget.active && widget.active;
     final becameInactive = oldWidget.active && !widget.active;
     if (becameActive) {
@@ -836,7 +842,10 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
       backdropGroupKey: _surfaceBackdropKey,
     );
     final headerHeight = _locationChatHeaderHeight(style);
-    final displayMessages = _locationChatDisplayMessages();
+    final displayMessages = _locationChatDisplayMessages()
+        .where((message) => !_localMessageEdits.isDeleted(message))
+        .map(_localMessageEdits.apply)
+        .toList(growable: false);
     // A finished individual stream does not mean the whole round is finished.
     // Only reveal the visual actions once all reply content is available.
     final repliesInProgress =
@@ -873,6 +882,21 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         replyActionsMessageId: replyActionsMessageId,
         onInspirationSend: (text) => unawaited(_send(textOverride: text)),
         onInspirationEdit: _editInspiration,
+        onEditReply: () => unawaited(
+          _openReplyEditor(
+            LocationChatEditPageArgs(
+              messages: displayMessages,
+              style: style,
+              backgroundImageUrl: widget.backgroundImageUrl,
+              backgroundPreviewImageUrl: widget.backgroundPreviewImageUrl,
+              selfMessageBubbleMaxWidthCap:
+                  ordinaryMessageBubbleMaxWidthCaps.selfMessage,
+              otherMessageBubbleMaxWidthCap:
+                  ordinaryMessageBubbleMaxWidthCaps.otherMessage,
+              mentionCatalog: _textController.catalog,
+            ),
+          ),
+        ),
         topTitle: '',
         oldestEdgeLoading: _showOlderMessagesLoading,
         onOldestEdgeLoadingCollapsed: _handleOlderMessagesLoadingCollapsed,

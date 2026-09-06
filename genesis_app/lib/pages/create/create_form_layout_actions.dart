@@ -23,6 +23,10 @@ class CreateFormDeleteButton extends StatelessWidget {
     this.decorationKey,
     this.size = 24,
     this.iconSize = 14,
+    this.backgroundColor = const Color(0xE6F4F4F6),
+    this.iconColor = const Color(0xFF666666),
+    this.borderSide = const BorderSide(color: Color(0xFFD8D8DE)),
+    this.borderRadius,
     this.enabled = true,
     this.onDisabledPressed,
   });
@@ -32,6 +36,10 @@ class CreateFormDeleteButton extends StatelessWidget {
   final Key? decorationKey;
   final double size;
   final double iconSize;
+  final Color backgroundColor;
+  final Color iconColor;
+  final BorderSide borderSide;
+  final BorderRadius? borderRadius;
   final bool enabled;
   final VoidCallback? onDisabledPressed;
 
@@ -51,9 +59,9 @@ class CreateFormDeleteButton extends StatelessWidget {
               Container(
                 key: decorationKey,
                 decoration: BoxDecoration(
-                  color: const Color(0xE6F4F4F6),
-                  border: Border.all(color: const Color(0xFFD8D8DE)),
-                  borderRadius: BorderRadius.circular(size / 4),
+                  color: backgroundColor,
+                  border: Border.fromBorderSide(borderSide),
+                  borderRadius: borderRadius ?? BorderRadius.circular(size / 4),
                 ),
               ),
               IconButton(
@@ -65,10 +73,7 @@ class CreateFormDeleteButton extends StatelessWidget {
                   createFormDeleteIconAsset,
                   width: iconSize,
                   height: iconSize,
-                  colorFilter: const ColorFilter.mode(
-                    Color(0xFF666666),
-                    BlendMode.srcIn,
-                  ),
+                  colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
                 ),
                 splashRadius: size / 2,
                 visualDensity: VisualDensity.compact,

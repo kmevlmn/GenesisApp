@@ -4,6 +4,7 @@ class ChatSystemMessage extends StatelessWidget {
   const ChatSystemMessage({
     super.key,
     required this.text,
+    this.content,
     this.fullWidth = false,
     this.useFullAvailableWidth = false,
     this.singleLine = false,
@@ -19,6 +20,7 @@ class ChatSystemMessage extends StatelessWidget {
     this.style,
   });
 
+  final Widget? content;
   final String text;
   final bool fullWidth;
   final bool useFullAvailableWidth;
@@ -63,17 +65,19 @@ class ChatSystemMessage extends StatelessWidget {
                   ),
                 ),
                 child: leadingIconAsset == null
-                    ? _InlineMarkdownText(
-                        text: text,
-                        maxLines: singleLine ? 1 : null,
-                        overflow: singleLine ? TextOverflow.ellipsis : null,
-                        textAlign: textAlign,
-                        style: textStyle ?? style.systemMessageTextStyle,
-                        softItalic: softItalic,
-                        emphasisColor: markdownEmphasisColor,
-                      )
+                    ? content ??
+                          _InlineMarkdownText(
+                            text: text,
+                            maxLines: singleLine ? 1 : null,
+                            overflow: singleLine ? TextOverflow.ellipsis : null,
+                            textAlign: textAlign,
+                            style: textStyle ?? style.systemMessageTextStyle,
+                            softItalic: softItalic,
+                            emphasisColor: markdownEmphasisColor,
+                          )
                     : _SystemMessageWithLeadingIcon(
                         iconAsset: leadingIconAsset!,
+                        content: content,
                         text: text,
                         textAlign: textAlign,
                         style: style,
@@ -95,6 +99,7 @@ class _SystemMessageWithLeadingIcon extends StatelessWidget {
   const _SystemMessageWithLeadingIcon({
     required this.iconAsset,
     required this.text,
+    this.content,
     required this.textAlign,
     required this.style,
     this.textStyle,
@@ -104,6 +109,7 @@ class _SystemMessageWithLeadingIcon extends StatelessWidget {
   });
 
   final String iconAsset;
+  final Widget? content;
   final String text;
   final TextAlign textAlign;
   final ChatUiStyleConfig style;
@@ -133,13 +139,15 @@ class _SystemMessageWithLeadingIcon extends StatelessWidget {
         ),
         const SizedBox(width: 9),
         Expanded(
-          child: _InlineMarkdownText(
-            text: text,
-            textAlign: textAlign,
-            style: resolvedTextStyle,
-            softItalic: softItalic,
-            emphasisColor: markdownEmphasisColor,
-          ),
+          child:
+              content ??
+              _InlineMarkdownText(
+                text: text,
+                textAlign: textAlign,
+                style: resolvedTextStyle,
+                softItalic: softItalic,
+                emphasisColor: markdownEmphasisColor,
+              ),
         ),
       ],
     );

@@ -33,7 +33,23 @@ class ChatNarratorMessageBubble extends StatelessWidget {
             fontWeight: FontWeight.w400,
           )
         : style.systemMessageTextStyle.copyWith(fontSize: 14);
+    final editor = ChatMessageEditorScope.controllerOf(
+      context,
+      message.localId,
+    );
     return ChatSystemMessage(
+      content: editor == null
+          ? null
+          : _ChatMessageTextEditor(
+              messageId: message.localId,
+              controller: editor,
+              style: usesScenePlate
+                  ? genesisSoftItalicStyle(
+                      narratorTextStyle,
+                      platform: Theme.of(context).platform,
+                    )
+                  : narratorTextStyle,
+            ),
       text: message.text,
       fullWidth: true,
       textAlign: TextAlign.left,

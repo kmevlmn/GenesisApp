@@ -17,6 +17,7 @@ enum LocationChatBottomReason {
   unseenMessageNotice,
   composerFocus,
   inspirationExpanded,
+  editPromptExpanded,
 }
 
 enum LocationChatBottomBehavior { jump, animate }
@@ -109,6 +110,41 @@ class LocationChatScrollCoordinator extends ChangeNotifier {
           _animateTo(target);
       }
     });
+  }
+
+  /// Reveal the entire edited row when it fits, otherwise keep its end visible.
+  void revealEditedMessage({
+    required BuildContext messageContext,
+    required BuildContext viewportContext,
+  }) {
+    if (_disposed || !controller.hasClients) return;
+    final messageBox = messageContext.findRenderObject();
+    final viewportBox = viewportContext.findRenderObject();
+    if (messageBox is! RenderBox ||
+        viewportBox is! RenderBox ||
+        !messageBox.hasSize ||
+        !viewportBox.hasSize) {
+      return;
+    }
+    final messageTop = messageBox.localToGlobal(Offset.zero).dy;
+    final messageBottom = messageTop + messageBox.size.height;
+    final viewportTop = viewportBox.localToGlobal(Offset.zero).dy + 12;
+    final viewportBottom = viewportTop + viewportBox.size.height - 24;
+    double delta = 0;
+    if (messageBottom - messageTop > viewportBottom - viewportTop ||
+        messageBottom > viewportBottom) {
+      delta = messageBottom - viewportBottom;
+    } else if (messageTop < viewportTop) {
+      delta = messageTop - viewportTop;
+    }
+    if (delta.abs() < 0.5) return;
+    _cancelPendingCommands();
+    _jumpTo(
+      (controller.position.pixels + delta).clamp(
+        controller.position.minScrollExtent,
+        controller.position.maxScrollExtent,
+      ),
+    );
   }
 
   bool handleScrollNotification(ScrollNotification notification) {
@@ -242,6 +278,7 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
     this.replyActionsMessageId,
     this.onInspirationSend,
     this.onInspirationEdit,
+    this.onEditReply,
     this.selfMessageBubbleMaxWidthCap,
     this.otherMessageBubbleMaxWidthCap,
     this.style,
@@ -266,6 +303,7 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
   final String? replyActionsMessageId;
   final ValueChanged<String>? onInspirationSend;
   final ValueChanged<String>? onInspirationEdit;
+  final VoidCallback? onEditReply;
   final double? selfMessageBubbleMaxWidthCap;
   final double? otherMessageBubbleMaxWidthCap;
   final ChatUiStyleConfig? style;
@@ -286,6 +324,7 @@ class _LocationChatAnchoredMessageListState
   late final Animation<double> _oldestEdgeLoadingAnimation;
   late List<ChatMessageVm> _renderedMessages;
   bool _inspirationExpanded = false;
+  bool _editPromptExpanded = false;
   int _inspirationPage = 0;
   List<ChatMessageVm>? _pendingMessages;
   late List<String> _messageLocalIds;
@@ -326,6 +365,7 @@ class _LocationChatAnchoredMessageListState
     if (oldWidget.active != widget.active ||
         oldWidget.replyActionsMessageId != widget.replyActionsMessageId) {
       _inspirationExpanded = false;
+      _editPromptExpanded = false;
       _inspirationPage = 0;
     }
     if (oldWidget.coordinator != widget.coordinator) {
@@ -1030,6 +1070,17 @@ class _LocationChatAnchoredMessageListState
                 key: ValueKey('reply-actions-${current.localId}'),
                 onInspirationSend: widget.onInspirationSend,
                 onInspirationEdit: widget.onInspirationEdit,
+                onEditReply: widget.onEditReply,
+                editPromptExpanded: _editPromptExpanded,
+                onEditPromptExpandedChanged: (expanded) {
+                  setState(() => _editPromptExpanded = expanded);
+                  if (expanded) {
+                    widget.coordinator.requestBottom(
+                      reason: LocationChatBottomReason.editPromptExpanded,
+                      behavior: LocationChatBottomBehavior.animate,
+                    );
+                  }
+                },
                 inspirationExpanded: _inspirationExpanded,
                 inspirationPage: _inspirationPage,
                 onInspirationPageChanged: (page) => _inspirationPage = page,

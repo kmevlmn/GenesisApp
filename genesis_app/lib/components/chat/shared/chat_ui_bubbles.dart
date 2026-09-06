@@ -47,14 +47,24 @@ class ChatMessageBubble extends StatelessWidget {
     final text = message.error == null
         ? message.text
         : '${message.text}\n${message.error}';
+    final editor = ChatMessageEditorScope.controllerOf(
+      context,
+      message.localId,
+    );
     final bubble = Container(
       key: ValueKey<String>('chat-message-bubble-${message.localId}'),
       padding: style.bubblePadding,
       decoration: BoxDecoration(color: background, borderRadius: borderRadius),
-      child: _InlineMarkdownText(
-        text: text.isEmpty ? '...' : text,
-        style: style.bubbleTextStyle,
-      ),
+      child: editor != null
+          ? _ChatMessageTextEditor(
+              messageId: message.localId,
+              controller: editor,
+              style: style.bubbleTextStyle,
+            )
+          : _InlineMarkdownText(
+              text: text.isEmpty ? '...' : text,
+              style: style.bubbleTextStyle,
+            ),
     );
     return GestureDetector(
       onTap: onTap,

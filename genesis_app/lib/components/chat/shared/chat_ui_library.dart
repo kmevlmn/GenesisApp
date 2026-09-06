@@ -31,6 +31,7 @@ export 'chat_mention.dart';
 export 'chat_ui_style_config.dart';
 
 part 'chat_ui_message_model.dart';
+part 'chat_ui_message_editor.dart';
 part 'chat_ui_header.dart';
 part 'chat_ui_composer.dart';
 part 'chat_ui_message_lists.dart';

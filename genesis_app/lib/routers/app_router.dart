@@ -39,6 +39,7 @@ sealed class RouteNames {
   static const world = '/world';
   static const chat = '/chat';
   static const locationChat = '/location_chat';
+  static const locationChatEdit = '/location_chat/edit';
   static const search = '/search';
   static const create = '/create';
   static const edit = '/edit';
@@ -585,6 +586,18 @@ sealed class AppRouter {
             peerAvatar: args.peerAvatar,
             conversationId: args.conversationId,
           ),
+        );
+      case RouteNames.locationChatEdit:
+        final args = settings.arguments;
+        if (args is! LocationChatEditPageArgs) {
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => const PageNotFoundPage(),
+          );
+        }
+        return MaterialPageRoute<LocationChatEditResult>(
+          settings: settings,
+          builder: (_) => LocationChatEditPage(args: args),
         );
       case RouteNames.locationChat:
         final args = _LocationChatRouteArgs.from(settings.arguments);

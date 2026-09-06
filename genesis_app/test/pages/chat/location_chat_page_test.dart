@@ -1656,6 +1656,156 @@ void main() {
     expect(selectedModelCodeFromUserInfo({'uid': 'u_1'}), isEmpty);
   });
 
+  testWidgets(
+    'reply Edit opens from a nested navigator and Done updates local chat',
+    (tester) async {
+      final harness = await _connectedLocationChatTestService();
+      await tester.pumpWidget(
+        AppServicesScope(
+          services: harness.services,
+          child: MaterialApp(
+            scrollBehavior: const GenesisScrollBehavior(),
+            onGenerateRoute: AppRouter.onGenerateRoute,
+            home: Navigator(
+              requestFocus: false,
+              pages: [
+                MaterialPage<void>(
+                  child: LocationChatPanel(
+                    worldId: 'world-current',
+                    locationId: 'location-current',
+                    service: harness.service,
+                    leaveOnInactive: false,
+                    messageQueueInitializationCovered: true,
+                  ),
+                ),
+              ],
+              onDidRemovePage: (_) {},
+            ),
+          ),
+        ),
+      );
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => harness.service.state.joinedLocationId == 'location-current',
+      );
+      harness.socket.serverV2StreamFrame(
+        streamType: 'llm_stream_end',
+        roundId: 301,
+        messageId: 302,
+        content: 'Original reply.',
+      );
+      harness.socket.serverEndConversationRound(roundId: 301);
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => find.bySemanticsLabel('Edit').evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+      final originalHeaderHeight = tester
+          .getSize(find.byType(ChatHeader))
+          .height;
+      await tester.tap(find.bySemanticsLabel('Edit'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LocationChatEditPage), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('edit-subscription-prompt')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('edit-subscription-prompt'),
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSize(find.byType(ChatHeader)).height,
+        originalHeaderHeight,
+      );
+      expect(find.byType(ChatComposer), findsNothing);
+      await tester.enterText(find.byType(TextField), 'Saved local reply.');
+      await tester.tap(find.byKey(const ValueKey('location-chat-edit-done')));
+      await tester.pumpAndSettle();
+      expect(find.byType(LocationChatEditPage), findsNothing);
+      expect(
+        find.byKey(const ValueKey('edit-subscription-prompt')),
+        findsOneWidget,
+      );
+      var list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.any((message) => message.text == 'Saved local reply.'),
+        isTrue,
+      );
+      expect(
+        harness
+            .service
+            .state
+            .messagesByLocation['location-current']!
+            .last
+            .content,
+        'Original reply.',
+      );
+      tester.widget<ChatComposer>(find.byType(ChatComposer)).controller.text =
+          'Draft';
+      await tester.pump();
+      list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.any((message) => message.text == 'Saved local reply.'),
+        isTrue,
+      );
+      await tester.tap(find.bySemanticsLabel('Edit'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'Saved local reply.',
+      );
+      await tester.enterText(find.byType(TextField), 'Discarded change');
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
+      await tester.pumpAndSettle();
+      list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.any((message) => message.text == 'Saved local reply.'),
+        isTrue,
+      );
+      await tester.tap(find.bySemanticsLabel('Edit'));
+      await tester.pumpAndSettle();
+      final messageId = list.messages
+          .firstWhere((message) => message.text == 'Saved local reply.')
+          .localId;
+      await tester.tap(
+        find.byKey(ValueKey('location-chat-edit-delete-$messageId')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('location-chat-edit-done')));
+      await tester.pumpAndSettle();
+      list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.any((message) => message.localId == messageId),
+        isFalse,
+      );
+      expect(
+        harness
+            .service
+            .state
+            .messagesByLocation['location-current']!
+            .last
+            .content,
+        'Original reply.',
+      );
+      expect(harness.socket.sendMessageCount, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      unawaited(harness.service.dispose());
+    },
+  );
+
   testWidgets('inspiration uses the composer focus and existing send flow', (
     tester,
   ) async {
