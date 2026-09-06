@@ -1,6 +1,6 @@
 part of 'chat_ui_library.dart';
 
-Color _chatNarratorMessageBackgroundColor(ChatUiStyleConfig style) {
+Color chatNarratorMessageBackgroundColor(ChatUiStyleConfig style) {
   if (!style.useScenePlateBubbleGeometry ||
       style.useConfiguredScenePlateSystemStyle) {
     return style.systemMessageBackgroundColor;
@@ -38,7 +38,7 @@ class ChatNarratorMessageBubble extends StatelessWidget {
       fullWidth: true,
       textAlign: TextAlign.left,
       leadingIconAsset: paragraphIconAsset,
-      backgroundColor: _chatNarratorMessageBackgroundColor(style),
+      backgroundColor: chatNarratorMessageBackgroundColor(style),
       textStyle: narratorTextStyle,
       leadingIconColor: usesScenePlate
           ? usesConfiguredSystemStyle

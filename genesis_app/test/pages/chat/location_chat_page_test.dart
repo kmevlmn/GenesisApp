@@ -1951,6 +1951,15 @@ void main() {
     );
     await tester.pump();
     expect(tester.widget<ChatComposer>(composerFinder).sendEnabled, isFalse);
+    expect(
+      tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .replyActionsMessageId,
+      isNull,
+      reason: 'Reply actions stay hidden until the entire round finishes.',
+    );
 
     await tester.widget<ChatComposer>(composerFinder).onSend();
     expect(socket.sendMessageCount, 0);
@@ -1973,6 +1982,15 @@ void main() {
       () => service.state.streamMessagesByKey.isNotEmpty,
     );
     expect(tester.widget<ChatComposer>(composerFinder).sendEnabled, isFalse);
+    expect(
+      tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .replyActionsMessageId,
+      isNull,
+      reason: 'Reply actions stay hidden until the entire round finishes.',
+    );
 
     socket.serverV2StreamFrame(
       streamType: 'llm_stream_end',
@@ -1986,6 +2004,15 @@ void main() {
     );
     await tester.pump();
     expect(tester.widget<ChatComposer>(composerFinder).sendEnabled, isFalse);
+    expect(
+      tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .replyActionsMessageId,
+      isNull,
+      reason: 'Reply actions stay hidden until the entire round finishes.',
+    );
 
     socket.serverEndConversationRound(roundId: 301);
     await _pumpUntilLocationChatTest(
@@ -1996,6 +2023,15 @@ void main() {
     );
     await tester.pump();
     expect(tester.widget<ChatComposer>(composerFinder).sendEnabled, isTrue);
+    expect(
+      tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .replyActionsMessageId,
+      isNotNull,
+      reason: 'Reply actions appear after the final content and round end.',
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

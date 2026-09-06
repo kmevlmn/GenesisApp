@@ -837,6 +837,26 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
     );
     final headerHeight = _locationChatHeaderHeight(style);
     final displayMessages = _locationChatDisplayMessages();
+    // A finished individual stream does not mean the whole round is finished.
+    // Only reveal the visual actions once all reply content is available.
+    final repliesInProgress =
+        _sending ||
+        _sendAwaitingResponse ||
+        inputBlocked ||
+        widget.worldTickInProgress ||
+        _awaitingTickProgressMessage ||
+        displayMessages.any((message) => message.status == 'streaming');
+    final replyActionsMessageId = repliesInProgress
+        ? null
+        : displayMessages.reversed
+              .where(
+                (message) =>
+                    !message.isMe &&
+                    (!message.isSystem || message.isNarrator) &&
+                    !message.isTimelineEvent,
+              )
+              .firstOrNull
+              ?.localId;
     final managesKeyboardInset = locationChatManagesKeyboardInsetForTesting(
       platform: Theme.of(context).platform,
       androidSdkInt: _androidSdkInt,
@@ -849,6 +869,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         coordinator: _scrollCoordinator,
         messages: displayMessages,
         messageLayoutId: _locationChatMessageLayoutId,
+        replyActionsMessageId: replyActionsMessageId,
         topTitle: '',
         oldestEdgeLoading: _showOlderMessagesLoading,
         onOldestEdgeLoadingCollapsed: _handleOlderMessagesLoadingCollapsed,

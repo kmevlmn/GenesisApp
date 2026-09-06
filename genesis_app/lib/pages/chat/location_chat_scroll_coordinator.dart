@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart'
         SliverMultiBoxAdaptorParentData;
 
 import '../../components/chat/shared/chat_ui.dart';
+import 'location_chat_reply_actions.dart';
 
 enum LocationChatViewportMode { initializing, followingLatest, detached }
 
@@ -232,6 +233,7 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
     this.onOldestEdgeLoadingCollapsed,
     this.showDateDividers = true,
     this.messageLayoutId,
+    this.replyActionsMessageId,
     this.selfMessageBubbleMaxWidthCap,
     this.otherMessageBubbleMaxWidthCap,
     this.style,
@@ -250,6 +252,9 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
   final VoidCallback? onOldestEdgeLoadingCollapsed;
   final bool showDateDividers;
   final String Function(ChatMessageVm message)? messageLayoutId;
+
+  /// Presentation-only marker; does not determine round or action eligibility.
+  final String? replyActionsMessageId;
   final double? selfMessageBubbleMaxWidthCap;
   final double? otherMessageBubbleMaxWidthCap;
   final ChatUiStyleConfig? style;
@@ -970,21 +975,42 @@ class _LocationChatAnchoredMessageListState
         : _renderedMessages[messageIndex - 1];
     final layoutId = _messageLayoutId(current);
     final layoutKey = _messageLayoutKeys.putIfAbsent(layoutId, GlobalKey.new);
+    final showReplyActions = current.localId == widget.replyActionsMessageId;
     final row = KeyedSubtree(
       key: layoutKey,
-      child: ChatMessageRow(
-        key: ValueKey(layoutId),
-        message: current,
-        imageViewerMessages: _renderedMessages,
-        style: style,
-        selfMessageBubbleMaxWidthCap: widget.selfMessageBubbleMaxWidthCap,
-        otherMessageBubbleMaxWidthCap: widget.otherMessageBubbleMaxWidthCap,
-        onMessageLongPressStart: widget.onMessageLongPressStart,
-        onFailedMessageTap: widget.onFailedMessageTap,
-        onCharactersMovedLocationTap: widget.onCharactersMovedLocationTap,
-        showDateDivider:
-            widget.showDateDividers &&
-            shouldShowChatDateDivider(previous?.createdAt, current.createdAt),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ChatMessageRow(
+            key: ValueKey(layoutId),
+            message: current,
+            imageViewerMessages: _renderedMessages,
+            style: showReplyActions
+                ? style.copyWith(
+                    rowBottomPadding: LocationChatReplyActions.contentBottomGap,
+                    systemMessageMargin: style.systemMessageMargin.copyWith(
+                      bottom: LocationChatReplyActions.contentBottomGap,
+                    ),
+                  )
+                : style,
+            selfMessageBubbleMaxWidthCap: widget.selfMessageBubbleMaxWidthCap,
+            otherMessageBubbleMaxWidthCap: widget.otherMessageBubbleMaxWidthCap,
+            onMessageLongPressStart: widget.onMessageLongPressStart,
+            onFailedMessageTap: widget.onFailedMessageTap,
+            onCharactersMovedLocationTap: widget.onCharactersMovedLocationTap,
+            showDateDivider:
+                widget.showDateDividers &&
+                shouldShowChatDateDivider(
+                  previous?.createdAt,
+                  current.createdAt,
+                ),
+          ),
+          if (showReplyActions)
+            Padding(
+              padding: EdgeInsets.only(bottom: style.rowBottomPadding),
+              child: LocationChatReplyActions(style: style),
+            ),
+        ],
       ),
     );
     if (!lazy) return row;
