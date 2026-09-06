@@ -16,6 +16,7 @@ enum LocationChatBottomReason {
   sentMessage,
   unseenMessageNotice,
   composerFocus,
+  inspirationExpanded,
 }
 
 enum LocationChatBottomBehavior { jump, animate }
@@ -111,6 +112,10 @@ class LocationChatScrollCoordinator extends ChangeNotifier {
   }
 
   bool handleScrollNotification(ScrollNotification notification) {
+    // Nested horizontal carousels must not change conversation anchoring.
+    if (notification.metrics.axis != Axis.vertical || notification.depth != 0) {
+      return false;
+    }
     if (notification is ScrollStartNotification &&
         notification.dragDetails != null) {
       _userDragActive = true;
@@ -234,6 +239,8 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
     this.showDateDividers = true,
     this.messageLayoutId,
     this.replyActionsMessageId,
+    this.onInspirationSend,
+    this.onInspirationEdit,
     this.selfMessageBubbleMaxWidthCap,
     this.otherMessageBubbleMaxWidthCap,
     this.style,
@@ -255,6 +262,8 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
 
   /// Presentation-only marker; does not determine round or action eligibility.
   final String? replyActionsMessageId;
+  final ValueChanged<String>? onInspirationSend;
+  final ValueChanged<String>? onInspirationEdit;
   final double? selfMessageBubbleMaxWidthCap;
   final double? otherMessageBubbleMaxWidthCap;
   final ChatUiStyleConfig? style;
@@ -274,6 +283,8 @@ class _LocationChatAnchoredMessageListState
   late final AnimationController _oldestEdgeLoadingController;
   late final Animation<double> _oldestEdgeLoadingAnimation;
   late List<ChatMessageVm> _renderedMessages;
+  bool _inspirationExpanded = false;
+  int _inspirationPage = 0;
   List<ChatMessageVm>? _pendingMessages;
   late List<String> _messageLocalIds;
   int _historyCommitGeneration = 0;
@@ -310,6 +321,10 @@ class _LocationChatAnchoredMessageListState
   @override
   void didUpdateWidget(LocationChatAnchoredMessageList oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.replyActionsMessageId != widget.replyActionsMessageId) {
+      _inspirationExpanded = false;
+      _inspirationPage = 0;
+    }
     if (oldWidget.coordinator != widget.coordinator) {
       oldWidget.coordinator.removeListener(_handleCoordinatorChanged);
       widget.coordinator.addListener(_handleCoordinatorChanged);
@@ -1008,7 +1023,26 @@ class _LocationChatAnchoredMessageListState
           if (showReplyActions)
             Padding(
               padding: EdgeInsets.only(bottom: style.rowBottomPadding),
-              child: LocationChatReplyActions(style: style),
+              child: LocationChatReplyActions(
+                key: ValueKey('reply-actions-${current.localId}'),
+                onInspirationSend: widget.onInspirationSend,
+                onInspirationEdit: widget.onInspirationEdit,
+                inspirationExpanded: _inspirationExpanded,
+                inspirationPage: _inspirationPage,
+                onInspirationPageChanged: (page) => _inspirationPage = page,
+                onInspirationExpandedChanged: (expanded) {
+                  setState(() => _inspirationExpanded = expanded);
+                  if (expanded) {
+                    widget.coordinator.requestBottom(
+                      reason: LocationChatBottomReason.inspirationExpanded,
+                      behavior: LocationChatBottomBehavior.animate,
+                    );
+                  }
+                },
+                style: style,
+                selfMessageBubbleMaxWidthCap:
+                    widget.selfMessageBubbleMaxWidthCap,
+              ),
             ),
         ],
       ),

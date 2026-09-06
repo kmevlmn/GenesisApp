@@ -7,12 +7,14 @@ class ChatMessageBubble extends StatelessWidget {
     this.onLongPressStart,
     this.onTap,
     this.style,
+    this.borderRadius,
   });
 
   final ChatMessageVm message;
   final GestureLongPressStartCallback? onLongPressStart;
   final VoidCallback? onTap;
   final ChatUiStyleConfig? style;
+  final BorderRadius? borderRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -28,18 +30,20 @@ class ChatMessageBubble extends StatelessWidget {
     final background = message.isMe
         ? style.selfBubbleColor
         : style.otherBubbleColor;
-    final borderRadius = !style.useScenePlateBubbleGeometry
-        ? BorderRadius.circular(style.systemMessageBorderRadius)
-        : usesSelfScenePlate
-        ? kChatScenePlateSelfBubbleBorderRadius
-        : usesAiScenePlate
-        ? kChatScenePlateAiBubbleBorderRadius
-        : BorderRadius.only(
-            topLeft: Radius.zero,
-            topRight: Radius.circular(style.bubbleBorderRadius),
-            bottomRight: Radius.circular(style.bubbleBorderRadius),
-            bottomLeft: Radius.circular(style.bubbleBorderRadius),
-          );
+    final borderRadius =
+        this.borderRadius ??
+        (!style.useScenePlateBubbleGeometry
+            ? BorderRadius.circular(style.systemMessageBorderRadius)
+            : usesSelfScenePlate
+            ? kChatScenePlateSelfBubbleBorderRadius
+            : usesAiScenePlate
+            ? kChatScenePlateAiBubbleBorderRadius
+            : BorderRadius.only(
+                topLeft: Radius.zero,
+                topRight: Radius.circular(style.bubbleBorderRadius),
+                bottomRight: Radius.circular(style.bubbleBorderRadius),
+                bottomLeft: Radius.circular(style.bubbleBorderRadius),
+              ));
     final text = message.error == null
         ? message.text
         : '${message.text}\n${message.error}';

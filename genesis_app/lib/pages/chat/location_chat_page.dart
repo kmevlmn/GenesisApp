@@ -870,6 +870,8 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         messages: displayMessages,
         messageLayoutId: _locationChatMessageLayoutId,
         replyActionsMessageId: replyActionsMessageId,
+        onInspirationSend: (text) => unawaited(_send(textOverride: text)),
+        onInspirationEdit: _editInspiration,
         topTitle: '',
         oldestEdgeLoading: _showOlderMessagesLoading,
         onOldestEdgeLoadingCollapsed: _handleOlderMessagesLoadingCollapsed,

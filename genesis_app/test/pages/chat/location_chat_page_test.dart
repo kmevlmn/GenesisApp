@@ -34,6 +34,7 @@ import 'package:genesis_flutter_android/platform/session/memory_user_session_sto
 import 'package:genesis_flutter_android/routers/app_router.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_character_avatar.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_avatar_radii.dart';
+import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
 
 String _readLocationChatImplementationSource() {
   return [
@@ -1653,6 +1654,71 @@ void main() {
 
   test('selected model code is empty when cache has no model field', () {
     expect(selectedModelCodeFromUserInfo({'uid': 'u_1'}), isEmpty);
+  });
+
+  testWidgets('inspiration uses the composer focus and existing send flow', (
+    tester,
+  ) async {
+    final harness = await _connectedLocationChatTestService();
+    await tester.pumpWidget(
+      AppServicesScope(
+        services: harness.services,
+        child: MaterialApp(
+          scrollBehavior: const GenesisScrollBehavior(),
+          home: LocationChatPanel(
+            worldId: 'world-current',
+            locationId: 'location-current',
+            service: harness.service,
+            leaveOnInactive: false,
+            messageQueueInitializationCovered: true,
+          ),
+        ),
+      ),
+    );
+    await _pumpUntilLocationChatTest(
+      tester,
+      () => harness.service.state.joinedLocationId == 'location-current',
+    );
+    final list = tester.widget<LocationChatAnchoredMessageList>(
+      find.byType(LocationChatAnchoredMessageList),
+    );
+    list.onInspirationEdit!('Good job!');
+    await tester.pump();
+    final composer = tester.widget<ChatComposer>(find.byType(ChatComposer));
+    expect(composer.controller.text, 'Good job!');
+    expect(composer.controller.selection.baseOffset, 'Good job!'.length);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+      isTrue,
+    );
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(harness.socket.sendMessageCount, 0);
+
+    tester.testTextInput.hide();
+    list.onInspirationEdit!('Edit while still focused.');
+    await tester.pump();
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(composer.controller.text, 'Edit while still focused.');
+
+    list.onInspirationSend!('A different suggestion.');
+    await _pumpUntilLocationChatTest(
+      tester,
+      () => harness.socket.sendMessageCount == 1,
+    );
+    final frame = harness.socket._sentFrames.lastWhere(
+      (frame) => frame['type'] == 'send_message',
+    );
+    expect(frame['payload']['content'], 'A different suggestion.');
+    expect(composer.controller.text, isEmpty);
+    // Busy send guards also apply to inspiration taps.
+    list.onInspirationSend!('Do not duplicate.');
+    await tester.pump();
+    expect(harness.socket.sendMessageCount, 1);
+    harness.socket.serverV2AckForLatestSend(errNo: 4001);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    unawaited(harness.service.dispose());
   });
 
   testWidgets(
