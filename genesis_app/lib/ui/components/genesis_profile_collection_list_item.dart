@@ -218,13 +218,17 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
                       height: 28,
                       child: Align(
                         alignment: Alignment.topRight,
-                        child: SvgPicture.asset(
-                          editPencilLineIconAsset,
-                          width: 16,
-                          height: 16,
-                          colorFilter: const ColorFilter.mode(
-                            Color(0xFF4B6192),
-                            BlendMode.srcIn,
+                        child: Transform.scale(
+                          // Match the previous edit icon within its existing layout slot.
+                          scale: 32 / 37.36,
+                          child: SvgPicture.asset(
+                            editSquareIconAsset,
+                            width: 16,
+                            height: 16,
+                            colorFilter: const ColorFilter.mode(
+                              Color(0xFF4B6192),
+                              BlendMode.srcIn,
+                            ),
                           ),
                         ),
                       ),

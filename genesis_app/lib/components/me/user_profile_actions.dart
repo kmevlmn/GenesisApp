@@ -336,11 +336,18 @@ class _ProfileEditButton extends StatelessWidget {
         height: 24,
         child: Align(
           alignment: Alignment.bottomCenter,
-          child: SvgPicture.asset(
-            editPencilLineIconAsset,
-            width: 18,
-            height: 18,
-            colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+          child: Transform.scale(
+            // Match the previous edit icon within its existing layout slot.
+            scale: 32 / 37.36,
+            child: SvgPicture.asset(
+              editSquareIconAsset,
+              width: 18,
+              height: 18,
+              colorFilter: const ColorFilter.mode(
+                Colors.black,
+                BlendMode.srcIn,
+              ),
+            ),
           ),
         ),
       ),
