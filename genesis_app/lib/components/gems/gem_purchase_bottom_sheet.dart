@@ -16,6 +16,7 @@ import '../common/genesis_modal_routes.dart';
 import 'gem_billing_purchase_dialog.dart';
 import 'gem_colors.dart';
 import 'gem_purchase_catalog.dart';
+import 'purchase_options_sheet.dart';
 
 typedef GemPurchaseProductsLoader = Future<List<GemProduct>> Function();
 
@@ -56,12 +57,45 @@ Future<void> showGemPurchaseBottomSheet(
       key: const ValueKey<String>('gem-purchase-sheet-size'),
       heightFactor: 0.8,
       alignment: Alignment.bottomCenter,
-      child: GemPurchaseBottomSheet(
-        alert: alert,
-        productsLoader: resolvedProductsLoader,
-        walletStore: resolvedWalletStore,
-        billingService: resolvedBillingService,
-        payTrackPageId: payTrackPageId,
+      child: PurchaseOptionsSheet(
+        gemsBuilder: (_) => GemPurchaseBottomSheet(
+          embedded: true,
+          alert: alert,
+          productsLoader: resolvedProductsLoader,
+          walletStore: resolvedWalletStore,
+          billingService: resolvedBillingService,
+          payTrackPageId: payTrackPageId,
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> showSubscriptionPurchaseBottomSheet(BuildContext context) async {
+  final services = AppServicesScope.maybeRead(context);
+  final billingService = services?.billing;
+  final payTrackPageId = newBillingTrackPageId();
+  await showGenesisModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => FractionallySizedBox(
+      heightFactor: 0.8,
+      alignment: Alignment.bottomCenter,
+      child: PurchaseOptionsSheet(
+        initialTab: PurchaseSheetTab.subscription,
+        gemsBuilder: (_) => services == null || billingService == null
+            ? const SizedBox.expand()
+            : GemPurchaseBottomSheet(
+                embedded: true,
+                alert: const GemBalanceAlert(kind: GemBalanceAlertKind.low),
+                productsLoader: () async =>
+                    (await services.api.v1.gem.products()).products,
+                walletStore: services.gemWallet,
+                billingService: billingService,
+                payTrackPageId: payTrackPageId,
+              ),
       ),
     ),
   );
@@ -89,6 +123,7 @@ class GemPurchaseBottomSheet extends StatefulWidget {
     required this.walletStore,
     required this.billingService,
     required this.payTrackPageId,
+    this.embedded = false,
   });
 
   final GemBalanceAlert alert;
@@ -96,6 +131,7 @@ class GemPurchaseBottomSheet extends StatefulWidget {
   final GemWalletStore walletStore;
   final BillingService billingService;
   final String payTrackPageId;
+  final bool embedded;
 
   @override
   State<GemPurchaseBottomSheet> createState() => _GemPurchaseBottomSheetState();
@@ -294,6 +330,28 @@ class _GemPurchaseBottomSheetState extends State<GemPurchaseBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final content = SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 14),
+      child: ValueListenableBuilder<GemWalletState>(
+        valueListenable: widget.walletStore.state,
+        builder: (context, walletState, _) => GemPurchaseCatalogSection(
+          balanceCent: walletState.balanceCent ?? 0,
+          balanceKey: const ValueKey<String>('gem-purchase-sheet-balance'),
+          catalog: _buildProducts(),
+        ),
+      ),
+    );
+    if (widget.embedded) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(_title, style: GenesisBottomSheetPanel.titleStyle),
+          const SizedBox(height: 20),
+          Expanded(child: content),
+        ],
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         return GenesisBottomSheetPanel(
@@ -304,20 +362,7 @@ class _GemPurchaseBottomSheetState extends State<GemPurchaseBottomSheet> {
             buttonKey: const ValueKey<String>('gem-purchase-sheet-close'),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 14),
-            child: ValueListenableBuilder<GemWalletState>(
-              valueListenable: widget.walletStore.state,
-              builder: (context, walletState, _) => GemPurchaseCatalogSection(
-                balanceCent: walletState.balanceCent ?? 0,
-                balanceKey: const ValueKey<String>(
-                  'gem-purchase-sheet-balance',
-                ),
-                catalog: _buildProducts(),
-              ),
-            ),
-          ),
+          child: content,
         );
       },
     );

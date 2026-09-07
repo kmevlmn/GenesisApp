@@ -34,6 +34,7 @@ import 'package:genesis_flutter_android/platform/session/memory_user_session_sto
 import 'package:genesis_flutter_android/routers/app_router.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_character_avatar.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_avatar_radii.dart';
+import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
 
 String _readLocationChatImplementationSource() {
   return [
@@ -1656,6 +1657,221 @@ void main() {
   });
 
   testWidgets(
+    'reply Edit opens from a nested navigator and Done updates local chat',
+    (tester) async {
+      final harness = await _connectedLocationChatTestService();
+      await tester.pumpWidget(
+        AppServicesScope(
+          services: harness.services,
+          child: MaterialApp(
+            scrollBehavior: const GenesisScrollBehavior(),
+            onGenerateRoute: AppRouter.onGenerateRoute,
+            home: Navigator(
+              requestFocus: false,
+              pages: [
+                MaterialPage<void>(
+                  child: LocationChatPanel(
+                    worldId: 'world-current',
+                    locationId: 'location-current',
+                    service: harness.service,
+                    leaveOnInactive: false,
+                    messageQueueInitializationCovered: true,
+                  ),
+                ),
+              ],
+              onDidRemovePage: (_) {},
+            ),
+          ),
+        ),
+      );
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => harness.service.state.joinedLocationId == 'location-current',
+      );
+      harness.socket.serverV2StreamFrame(
+        streamType: 'llm_stream_end',
+        roundId: 301,
+        messageId: 302,
+        content: 'Original reply.',
+      );
+      harness.socket.serverEndConversationRound(roundId: 301);
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => find.bySemanticsLabel('Edit').evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+      final originalHeaderHeight = tester
+          .getSize(find.byType(ChatHeader))
+          .height;
+      await tester.tap(find.bySemanticsLabel('Edit'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LocationChatEditPage), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('edit-subscription-prompt')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('edit-subscription-prompt'),
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSize(find.byType(ChatHeader)).height,
+        originalHeaderHeight,
+      );
+      expect(find.byType(ChatComposer), findsNothing);
+      await tester.enterText(find.byType(TextField), 'Saved local reply.');
+      await tester.tap(find.byKey(const ValueKey('location-chat-edit-done')));
+      await tester.pumpAndSettle();
+      expect(find.byType(LocationChatEditPage), findsNothing);
+      expect(
+        find.byKey(const ValueKey('edit-subscription-prompt')),
+        findsOneWidget,
+      );
+      var list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.any((message) => message.text == 'Saved local reply.'),
+        isTrue,
+      );
+      expect(
+        harness
+            .service
+            .state
+            .messagesByLocation['location-current']!
+            .last
+            .content,
+        'Original reply.',
+      );
+      tester.widget<ChatComposer>(find.byType(ChatComposer)).controller.text =
+          'Draft';
+      await tester.pump();
+      list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.any((message) => message.text == 'Saved local reply.'),
+        isTrue,
+      );
+      await tester.tap(find.bySemanticsLabel('Edit'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'Saved local reply.',
+      );
+      await tester.enterText(find.byType(TextField), 'Discarded change');
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
+      await tester.pumpAndSettle();
+      list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.any((message) => message.text == 'Saved local reply.'),
+        isTrue,
+      );
+      await tester.tap(find.bySemanticsLabel('Edit'));
+      await tester.pumpAndSettle();
+      final messageId = list.messages
+          .firstWhere((message) => message.text == 'Saved local reply.')
+          .localId;
+      await tester.tap(
+        find.byKey(ValueKey('location-chat-edit-delete-$messageId')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('location-chat-edit-done')));
+      await tester.pumpAndSettle();
+      list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.any((message) => message.localId == messageId),
+        isFalse,
+      );
+      expect(
+        harness
+            .service
+            .state
+            .messagesByLocation['location-current']!
+            .last
+            .content,
+        'Original reply.',
+      );
+      expect(harness.socket.sendMessageCount, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      unawaited(harness.service.dispose());
+    },
+  );
+
+  testWidgets('inspiration uses the composer focus and existing send flow', (
+    tester,
+  ) async {
+    final harness = await _connectedLocationChatTestService();
+    await tester.pumpWidget(
+      AppServicesScope(
+        services: harness.services,
+        child: MaterialApp(
+          scrollBehavior: const GenesisScrollBehavior(),
+          home: LocationChatPanel(
+            worldId: 'world-current',
+            locationId: 'location-current',
+            service: harness.service,
+            leaveOnInactive: false,
+            messageQueueInitializationCovered: true,
+          ),
+        ),
+      ),
+    );
+    await _pumpUntilLocationChatTest(
+      tester,
+      () => harness.service.state.joinedLocationId == 'location-current',
+    );
+    final list = tester.widget<LocationChatAnchoredMessageList>(
+      find.byType(LocationChatAnchoredMessageList),
+    );
+    list.onInspirationEdit!('Good job!');
+    await tester.pump();
+    final composer = tester.widget<ChatComposer>(find.byType(ChatComposer));
+    expect(composer.controller.text, 'Good job!');
+    expect(composer.controller.selection.baseOffset, 'Good job!'.length);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+      isTrue,
+    );
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(harness.socket.sendMessageCount, 0);
+
+    tester.testTextInput.hide();
+    list.onInspirationEdit!('Edit while still focused.');
+    await tester.pump();
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(composer.controller.text, 'Edit while still focused.');
+
+    list.onInspirationSend!('A different suggestion.');
+    await _pumpUntilLocationChatTest(
+      tester,
+      () => harness.socket.sendMessageCount == 1,
+    );
+    final frame = harness.socket._sentFrames.lastWhere(
+      (frame) => frame['type'] == 'send_message',
+    );
+    expect(frame['payload']['content'], 'A different suggestion.');
+    expect(composer.controller.text, isEmpty);
+    // Busy send guards also apply to inspiration taps.
+    list.onInspirationSend!('Do not duplicate.');
+    await tester.pump();
+    expect(harness.socket.sendMessageCount, 1);
+    harness.socket.serverV2AckForLatestSend(errNo: 4001);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    unawaited(harness.service.dispose());
+  });
+
+  testWidgets(
     'location chat records one message_sent across transport retries',
     (WidgetTester tester) async {
       final analytics = _enableLocationChatAnalyticsForTesting(
@@ -1951,6 +2167,15 @@ void main() {
     );
     await tester.pump();
     expect(tester.widget<ChatComposer>(composerFinder).sendEnabled, isFalse);
+    expect(
+      tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .replyActionsMessageId,
+      isNull,
+      reason: 'Reply actions stay hidden until the entire round finishes.',
+    );
 
     await tester.widget<ChatComposer>(composerFinder).onSend();
     expect(socket.sendMessageCount, 0);
@@ -1973,6 +2198,15 @@ void main() {
       () => service.state.streamMessagesByKey.isNotEmpty,
     );
     expect(tester.widget<ChatComposer>(composerFinder).sendEnabled, isFalse);
+    expect(
+      tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .replyActionsMessageId,
+      isNull,
+      reason: 'Reply actions stay hidden until the entire round finishes.',
+    );
 
     socket.serverV2StreamFrame(
       streamType: 'llm_stream_end',
@@ -1986,6 +2220,15 @@ void main() {
     );
     await tester.pump();
     expect(tester.widget<ChatComposer>(composerFinder).sendEnabled, isFalse);
+    expect(
+      tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .replyActionsMessageId,
+      isNull,
+      reason: 'Reply actions stay hidden until the entire round finishes.',
+    );
 
     socket.serverEndConversationRound(roundId: 301);
     await _pumpUntilLocationChatTest(
@@ -1996,6 +2239,15 @@ void main() {
     );
     await tester.pump();
     expect(tester.widget<ChatComposer>(composerFinder).sendEnabled, isTrue);
+    expect(
+      tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .replyActionsMessageId,
+      isNotNull,
+      reason: 'Reply actions appear after the final content and round end.',
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

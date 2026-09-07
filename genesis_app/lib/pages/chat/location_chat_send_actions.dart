@@ -31,7 +31,17 @@ extension _LocationChatSendActions on _LocationChatPanelState {
     });
   }
 
-  Future<void> _send() async {
+  void _editInspiration(String text) {
+    _textController.setSerializedText(text);
+    if (_composerFocusNode.hasFocus) {
+      // The system back button can hide the keyboard without dropping focus.
+      unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.show'));
+    } else {
+      _composerFocusNode.requestFocus();
+    }
+  }
+
+  Future<void> _send({String? textOverride}) async {
     final service = _service;
     if (service == null ||
         _chatroomState.joinedLocationId != widget.locationId ||
@@ -41,7 +51,7 @@ extension _LocationChatSendActions on _LocationChatPanelState {
       return;
     }
     final text = normalizeGenesisUgcTextForDisplay(
-      _textController.serializedText,
+      textOverride ?? _textController.serializedText,
     );
     if (isGenesisUgcTextBlank(text)) return;
 

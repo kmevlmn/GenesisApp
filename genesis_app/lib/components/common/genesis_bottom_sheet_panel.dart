@@ -43,6 +43,7 @@ class GenesisBottomSheetPanel extends StatelessWidget {
     this.padding = const EdgeInsets.fromLTRB(16, 20, 16, 14),
     this.titleBottomSpacing = 20,
     this.titleTextStyle,
+    this.titleWidget,
     this.maintainBottomViewPadding = false,
     this.showHeader = true,
   });
@@ -63,6 +64,7 @@ class GenesisBottomSheetPanel extends StatelessWidget {
   final EdgeInsets padding;
   final double titleBottomSpacing;
   final TextStyle? titleTextStyle;
+  final Widget? titleWidget;
   final bool maintainBottomViewPadding;
   final bool showHeader;
 
@@ -86,12 +88,14 @@ class GenesisBottomSheetPanel extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          title,
-                          style:
-                              titleTextStyle ??
-                              GenesisBottomSheetPanel.titleStyle,
-                        ),
+                        child:
+                            titleWidget ??
+                            Text(
+                              title,
+                              style:
+                                  titleTextStyle ??
+                                  GenesisBottomSheetPanel.titleStyle,
+                            ),
                       ),
                       if (trailing != null) trailing!,
                     ],

@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart'
         SliverMultiBoxAdaptorParentData;
 
 import '../../components/chat/shared/chat_ui.dart';
+import 'location_chat_reply_actions.dart';
 
 enum LocationChatViewportMode { initializing, followingLatest, detached }
 
@@ -15,6 +16,8 @@ enum LocationChatBottomReason {
   sentMessage,
   unseenMessageNotice,
   composerFocus,
+  inspirationExpanded,
+  editPromptExpanded,
 }
 
 enum LocationChatBottomBehavior { jump, animate }
@@ -109,7 +112,46 @@ class LocationChatScrollCoordinator extends ChangeNotifier {
     });
   }
 
+  /// Reveal the entire edited row when it fits, otherwise keep its end visible.
+  void revealEditedMessage({
+    required BuildContext messageContext,
+    required BuildContext viewportContext,
+  }) {
+    if (_disposed || !controller.hasClients) return;
+    final messageBox = messageContext.findRenderObject();
+    final viewportBox = viewportContext.findRenderObject();
+    if (messageBox is! RenderBox ||
+        viewportBox is! RenderBox ||
+        !messageBox.hasSize ||
+        !viewportBox.hasSize) {
+      return;
+    }
+    final messageTop = messageBox.localToGlobal(Offset.zero).dy;
+    final messageBottom = messageTop + messageBox.size.height;
+    final viewportTop = viewportBox.localToGlobal(Offset.zero).dy + 12;
+    final viewportBottom = viewportTop + viewportBox.size.height - 24;
+    double delta = 0;
+    if (messageBottom - messageTop > viewportBottom - viewportTop ||
+        messageBottom > viewportBottom) {
+      delta = messageBottom - viewportBottom;
+    } else if (messageTop < viewportTop) {
+      delta = messageTop - viewportTop;
+    }
+    if (delta.abs() < 0.5) return;
+    _cancelPendingCommands();
+    _jumpTo(
+      (controller.position.pixels + delta).clamp(
+        controller.position.minScrollExtent,
+        controller.position.maxScrollExtent,
+      ),
+    );
+  }
+
   bool handleScrollNotification(ScrollNotification notification) {
+    // Nested horizontal carousels must not change conversation anchoring.
+    if (notification.metrics.axis != Axis.vertical || notification.depth != 0) {
+      return false;
+    }
     if (notification is ScrollStartNotification &&
         notification.dragDetails != null) {
       _userDragActive = true;
@@ -222,6 +264,7 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
     required this.coordinator,
     required this.messages,
     required this.topTitle,
+    this.active = true,
     this.onMessageLongPressStart,
     this.onFailedMessageTap,
     this.onCharactersMovedLocationTap,
@@ -232,6 +275,10 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
     this.onOldestEdgeLoadingCollapsed,
     this.showDateDividers = true,
     this.messageLayoutId,
+    this.replyActionsMessageId,
+    this.onInspirationSend,
+    this.onInspirationEdit,
+    this.onEditReply,
     this.selfMessageBubbleMaxWidthCap,
     this.otherMessageBubbleMaxWidthCap,
     this.style,
@@ -240,6 +287,7 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
   final LocationChatScrollCoordinator coordinator;
   final List<ChatMessageVm> messages;
   final String topTitle;
+  final bool active;
   final ChatMessageLongPressStart? onMessageLongPressStart;
   final ChatMessageTap? onFailedMessageTap;
   final ChatCharacterMovementTap? onCharactersMovedLocationTap;
@@ -250,6 +298,12 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
   final VoidCallback? onOldestEdgeLoadingCollapsed;
   final bool showDateDividers;
   final String Function(ChatMessageVm message)? messageLayoutId;
+
+  /// Presentation-only marker; does not determine round or action eligibility.
+  final String? replyActionsMessageId;
+  final ValueChanged<String>? onInspirationSend;
+  final ValueChanged<String>? onInspirationEdit;
+  final VoidCallback? onEditReply;
   final double? selfMessageBubbleMaxWidthCap;
   final double? otherMessageBubbleMaxWidthCap;
   final ChatUiStyleConfig? style;
@@ -269,6 +323,9 @@ class _LocationChatAnchoredMessageListState
   late final AnimationController _oldestEdgeLoadingController;
   late final Animation<double> _oldestEdgeLoadingAnimation;
   late List<ChatMessageVm> _renderedMessages;
+  bool _inspirationExpanded = false;
+  bool _editPromptExpanded = false;
+  int _inspirationPage = 0;
   List<ChatMessageVm>? _pendingMessages;
   late List<String> _messageLocalIds;
   int _historyCommitGeneration = 0;
@@ -305,6 +362,12 @@ class _LocationChatAnchoredMessageListState
   @override
   void didUpdateWidget(LocationChatAnchoredMessageList oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active ||
+        oldWidget.replyActionsMessageId != widget.replyActionsMessageId) {
+      _inspirationExpanded = false;
+      _editPromptExpanded = false;
+      _inspirationPage = 0;
+    }
     if (oldWidget.coordinator != widget.coordinator) {
       oldWidget.coordinator.removeListener(_handleCoordinatorChanged);
       widget.coordinator.addListener(_handleCoordinatorChanged);
@@ -970,21 +1033,72 @@ class _LocationChatAnchoredMessageListState
         : _renderedMessages[messageIndex - 1];
     final layoutId = _messageLayoutId(current);
     final layoutKey = _messageLayoutKeys.putIfAbsent(layoutId, GlobalKey.new);
+    final showReplyActions = current.localId == widget.replyActionsMessageId;
     final row = KeyedSubtree(
       key: layoutKey,
-      child: ChatMessageRow(
-        key: ValueKey(layoutId),
-        message: current,
-        imageViewerMessages: _renderedMessages,
-        style: style,
-        selfMessageBubbleMaxWidthCap: widget.selfMessageBubbleMaxWidthCap,
-        otherMessageBubbleMaxWidthCap: widget.otherMessageBubbleMaxWidthCap,
-        onMessageLongPressStart: widget.onMessageLongPressStart,
-        onFailedMessageTap: widget.onFailedMessageTap,
-        onCharactersMovedLocationTap: widget.onCharactersMovedLocationTap,
-        showDateDivider:
-            widget.showDateDividers &&
-            shouldShowChatDateDivider(previous?.createdAt, current.createdAt),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ChatMessageRow(
+            key: ValueKey(layoutId),
+            message: current,
+            imageViewerMessages: _renderedMessages,
+            style: showReplyActions
+                ? style.copyWith(
+                    rowBottomPadding: LocationChatReplyActions.contentBottomGap,
+                    systemMessageMargin: style.systemMessageMargin.copyWith(
+                      bottom: LocationChatReplyActions.contentBottomGap,
+                    ),
+                  )
+                : style,
+            selfMessageBubbleMaxWidthCap: widget.selfMessageBubbleMaxWidthCap,
+            otherMessageBubbleMaxWidthCap: widget.otherMessageBubbleMaxWidthCap,
+            onMessageLongPressStart: widget.onMessageLongPressStart,
+            onFailedMessageTap: widget.onFailedMessageTap,
+            onCharactersMovedLocationTap: widget.onCharactersMovedLocationTap,
+            showDateDivider:
+                widget.showDateDividers &&
+                shouldShowChatDateDivider(
+                  previous?.createdAt,
+                  current.createdAt,
+                ),
+          ),
+          if (showReplyActions)
+            Padding(
+              padding: EdgeInsets.only(bottom: style.rowBottomPadding),
+              child: LocationChatReplyActions(
+                key: ValueKey('reply-actions-${current.localId}'),
+                onInspirationSend: widget.onInspirationSend,
+                onInspirationEdit: widget.onInspirationEdit,
+                onEditReply: widget.onEditReply,
+                editPromptExpanded: _editPromptExpanded,
+                onEditPromptExpandedChanged: (expanded) {
+                  setState(() => _editPromptExpanded = expanded);
+                  if (expanded) {
+                    widget.coordinator.requestBottom(
+                      reason: LocationChatBottomReason.editPromptExpanded,
+                      behavior: LocationChatBottomBehavior.animate,
+                    );
+                  }
+                },
+                inspirationExpanded: _inspirationExpanded,
+                inspirationPage: _inspirationPage,
+                onInspirationPageChanged: (page) => _inspirationPage = page,
+                onInspirationExpandedChanged: (expanded) {
+                  setState(() => _inspirationExpanded = expanded);
+                  if (expanded) {
+                    widget.coordinator.requestBottom(
+                      reason: LocationChatBottomReason.inspirationExpanded,
+                      behavior: LocationChatBottomBehavior.animate,
+                    );
+                  }
+                },
+                style: style,
+                selfMessageBubbleMaxWidthCap:
+                    widget.selfMessageBubbleMaxWidthCap,
+              ),
+            ),
+        ],
       ),
     );
     if (!lazy) return row;
