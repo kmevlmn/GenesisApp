@@ -4,6 +4,7 @@ import '../../app/telemetry/genesis_telemetry.dart';
 import '../tokens/genesis_colors.dart';
 import '../tokens/genesis_radii.dart';
 import '../tokens/genesis_spacing.dart';
+import '../tokens/genesis_typography.dart';
 
 class GenesisPrimaryButton extends StatelessWidget {
   const GenesisPrimaryButton({
@@ -105,11 +106,12 @@ class GenesisPrimaryButton extends StatelessWidget {
             disabledForegroundColor:
                 disabledForegroundColor ?? defaultDisabledForegroundColor,
             side: side,
-            textStyle: defaultTextStyle.copyWith(
-              fontFamily: fontFamily,
-              fontSize: fontSize,
-              fontWeight: fontWeight,
-            ),
+            textStyle: GenesisTypography.resolve(context, defaultTextStyle)
+                .copyWith(
+                  fontFamily: fontFamily,
+                  fontSize: fontSize,
+                  fontWeight: fontWeight,
+                ),
             shape: RoundedRectangleBorder(
               borderRadius: borderRadius ?? defaultBorderRadius,
             ),
@@ -211,9 +213,10 @@ class GenesisSecondaryButton extends StatelessWidget {
           foregroundColor: foregroundColor,
           disabledForegroundColor: disabledForegroundColor,
           side: side,
-          textStyle: GenesisPrimaryButton.defaultTextStyle.copyWith(
-            fontWeight: fontWeight,
-          ),
+          textStyle: GenesisTypography.resolve(
+            context,
+            GenesisPrimaryButton.defaultTextStyle,
+          ).copyWith(fontWeight: fontWeight),
           shape: RoundedRectangleBorder(
             borderRadius:
                 borderRadius ?? GenesisPrimaryButton.defaultBorderRadius,

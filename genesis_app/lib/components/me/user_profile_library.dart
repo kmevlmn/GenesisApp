@@ -23,6 +23,8 @@ import '../../utils/entity_deleted.dart';
 import '../../utils/stat_count_formatter.dart';
 import '../gems/gem_assets.dart';
 import '../gems/gem_balance_text.dart';
+import '../gems/gem_card_action_style.dart';
+import '../gems/profile_membership_card.dart';
 import 'profile_collection_list.dart';
 
 part 'user_profile_shell.dart';

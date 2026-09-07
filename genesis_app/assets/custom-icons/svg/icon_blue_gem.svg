@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="164" height="256" viewBox="258 42 164 256">
+  <polygon fill="#2275E3" points="305,50 375,50 415,90 415,250 375,290 305,290 265,250 265,90"/>
+  <polygon fill="#C6E5FF" points="265,90 305,50 290,105"/>
+  <polygon fill="#A6D8FF" points="305,50 318,78 290,105"/>
+  <polygon fill="#82C9FF" points="305,50 375,50 362,78 318,78"/>
+  <polygon fill="#5EB6FF" points="375,50 390,105 362,78"/>
+  <polygon fill="#3B9AF6" points="375,50 415,90 390,105"/>
+  <polygon fill="#2275E3" points="415,90 415,250 390,235 390,105"/>
+  <polygon fill="#1256B5" points="415,250 375,290 390,235"/>
+  <polygon fill="#0C4296" points="375,290 362,262 390,235"/>
+  <polygon fill="#1868C9" points="375,290 305,290 318,262 362,262"/>
+  <polygon fill="#2D83DD" points="305,290 265,250 318,262"/>
+  <polygon fill="#52ACF4" points="265,250 290,235 318,262"/>
+  <polygon fill="#9AD4FF" points="265,250 265,90 290,105 290,235"/>
+  <polygon fill="#B4DFFF" points="318,78 362,78 350,104 330,104"/>
+  <polygon fill="#6BC4FF" points="362,78 390,105 368,124 350,104"/>
+  <polygon fill="#1765C8" points="390,105 390,235 368,216 368,124"/>
+  <polygon fill="#0B3E8E" points="390,235 362,262 350,236 368,216"/>
+  <polygon fill="#186EE2" points="362,262 318,262 330,236 350,236"/>
+  <polygon fill="#4BA7F9" points="318,262 290,235 312,216 330,236"/>
+  <polygon fill="#DFF2FF" points="290,235 290,105 312,124 312,216"/>
+  <polygon fill="#82C9FF" points="290,105 318,78 330,104 312,124"/>
+  <polygon fill="#2C91F9" points="330,104 350,104 368,124 368,216 350,236 330,236 312,216 312,124"/>
+  <polygon fill="#A8DCFF" points="332,104 348,104 312,190 312,152"/>
+  <polygon fill="#1F79DE" points="368,178 368,216 350,236 341,236"/>
+  <polyline points="265,90 305,50 375,50" fill="none" stroke="#D3ECFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="312,124 330,104 350,104" fill="none" stroke="#E6F6FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="415,250 375,290 305,290" fill="none" stroke="#08367A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <polygon fill="#FFFFFF" points="326,116 332,128 326,140 320,128"/>
+  <circle cx="356" cy="208" r="3" fill="#E6F6FF"/>
+</svg>

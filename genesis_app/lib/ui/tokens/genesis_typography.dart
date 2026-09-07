@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import 'genesis_colors.dart';
 
 abstract final class GenesisTypography {
+  /// Resolve theme typography for painters and controls that do not inherit
+  /// DefaultTextStyle automatically. Local styles need only specify overrides.
+  static TextStyle resolve(BuildContext context, TextStyle style) =>
+      Theme.of(context).textTheme.bodyMedium!.merge(style);
+
   static const String fontFamily = 'Inter';
   static const List<String> fontFamilyFallback = <String>[
     'PingFang SC',

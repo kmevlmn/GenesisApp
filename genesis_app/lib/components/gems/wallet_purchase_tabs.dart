@@ -19,18 +19,19 @@ class WalletPurchaseTabs extends StatelessWidget {
   );
 
   Color _colorForTab(int index) {
+    const selectedColor = GenesisColors.textPrimary;
     // Taps select immediately; swipes use page progress before the controller
     // commits its new index at scroll end.
     if (controller.indexIsChanging) {
       return controller.index == index
-          ? GenesisColors.textPrimary
+          ? selectedColor
           : GenesisColors.tabUnselected;
     }
     final page = controller.animation?.value ?? controller.index.toDouble();
     final selectedness = (1 - (page - index).abs()).clamp(0.0, 1.0);
     return Color.lerp(
       GenesisColors.tabUnselected,
-      GenesisColors.textPrimary,
+      selectedColor,
       selectedness,
     )!;
   }
@@ -49,6 +50,7 @@ class WalletPurchaseTabs extends StatelessWidget {
             animation: Listenable.merge([controller, controller.animation]),
             builder: (context, _) => SecendTabs(
               controller: controller,
+              indicatorColor: GenesisColors.brand,
               labels: const ['Subscription', 'Buy Gems'],
               horizontalPadding: 0,
               labelPadding: const EdgeInsets.symmetric(horizontal: 4),

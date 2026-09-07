@@ -316,8 +316,8 @@ class GemProductCard extends StatelessWidget {
                                       ),
                                 maxLines: 1,
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  height: 14 / 12,
+                                  fontSize: 14,
+                                  height: 16 / 14,
                                   fontWeight: FontWeight.w600,
                                   color: isSoldOut
                                       ? kGemSoldOutForegroundColor

@@ -7,6 +7,7 @@ import '../../components/chat/shared/chat_ui.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../components/gems/gem_purchase_bottom_sheet.dart';
 import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/tokens/genesis_typography.dart';
 
 /// Reply actions with local inspiration suggestions and host-owned messaging.
 class LocationChatReplyActions extends StatefulWidget {
@@ -313,7 +314,13 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
         for (final reply in replies) {
           final painter =
               TextPainter(
-                text: TextSpan(text: reply, style: style.bubbleTextStyle),
+                text: TextSpan(
+                  text: reply,
+                  style: GenesisTypography.resolve(
+                    context,
+                    style.bubbleTextStyle,
+                  ),
+                ),
                 textDirection: Directionality.of(context),
                 textScaler: MediaQuery.textScalerOf(context),
               )..layout(
@@ -508,7 +515,10 @@ class LocationChatSubscriptionPrompt extends StatelessWidget {
             softWrap: !singleLine,
             textWidthBasis: TextWidthBasis.longestLine,
             textAlign: TextAlign.center,
-            style: style.bubbleTextStyle.copyWith(fontSize: 13),
+            style: GenesisTypography.resolve(
+              context,
+              style.bubbleTextStyle,
+            ).copyWith(fontSize: 13),
           ),
         ),
       ),

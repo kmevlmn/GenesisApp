@@ -8,6 +8,7 @@ import '../../ui/components/genesis_soft_italic_text.dart';
 import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_typography.dart';
 import '../common/genesis_center_toast.dart';
+import 'pro_colors.dart';
 
 // Demo prices and benefits only, not store products or entitlement rules.
 enum _PreviewProPlan {
@@ -153,17 +154,33 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
                 ],
               ),
               const SizedBox(height: 34),
-              GenesisPrimaryButton(
-                key: const ValueKey('pro-subscribe-button'),
-                label: '${_plan.label}: \$${_plan.total}',
-                height: 44,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                fontFamily: GenesisTypography.fontFamily,
-                borderRadius: BorderRadius.circular(8),
-                onPressed: () => showGenesisToast(
-                  context,
-                  'Pro subscriptions are coming soon.',
+              DecoratedBox(
+                key: const ValueKey('pro-subscribe-gold-surface'),
+                decoration: BoxDecoration(
+                  gradient: proPurchaseButtonGradient,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x18A86A17),
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: GenesisPrimaryButton(
+                  key: const ValueKey('pro-subscribe-button'),
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: proPurchaseInk,
+                  side: const BorderSide(color: Color(0xFFC69A45)),
+                  label: '${_plan.label}: \$${_plan.total}',
+                  height: 44,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  borderRadius: BorderRadius.circular(8),
+                  onPressed: () => showGenesisToast(
+                    context,
+                    'Pro subscriptions are coming soon.',
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -182,9 +199,9 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
                         ),
                         style: TextButton.styleFrom(
                           foregroundColor: const Color(0xFF888888),
-                          textStyle: const TextStyle(
-                            fontSize: 11,
-                            fontFamily: GenesisTypography.fontFamily,
+                          textStyle: GenesisTypography.resolve(
+                            context,
+                            const TextStyle(fontSize: 11),
                           ),
                           minimumSize: const Size(0, 20),
                           padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -223,7 +240,7 @@ class _ProBenefit extends StatelessWidget {
     final (statusIcon, statusColor, statusLabel) = switch (status) {
       _PreviewBenefitStatus.upgraded => (
         null,
-        GenesisColors.brand,
+        proCopperAccent,
         'Improved with Pro',
       ),
       _PreviewBenefitStatus.unchanged => (
@@ -310,12 +327,12 @@ class _ProPlanCard extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Material(
-            color: selected ? const Color(0xFFFFF5F6) : Colors.white,
+            color: selected ? proPurchaseTint : Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
               side: BorderSide(
-                color: selected ? GenesisColors.brand : const Color(0xFFEBEBEB),
-                width: selected ? 2 : 1,
+                color: selected ? proPurchaseAccent : const Color(0xFFEBEBEB),
+                width: 1,
               ),
             ),
             clipBehavior: Clip.antiAlias,
@@ -333,7 +350,7 @@ class _ProPlanCard extends StatelessWidget {
                     children: [
                       Text(
                         plan.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           height: 20 / 14,
                           fontWeight: FontWeight.w400,
@@ -347,18 +364,18 @@ class _ProPlanCard extends StatelessWidget {
                             children: [
                               TextSpan(
                                 text: '\$${plan.perMonth}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 24,
                                   height: 28 / 24,
                                   fontWeight: FontWeight.w400,
                                   color: GenesisColors.textPrimary,
                                 ),
                               ),
-                              const TextSpan(
+                              TextSpan(
                                 text: '/mo',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Color(0xFF888888),
+                                  color: const Color(0xFF888888),
                                 ),
                               ),
                             ],
@@ -381,7 +398,7 @@ class _ProPlanCard extends StatelessWidget {
                   height: 21,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   decoration: const BoxDecoration(
-                    color: GenesisColors.brand,
+                    color: proCopperAccent,
                     borderRadius: BorderRadius.only(
                       topLeft: Radius.circular(12),
                       topRight: Radius.circular(3),
@@ -394,7 +411,7 @@ class _ProPlanCard extends StatelessWidget {
                       Icon(
                         Icons.local_fire_department,
                         size: 12,
-                        color: Color(0xFFFFD154),
+                        color: Colors.white,
                       ),
                       SizedBox(width: 3),
                       Text(

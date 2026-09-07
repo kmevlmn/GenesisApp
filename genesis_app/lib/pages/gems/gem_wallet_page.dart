@@ -45,6 +45,7 @@ typedef DiscordLauncher = Future<bool> Function(Uri uri);
 class GemWalletPage extends StatefulWidget {
   const GemWalletPage({
     super.key,
+    this.showSubscriptionInitially = false,
     this.productsLoader,
     this.tasksLoader,
     this.walletStore,
@@ -55,6 +56,7 @@ class GemWalletPage extends StatefulWidget {
   });
 
   final GemProductsLoader? productsLoader;
+  final bool showSubscriptionInitially;
   final GemTasksLoader? tasksLoader;
   final GemWalletStore? walletStore;
   final BillingService? billingService;
@@ -122,7 +124,11 @@ class _GemWalletPageState extends State<GemWalletPage>
   @override
   void initState() {
     super.initState();
-    _purchaseTabs = TabController(length: 2, initialIndex: 1, vsync: this);
+    _purchaseTabs = TabController(
+      length: 2,
+      initialIndex: widget.showSubscriptionInitially ? 0 : 1,
+      vsync: this,
+    );
     WidgetsBinding.instance.addObserver(this);
     _trackBuyGemsPageView();
     unawaited(_refreshAll());

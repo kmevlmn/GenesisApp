@@ -410,6 +410,11 @@ class _UserProfileContentState extends State<UserProfileContent>
           ),
           if (data.isSelf) ...[
             const SizedBox(height: 20),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: ProfileMembershipCardPreview(),
+            ),
+            const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _GemsBalanceEntry(
@@ -640,7 +645,7 @@ class _GemsBalanceEntry extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Balance',
+                          'Gems',
                           style: TextStyle(
                             fontSize: 12,
                             height: 14 / 12,
@@ -679,19 +684,8 @@ class _GemsBalanceEntry extends StatelessWidget {
                                         fontSize: 18,
                                         height: 22 / 18,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                        color: Color(0xF2FFFFFF),
                                       ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Text(
-                                    'Gems',
-                                    key: ValueKey('user-profile-gems-unit'),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      height: 14 / 11,
-                                      fontWeight: FontWeight.w400,
-                                      color: Color(0xFFFFD4DA),
                                     ),
                                   ),
                                 ],
@@ -712,12 +706,9 @@ class _GemsBalanceEntry extends StatelessWidget {
                       color: GenesisColors.brand,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Top Up',
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 16 / 13,
-                        fontWeight: FontWeight.w600,
+                      style: gemCardActionTextStyle.copyWith(
                         color: Colors.white,
                       ),
                     ),

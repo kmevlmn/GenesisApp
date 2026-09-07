@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"><rect width="1080" height="1080" fill="#FAF9F7"/><svg x="80" y="26" width="200" height="200" viewBox="0 0 56 56">
+  <defs>
+    <clipPath id="crown0">
+      <path d="M30.5 15.8C31.8 15 32.5 13.6 32.5 12C32.5 9.5 30.5 7.5 28 7.5C25.5 7.5 23.5 9.5 23.5 12C23.5 13.6 24.2 15 25.5 15.8L16.5 26.5C16 27.1 15.4 27.3 14.7 27L7.8 24C6.2 23.3 5.2 24.1 5.7 25.9L11.2 46.6C11.8 48.9 12.9 49.8 15.3 49.8H40.7C43.1 49.8 44.2 48.9 44.8 46.6L50.3 25.9C50.8 24.1 49.8 23.3 48.2 24L41.3 27C40.6 27.3 40 27.1 39.5 26.5L30.5 15.8Z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#crown0)">
+    <path d="M0 0H56V56H0Z" fill="#C8A665"/>
+    <!-- Pale upper and left bevels, with the same light direction as Gems. -->
+    <path d="M4 22L15.5 27.5L28 12L28 19L16.5 31.5L10.5 29L15.3 45.5L11 50Z" fill="#E6D2AA"/>
+    <path d="M4 22L15.5 27.5L16.5 31.5L10.5 29Z" fill="#FFF4DC"/>
+    <path d="M15.5 27.5L28 12L28 19L16.5 31.5Z" fill="#F4E4C4"/>
+    <!-- Recessed right and lower faces give the crown0 its thickness. -->
+    <path d="M28 12L40.5 27.5L52 22L45.5 29L39.5 31.5L28 19Z" fill="#D8BA82"/>
+    <path d="M52 22L45 50L40.7 45.5L45.5 29Z" fill="#8F703E"/>
+    <path d="M11 50L15.3 45.5H40.7L45 50Z" fill="#73582D"/>
+    <path d="M15.3 45.5L28 49.8H45L40.7 45.5Z" fill="#A0834B"/>
+    <!-- Broad face reflections remain legible at the 24px display size. -->
+    <path d="M10.5 29L16.5 31.5L28 19L24 35L15.3 45.5Z" fill="#D8BA82"/>
+    <path d="M39.5 31.5L45.5 29L40.7 45.5H31Z" fill="#B99656"/>
+    <!-- Rounded crown0 tip with a small lit face. -->
+    <circle cx="28" cy="12" r="4.5" fill="#D3B77D"/>
+    <path d="M23.5 12L26 7.5H30L28.5 10.5L25 13.5Z" fill="#F4E4C4"/>
+    <path d="M28.5 10.5L32.5 12L30.5 16H27Z" fill="#B99656"/>
+    <path d="M7 25L14.3 28.2M17.2 27.2L25 18.1" stroke="#FFF8E8" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M15.3 46H40.7" stroke="#DFC595" stroke-width="1" stroke-linecap="round"/>
+    <path d="M14.8 35.5L16.4 41.7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+</svg><rect x="24" y="254" width="312" height="88" rx="12" fill="#F6E8CB"/><svg x="45" y="280" width="36" height="36" viewBox="0 0 56 56">
+  <defs>
+    <clipPath id="small0">
+      <path d="M30.5 15.8C31.8 15 32.5 13.6 32.5 12C32.5 9.5 30.5 7.5 28 7.5C25.5 7.5 23.5 9.5 23.5 12C23.5 13.6 24.2 15 25.5 15.8L16.5 26.5C16 27.1 15.4 27.3 14.7 27L7.8 24C6.2 23.3 5.2 24.1 5.7 25.9L11.2 46.6C11.8 48.9 12.9 49.8 15.3 49.8H40.7C43.1 49.8 44.2 48.9 44.8 46.6L50.3 25.9C50.8 24.1 49.8 23.3 48.2 24L41.3 27C40.6 27.3 40 27.1 39.5 26.5L30.5 15.8Z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#small0)">
+    <path d="M0 0H56V56H0Z" fill="#C8A665"/>
+    <!-- Pale upper and left bevels, with the same light direction as Gems. -->
+    <path d="M4 22L15.5 27.5L28 12L28 19L16.5 31.5L10.5 29L15.3 45.5L11 50Z" fill="#E6D2AA"/>
+    <path d="M4 22L15.5 27.5L16.5 31.5L10.5 29Z" fill="#FFF4DC"/>
+    <path d="M15.5 27.5L28 12L28 19L16.5 31.5Z" fill="#F4E4C4"/>
+    <!-- Recessed right and lower faces give the small0 its thickness. -->
+    <path d="M28 12L40.5 27.5L52 22L45.5 29L39.5 31.5L28 19Z" fill="#D8BA82"/>
+    <path d="M52 22L45 50L40.7 45.5L45.5 29Z" fill="#8F703E"/>
+    <path d="M11 50L15.3 45.5H40.7L45 50Z" fill="#73582D"/>
+    <path d="M15.3 45.5L28 49.8H45L40.7 45.5Z" fill="#A0834B"/>
+    <!-- Broad face reflections remain legible at the 24px display size. -->
+    <path d="M10.5 29L16.5 31.5L28 19L24 35L15.3 45.5Z" fill="#D8BA82"/>
+    <path d="M39.5 31.5L45.5 29L40.7 45.5H31Z" fill="#B99656"/>
+    <!-- Rounded small0 tip with a small lit face. -->
+    <circle cx="28" cy="12" r="4.5" fill="#D3B77D"/>
+    <path d="M23.5 12L26 7.5H30L28.5 10.5L25 13.5Z" fill="#F4E4C4"/>
+    <path d="M28.5 10.5L32.5 12L30.5 16H27Z" fill="#B99656"/>
+    <path d="M7 25L14.3 28.2M17.2 27.2L25 18.1" stroke="#FFF8E8" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M15.3 46H40.7" stroke="#DFC595" stroke-width="1" stroke-linecap="round"/>
+    <path d="M14.8 35.5L16.4 41.7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+</svg><text x="93" y="307" font-family="Helvetica,Arial" font-size="24" font-weight="600" fill="#603F23">Pro</text><text x="180" y="392" text-anchor="middle" font-family="Helvetica,Arial" font-size="18" fill="#333333">01 · CHAMPAGNE</text><svg x="440" y="26" width="200" height="200" viewBox="0 0 56 56">
+  <defs>
+    <clipPath id="crown1">
+      <path d="M30.5 15.8C31.8 15 32.5 13.6 32.5 12C32.5 9.5 30.5 7.5 28 7.5C25.5 7.5 23.5 9.5 23.5 12C23.5 13.6 24.2 15 25.5 15.8L16.5 26.5C16 27.1 15.4 27.3 14.7 27L7.8 24C6.2 23.3 5.2 24.1 5.7 25.9L11.2 46.6C11.8 48.9 12.9 49.8 15.3 49.8H40.7C43.1 49.8 44.2 48.9 44.8 46.6L50.3 25.9C50.8 24.1 49.8 23.3 48.2 24L41.3 27C40.6 27.3 40 27.1 39.5 26.5L30.5 15.8Z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#crown1)">
+    <path d="M0 0H56V56H0Z" fill="#DBA633"/>
+    <!-- Pale upper and left bevels, with the same light direction as Gems. -->
+    <path d="M4 22L15.5 27.5L28 12L28 19L16.5 31.5L10.5 29L15.3 45.5L11 50Z" fill="#F0CE81"/>
+    <path d="M4 22L15.5 27.5L16.5 31.5L10.5 29Z" fill="#FFF0C6"/>
+    <path d="M15.5 27.5L28 12L28 19L16.5 31.5Z" fill="#FFE0A0"/>
+    <!-- Recessed right and lower faces give the crown1 its thickness. -->
+    <path d="M28 12L40.5 27.5L52 22L45.5 29L39.5 31.5L28 19Z" fill="#E9BC59"/>
+    <path d="M52 22L45 50L40.7 45.5L45.5 29Z" fill="#9F6A18"/>
+    <path d="M11 50L15.3 45.5H40.7L45 50Z" fill="#805212"/>
+    <path d="M15.3 45.5L28 49.8H45L40.7 45.5Z" fill="#B77D20"/>
+    <!-- Broad face reflections remain legible at the 24px display size. -->
+    <path d="M10.5 29L16.5 31.5L28 19L24 35L15.3 45.5Z" fill="#E9BC59"/>
+    <path d="M39.5 31.5L45.5 29L40.7 45.5H31Z" fill="#CC922A"/>
+    <!-- Rounded crown1 tip with a small lit face. -->
+    <circle cx="28" cy="12" r="4.5" fill="#E3B044"/>
+    <path d="M23.5 12L26 7.5H30L28.5 10.5L25 13.5Z" fill="#FFE0A0"/>
+    <path d="M28.5 10.5L32.5 12L30.5 16H27Z" fill="#CC922A"/>
+    <path d="M7 25L14.3 28.2M17.2 27.2L25 18.1" stroke="#FFF5D9" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M15.3 46H40.7" stroke="#EEC471" stroke-width="1" stroke-linecap="round"/>
+    <path d="M14.8 35.5L16.4 41.7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+</svg><rect x="384" y="254" width="312" height="88" rx="12" fill="#701429"/><svg x="405" y="280" width="36" height="36" viewBox="0 0 56 56">
+  <defs>
+    <clipPath id="small1">
+      <path d="M30.5 15.8C31.8 15 32.5 13.6 32.5 12C32.5 9.5 30.5 7.5 28 7.5C25.5 7.5 23.5 9.5 23.5 12C23.5 13.6 24.2 15 25.5 15.8L16.5 26.5C16 27.1 15.4 27.3 14.7 27L7.8 24C6.2 23.3 5.2 24.1 5.7 25.9L11.2 46.6C11.8 48.9 12.9 49.8 15.3 49.8H40.7C43.1 49.8 44.2 48.9 44.8 46.6L50.3 25.9C50.8 24.1 49.8 23.3 48.2 24L41.3 27C40.6 27.3 40 27.1 39.5 26.5L30.5 15.8Z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#small1)">
+    <path d="M0 0H56V56H0Z" fill="#DBA633"/>
+    <!-- Pale upper and left bevels, with the same light direction as Gems. -->
+    <path d="M4 22L15.5 27.5L28 12L28 19L16.5 31.5L10.5 29L15.3 45.5L11 50Z" fill="#F0CE81"/>
+    <path d="M4 22L15.5 27.5L16.5 31.5L10.5 29Z" fill="#FFF0C6"/>
+    <path d="M15.5 27.5L28 12L28 19L16.5 31.5Z" fill="#FFE0A0"/>
+    <!-- Recessed right and lower faces give the small1 its thickness. -->
+    <path d="M28 12L40.5 27.5L52 22L45.5 29L39.5 31.5L28 19Z" fill="#E9BC59"/>
+    <path d="M52 22L45 50L40.7 45.5L45.5 29Z" fill="#9F6A18"/>
+    <path d="M11 50L15.3 45.5H40.7L45 50Z" fill="#805212"/>
+    <path d="M15.3 45.5L28 49.8H45L40.7 45.5Z" fill="#B77D20"/>
+    <!-- Broad face reflections remain legible at the 24px display size. -->
+    <path d="M10.5 29L16.5 31.5L28 19L24 35L15.3 45.5Z" fill="#E9BC59"/>
+    <path d="M39.5 31.5L45.5 29L40.7 45.5H31Z" fill="#CC922A"/>
+    <!-- Rounded small1 tip with a small lit face. -->
+    <circle cx="28" cy="12" r="4.5" fill="#E3B044"/>
+    <path d="M23.5 12L26 7.5H30L28.5 10.5L25 13.5Z" fill="#FFE0A0"/>
+    <path d="M28.5 10.5L32.5 12L30.5 16H27Z" fill="#CC922A"/>
+    <path d="M7 25L14.3 28.2M17.2 27.2L25 18.1" stroke="#FFF5D9" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M15.3 46H40.7" stroke="#EEC471" stroke-width="1" stroke-linecap="round"/>
+    <path d="M14.8 35.5L16.4 41.7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+</svg><text x="453" y="307" font-family="Helvetica,Arial" font-size="24" font-weight="600" fill="#F4DEAA">Pro</text><text x="540" y="392" text-anchor="middle" font-family="Helvetica,Arial" font-size="18" fill="#333333">02 · GOLD</text><svg x="800" y="26" width="200" height="200" viewBox="0 0 56 56">
+  <defs>
+    <clipPath id="crown2">
+      <path d="M30.5 15.8C31.8 15 32.5 13.6 32.5 12C32.5 9.5 30.5 7.5 28 7.5C25.5 7.5 23.5 9.5 23.5 12C23.5 13.6 24.2 15 25.5 15.8L16.5 26.5C16 27.1 15.4 27.3 14.7 27L7.8 24C6.2 23.3 5.2 24.1 5.7 25.9L11.2 46.6C11.8 48.9 12.9 49.8 15.3 49.8H40.7C43.1 49.8 44.2 48.9 44.8 46.6L50.3 25.9C50.8 24.1 49.8 23.3 48.2 24L41.3 27C40.6 27.3 40 27.1 39.5 26.5L30.5 15.8Z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#crown2)">
+    <path d="M0 0H56V56H0Z" fill="#FF2442"/>
+    <!-- Pale upper and left bevels, with the same light direction as Gems. -->
+    <path d="M4 22L15.5 27.5L28 12L28 19L16.5 31.5L10.5 29L15.3 45.5L11 50Z" fill="#FF9AA5"/>
+    <path d="M4 22L15.5 27.5L16.5 31.5L10.5 29Z" fill="#FFDFE2"/>
+    <path d="M15.5 27.5L28 12L28 19L16.5 31.5Z" fill="#FFC6CC"/>
+    <!-- Recessed right and lower faces give the crown2 its thickness. -->
+    <path d="M28 12L40.5 27.5L52 22L45.5 29L39.5 31.5L28 19Z" fill="#FF5E6E"/>
+    <path d="M52 22L45 50L40.7 45.5L45.5 29Z" fill="#B5122A"/>
+    <path d="M11 50L15.3 45.5H40.7L45 50Z" fill="#960C20"/>
+    <path d="M15.3 45.5L28 49.8H45L40.7 45.5Z" fill="#C9182E"/>
+    <!-- Broad face reflections remain legible at the 24px display size. -->
+    <path d="M10.5 29L16.5 31.5L28 19L24 35L15.3 45.5Z" fill="#FF5E6E"/>
+    <path d="M39.5 31.5L45.5 29L40.7 45.5H31Z" fill="#E32236"/>
+    <!-- Rounded crown2 tip with a small lit face. -->
+    <circle cx="28" cy="12" r="4.5" fill="#F63B52"/>
+    <path d="M23.5 12L26 7.5H30L28.5 10.5L25 13.5Z" fill="#FFC6CC"/>
+    <path d="M28.5 10.5L32.5 12L30.5 16H27Z" fill="#E32236"/>
+    <path d="M7 25L14.3 28.2M17.2 27.2L25 18.1" stroke="#FFE6E9" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M15.3 46H40.7" stroke="#FF8291" stroke-width="1" stroke-linecap="round"/>
+    <path d="M14.8 35.5L16.4 41.7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+</svg><rect x="744" y="254" width="312" height="88" rx="12" fill="#F8DDD5"/><svg x="765" y="280" width="36" height="36" viewBox="0 0 56 56">
+  <defs>
+    <clipPath id="small2">
+      <path d="M30.5 15.8C31.8 15 32.5 13.6 32.5 12C32.5 9.5 30.5 7.5 28 7.5C25.5 7.5 23.5 9.5 23.5 12C23.5 13.6 24.2 15 25.5 15.8L16.5 26.5C16 27.1 15.4 27.3 14.7 27L7.8 24C6.2 23.3 5.2 24.1 5.7 25.9L11.2 46.6C11.8 48.9 12.9 49.8 15.3 49.8H40.7C43.1 49.8 44.2 48.9 44.8 46.6L50.3 25.9C50.8 24.1 49.8 23.3 48.2 24L41.3 27C40.6 27.3 40 27.1 39.5 26.5L30.5 15.8Z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#small2)">
+    <path d="M0 0H56V56H0Z" fill="#FF2442"/>
+    <!-- Pale upper and left bevels, with the same light direction as Gems. -->
+    <path d="M4 22L15.5 27.5L28 12L28 19L16.5 31.5L10.5 29L15.3 45.5L11 50Z" fill="#FF9AA5"/>
+    <path d="M4 22L15.5 27.5L16.5 31.5L10.5 29Z" fill="#FFDFE2"/>
+    <path d="M15.5 27.5L28 12L28 19L16.5 31.5Z" fill="#FFC6CC"/>
+    <!-- Recessed right and lower faces give the small2 its thickness. -->
+    <path d="M28 12L40.5 27.5L52 22L45.5 29L39.5 31.5L28 19Z" fill="#FF5E6E"/>
+    <path d="M52 22L45 50L40.7 45.5L45.5 29Z" fill="#B5122A"/>
+    <path d="M11 50L15.3 45.5H40.7L45 50Z" fill="#960C20"/>
+    <path d="M15.3 45.5L28 49.8H45L40.7 45.5Z" fill="#C9182E"/>
+    <!-- Broad face reflections remain legible at the 24px display size. -->
+    <path d="M10.5 29L16.5 31.5L28 19L24 35L15.3 45.5Z" fill="#FF5E6E"/>
+    <path d="M39.5 31.5L45.5 29L40.7 45.5H31Z" fill="#E32236"/>
+    <!-- Rounded small2 tip with a small lit face. -->
+    <circle cx="28" cy="12" r="4.5" fill="#F63B52"/>
+    <path d="M23.5 12L26 7.5H30L28.5 10.5L25 13.5Z" fill="#FFC6CC"/>
+    <path d="M28.5 10.5L32.5 12L30.5 16H27Z" fill="#E32236"/>
+    <path d="M7 25L14.3 28.2M17.2 27.2L25 18.1" stroke="#FFE6E9" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M15.3 46H40.7" stroke="#FF8291" stroke-width="1" stroke-linecap="round"/>
+    <path d="M14.8 35.5L16.4 41.7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+</svg><text x="813" y="307" font-family="Helvetica,Arial" font-size="24" font-weight="600" fill="#781C2C">Pro</text><text x="900" y="392" text-anchor="middle" font-family="Helvetica,Arial" font-size="18" fill="#333333">03 · BRAND-RED</text></svg>

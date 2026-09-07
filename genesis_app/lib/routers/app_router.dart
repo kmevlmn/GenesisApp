@@ -695,7 +695,9 @@ sealed class AppRouter {
       case RouteNames.gemWallet:
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => const GemWalletPage(),
+          builder: (_) => GemWalletPage(
+            showSubscriptionInitially: settings.arguments == 'subscription',
+          ),
         );
       case RouteNames.gemRecords:
         return MaterialPageRoute<void>(

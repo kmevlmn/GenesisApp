@@ -86,7 +86,7 @@ class _ChatMessageTextEditorState extends State<_ChatMessageTextEditor> {
       key: ValueKey('chat-message-editor-${widget.messageId}'),
       controller: widget.controller,
       focusNode: _focusNode,
-      style: widget.style,
+      style: GenesisTypography.resolve(context, widget.style),
       cursorColor: widget.style.color,
       keyboardType: TextInputType.multiline,
       textInputAction: TextInputAction.newline,

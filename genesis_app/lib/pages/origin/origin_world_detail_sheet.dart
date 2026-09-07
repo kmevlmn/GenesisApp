@@ -1895,10 +1895,8 @@ class _OriginSheetHeaderContent extends StatelessWidget {
                     text: 'Originator: ${formatUidForDisplay(originator)}',
                     trailing: origin.ownerDeleted
                         ? null
-                        : SvgPicture.asset(
-                            proCrownFilledIconAsset,
-                            key: const ValueKey('originator-membership-badge'),
-                            width: 14,
+                        : const ProMembershipBadge(
+                            key: ValueKey('originator-membership-badge'),
                             height: 14,
                           ),
                     onTap: ownerUid.isEmpty || origin.ownerDeleted
