@@ -23,7 +23,10 @@ Future<bool> showDailyCheckInDialog(
   final shouldCheckIn = await showGenesisActionBox<bool>(
     context: context,
     title: 'Daily Check-in',
-    titleContent: _GemTaskReward(rewardGemsCent: rewardGemsCent),
+    titleContent: _GemTaskReward(
+      rewardGemsCent: rewardGemsCent,
+      showWholeReward: true,
+    ),
     titleContentSpacing: 10,
     actions: [
       GenesisActionBoxAction<bool>(
