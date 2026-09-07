@@ -30,13 +30,9 @@ void main() {
       fixture,
     );
 
-    expect(find.text(insufficientGemBalancePrompt), findsOneWidget);
-    final titleStyle = tester
-        .widget<Text>(find.text(insufficientGemBalancePrompt))
-        .style;
-    expect(titleStyle?.fontWeight, FontWeight.w600);
-    expect(titleStyle?.fontSize, 18);
-    expect(titleStyle?.color, const Color(0xFF111111));
+    expect(find.text('Buy Gems'), findsOneWidget);
+    expect(find.text(insufficientGemBalancePrompt), findsNothing);
+    expect(find.text(lowGemBalancePrompt), findsNothing);
     expect(find.byType(GenesisBottomSheetPanel), findsOneWidget);
     expect(find.byType(GemPurchaseCatalogSection), findsOneWidget);
     final closeIcon = tester.widget<Icon>(
@@ -84,23 +80,28 @@ void main() {
     _expectSheetShowEvent(telemetry, gemPurchaseSheetTriggerMessageNoBalance);
   });
 
-  testWidgets('low balance uses the same purchase sheet with low copy', (
-    tester,
-  ) async {
-    final telemetry = _CapturingTelemetrySink();
-    GenesisTelemetry.setSinkForTesting(telemetry);
-    final fixture = _PromptFixture();
-    addTearDown(fixture.dispose);
-    await _pumpPrompt(
-      tester,
-      const GemBalanceAlert(kind: GemBalanceAlertKind.low, balanceCent: 1000),
-      fixture,
-    );
+  testWidgets(
+    'low balance uses the same purchase sheet without an alert title',
+    (tester) async {
+      final telemetry = _CapturingTelemetrySink();
+      GenesisTelemetry.setSinkForTesting(telemetry);
+      final fixture = _PromptFixture();
+      addTearDown(fixture.dispose);
+      await _pumpPrompt(
+        tester,
+        const GemBalanceAlert(kind: GemBalanceAlertKind.low, balanceCent: 1000),
+        fixture,
+      );
 
-    expect(find.text(lowGemBalancePrompt), findsOneWidget);
-    expect(find.text('+550'), findsOneWidget);
-    _expectSheetShowEvent(telemetry, gemPurchaseSheetTriggerMessageLowBalance);
-  });
+      expect(find.text('Buy Gems'), findsOneWidget);
+      expect(find.text(lowGemBalancePrompt), findsNothing);
+      expect(find.text('+550'), findsOneWidget);
+      _expectSheetShowEvent(
+        telemetry,
+        gemPurchaseSheetTriggerMessageLowBalance,
+      );
+    },
+  );
 
   testWidgets('tick balance prompt reports tick purchase sheet trigger', (
     tester,
@@ -116,7 +117,7 @@ void main() {
       analyticsTrigger: gemPurchaseSheetTriggerTick,
     );
 
-    expect(find.text(insufficientGemBalancePrompt), findsOneWidget);
+    expect(find.text('Buy Gems'), findsOneWidget);
     _expectSheetShowEvent(telemetry, gemPurchaseSheetTriggerTick);
   });
 
@@ -196,12 +197,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Purchase successful!'), findsOneWidget);
-    expect(find.text(insufficientGemBalancePrompt), findsOneWidget);
+    expect(find.text('Buy Gems'), findsOneWidget);
 
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
-    expect(find.text(insufficientGemBalancePrompt), findsNothing);
+    expect(find.text('Buy Gems'), findsNothing);
   });
 
   testWidgets('purchase sheet closes from its close button', (tester) async {
@@ -218,7 +219,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text(insufficientGemBalancePrompt), findsNothing);
+    expect(find.text('Buy Gems'), findsNothing);
   });
 }
 

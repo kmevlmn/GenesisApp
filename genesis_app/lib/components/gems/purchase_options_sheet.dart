@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../common/genesis_bottom_sheet_panel.dart';
+import '../common/genesis_modal_routes.dart';
+import '../page_header.dart';
+import 'pro_subscription_content.dart';
+import 'wallet_purchase_tabs.dart';
 
 enum PurchaseSheetTab { subscription, buyGems }
 
-/// Shared purchase shell. Subscription is a presentation-only placeholder.
+/// Shared purchase shell with Wallet's tabs and subscription presentation.
 class PurchaseOptionsSheet extends StatefulWidget {
   const PurchaseOptionsSheet({
     super.key,
@@ -19,9 +23,39 @@ class PurchaseOptionsSheet extends StatefulWidget {
   State<PurchaseOptionsSheet> createState() => _PurchaseOptionsSheetState();
 }
 
-class _PurchaseOptionsSheetState extends State<PurchaseOptionsSheet> {
-  late int _selected = widget.initialTab.index;
-  late bool _gemsVisited = _selected == PurchaseSheetTab.buyGems.index;
+class _PurchaseOptionsSheetState extends State<PurchaseOptionsSheet>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  late bool _gemsVisited;
+
+  @override
+  void initState() {
+    super.initState();
+    _gemsVisited = widget.initialTab == PurchaseSheetTab.buyGems;
+    _tabs = TabController(
+      length: 2,
+      initialIndex: widget.initialTab.index,
+      vsync: this,
+    );
+    _tabs.addListener(_visitGems);
+    _tabs.animation!.addListener(_visitGems);
+  }
+
+  void _visitGems() {
+    if (!_gemsVisited &&
+        (_tabs.index == PurchaseSheetTab.buyGems.index ||
+            _tabs.animation!.value > 0)) {
+      setState(() => _gemsVisited = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabs.removeListener(_visitGems);
+    _tabs.animation!.removeListener(_visitGems);
+    _tabs.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,56 +63,73 @@ class _PurchaseOptionsSheetState extends State<PurchaseOptionsSheet> {
       builder: (context, constraints) => GenesisBottomSheetPanel(
         title: '',
         height: constraints.maxHeight,
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+        // Retain the existing close center (32px) and body start (64px).
+        padding: const EdgeInsets.fromLTRB(0, 7, 0, 10),
+        titleBottomSpacing: 7,
         titleWidget: SizedBox(
-          height: 24,
-          child: Row(
+          height: kGenesisTopBarHeight,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              for (var index = 0; index < 2; index++) ...[
-                if (index > 0) const SizedBox(width: 24),
-                Flexible(
-                  child: Semantics(
-                    button: true,
-                    selected: _selected == index,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => setState(() {
-                        _selected = index;
-                        _gemsVisited |= index == PurchaseSheetTab.buyGems.index;
-                      }),
-                      child: Text(
-                        index == 0 ? 'Subscription' : 'Buy Gems',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GenesisBottomSheetPanel.titleStyle.copyWith(
-                          color: _selected == index
-                              ? const Color(0xFF111111)
-                              : const Color(0xFF999999),
-                        ),
-                      ),
-                    ),
-                  ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 56),
+                child: Center(child: WalletPurchaseTabs(controller: _tabs)),
+              ),
+              Positioned(
+                right: 20,
+                child: GenesisBottomSheetCloseButton(
+                  buttonKey: const ValueKey('gem-purchase-sheet-close'),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
-              ],
+              ),
             ],
           ),
         ),
-        trailing: GenesisBottomSheetCloseButton(
-          buttonKey: const ValueKey('gem-purchase-sheet-close'),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        child: IndexedStack(
-          index: _selected,
-          sizing: StackFit.expand,
+        child: TabBarView(
+          key: const ValueKey('purchase-sheet-pages'),
+          controller: _tabs,
           children: [
-            const SizedBox.expand(key: ValueKey('subscription-placeholder')),
-            if (_gemsVisited)
-              widget.gemsBuilder(context)
-            else
-              const SizedBox.expand(),
+            const _PurchaseSheetPage(child: ProSubscriptionContent()),
+            _PurchaseSheetPage(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _gemsVisited
+                    ? Builder(builder: widget.gemsBuilder)
+                    : const SizedBox.expand(),
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PurchaseSheetPage extends StatefulWidget {
+  const _PurchaseSheetPage({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_PurchaseSheetPage> createState() => _PurchaseSheetPageState();
+}
+
+class _PurchaseSheetPageState extends State<_PurchaseSheetPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return GenesisBottomSheetDragDismissArea(
+      onDismiss: () {
+        // The route can also be dismissed by its native header drag.
+        if (ModalRoute.of(context)?.isCurrent == true) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: widget.child,
     );
   }
 }

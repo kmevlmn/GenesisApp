@@ -343,14 +343,7 @@ class _GemPurchaseBottomSheetState extends State<GemPurchaseBottomSheet> {
       ),
     );
     if (widget.embedded) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(_title, style: GenesisBottomSheetPanel.titleStyle),
-          const SizedBox(height: 20),
-          Expanded(child: content),
-        ],
-      );
+      return content;
     }
     return LayoutBuilder(
       builder: (context, constraints) {

@@ -161,10 +161,17 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
             child: LocationChatSubscriptionPrompt(
               style: style,
               promptKey: const ValueKey('edit-subscription-prompt'),
-              semanticsLabel: 'Subscribe to edit messages',
-              message: const TextSpan(text: 'Members only.'),
-              actionLabel: 'Subscribe >',
-              singleLine: true,
+              semanticsLabel: 'Get more editions',
+              message: const TextSpan(
+                children: [
+                  TextSpan(text: 'Free Edition uses left: '),
+                  TextSpan(
+                    text: '"3"',
+                    style: TextStyle(color: GenesisColors.brand),
+                  ),
+                ],
+              ),
+              actionLabel: 'Get more >',
             ),
           ),
         ],

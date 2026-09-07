@@ -8,65 +8,64 @@ import 'package:genesis_flutter_android/components/common/genesis_bottom_sheet_p
 import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
 
 void main() {
-  testWidgets(
-    'Edit shows a single-line prompt below icons and opens Subscription',
-    (tester) async {
-      var editorOpened = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          scrollBehavior: const GenesisScrollBehavior(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 390,
-              child: LocationChatReplyActions(
-                style: kLocationChatStyle,
-                onEditReply: () => editorOpened = true,
-              ),
+  testWidgets('Edit shows free uses below icons and opens Subscription', (
+    tester,
+  ) async {
+    var editorOpened = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        scrollBehavior: const GenesisScrollBehavior(),
+        home: Scaffold(
+          body: SizedBox(
+            width: 390,
+            child: LocationChatReplyActions(
+              style: kLocationChatStyle,
+              onEditReply: () => editorOpened = true,
             ),
           ),
         ),
-      );
-      final prompt = find.byKey(const ValueKey('edit-subscription-prompt'));
-      expect(prompt, findsNothing);
-      await tester.tap(find.bySemanticsLabel('Edit'));
-      await tester.pumpAndSettle();
-      expect(editorOpened, isTrue);
-      expect(prompt, findsOneWidget);
-      final label = tester.widget<Text>(
-        find.descendant(of: prompt, matching: find.byType(Text)),
-      );
-      expect(label.textSpan!.toPlainText(), 'Members only. Subscribe >');
-      expect(label.maxLines, 1);
-      expect(label.softWrap, isFalse);
-      expect(label.style!.fontSize, 13);
-      final icons = find.byKey(
-        const ValueKey('location-chat-reply-actions-four-icons'),
-      );
-      expect(
-        tester.getTopLeft(prompt).dy,
-        greaterThan(tester.getBottomRight(icons).dy),
-      );
-      await tester.tap(prompt);
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('subscription-placeholder')),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(const ValueKey('gem-purchase-sheet-close')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Edit'));
-      await tester.pumpAndSettle();
-      expect(prompt, findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('Inspiration'));
-      await tester.pumpAndSettle();
-      expect(prompt, findsNothing);
-      expect(
-        find.byKey(const ValueKey('inspiration-replies-carousel')),
-        findsOneWidget,
-      );
-      expect(editorOpened, isTrue);
-    },
-  );
+      ),
+    );
+    final prompt = find.byKey(const ValueKey('edit-subscription-prompt'));
+    expect(prompt, findsNothing);
+    await tester.tap(find.bySemanticsLabel('Edit'));
+    await tester.pumpAndSettle();
+    expect(editorOpened, isTrue);
+    expect(prompt, findsOneWidget);
+    final label = tester.widget<Text>(
+      find.descendant(of: prompt, matching: find.byType(Text)),
+    );
+    expect(
+      label.textSpan!.toPlainText(),
+      'Free Edition uses left: "3"\nGet more >',
+    );
+    expect(label.maxLines, isNull);
+    expect(label.softWrap, isTrue);
+    expect(label.style!.fontSize, 13);
+    final icons = find.byKey(
+      const ValueKey('location-chat-reply-actions-four-icons'),
+    );
+    expect(
+      tester.getTopLeft(prompt).dy,
+      greaterThan(tester.getBottomRight(icons).dy),
+    );
+    await tester.tap(prompt);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('pro-tier-title')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('gem-purchase-sheet-close')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Edit'));
+    await tester.pumpAndSettle();
+    expect(prompt, findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Inspiration'));
+    await tester.pumpAndSettle();
+    expect(prompt, findsNothing);
+    expect(
+      find.byKey(const ValueKey('inspiration-replies-carousel')),
+      findsOneWidget,
+    );
+    expect(editorOpened, isTrue);
+  });
 
   testWidgets(
     'inspiration swipes through three previews matching the user bubble',
@@ -433,22 +432,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Subscription'), findsOneWidget);
       expect(find.text('Buy Gems'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('subscription-placeholder')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('pro-tier-title')), findsOneWidget);
       await tester.tap(find.text('Buy Gems'));
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('subscription-placeholder')),
-        findsNothing,
-      );
+      expect(find.byKey(const ValueKey('pro-tier-title')), findsNothing);
       await tester.tap(find.text('Subscription'));
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('subscription-placeholder')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('pro-tier-title')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('gem-purchase-sheet-close')));
       await tester.pumpAndSettle();
       expect(find.byType(PurchaseOptionsSheet), findsNothing);
