@@ -29,7 +29,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Daily Check-in'), findsOneWidget);
-      expect(find.text('+50.0'), findsOneWidget);
+      expect(find.text('+50'), findsOneWidget);
       expect(
         find.byKey(const ValueKey<String>('gem-task-reward-icon')),
         findsOneWidget,
