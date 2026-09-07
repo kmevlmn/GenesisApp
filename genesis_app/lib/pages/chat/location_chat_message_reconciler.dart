@@ -456,6 +456,7 @@ extension _LocationChatMessageReconciler on _LocationChatPanelState {
     if (_handlingUnauthorizedFailure || !mounted) return;
     _handlingUnauthorizedFailure = true;
     try {
+      GenesisTelemetry.clearUser();
       final services = AppServicesScope.read(context);
       final previousService = _service;
       final ownedPreviousService = _ownsService;

@@ -63,6 +63,7 @@ extension _WorldPageChatroomSession on _WorldPageState {
   Future<void> _performWorldChatroomAuthenticationRecovery() async {
     final oldService = _worldChatroom;
     try {
+      GenesisTelemetry.clearUser();
       await _detachWorldChatroomForAuthentication(oldService);
       if (!mounted) return;
 

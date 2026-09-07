@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/app/config/app_config.dart';
 import 'package:genesis_flutter_android/app/telemetry/firebase_analytics_monitoring.dart';
+import 'package:genesis_flutter_android/app/telemetry/genesis_telemetry.dart';
 import 'package:genesis_flutter_android/network/api_client.dart';
 import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/network/genesis_api.dart';
@@ -3996,6 +3997,22 @@ void main() {
     test(
       'successful ${provider.name} login records login and login_first',
       () async {
+        final collectStore = MemoryCollectEventStore();
+        final collectUploader = CollectTelemetryUploader(store: collectStore)
+          ..configure(enabled: true);
+        GenesisTelemetry.setCollectUploaderForTesting(collectUploader);
+        addTearDown(GenesisTelemetry.resetForTesting);
+        GenesisTelemetry.setUserId('u_previous');
+        await GenesisTelemetry.collectLogAndWait(
+          actionType: 'event',
+          action: 'before_session_expired',
+        );
+        GenesisTelemetry.clearUser();
+        await GenesisTelemetry.collectLogAndWait(
+          actionType: 'event',
+          action: 'after_session_expired',
+        );
+
         final analytics = _RecordingFirebaseAnalyticsClient();
         FirebaseAnalyticsMonitoring.resetForTesting();
         FirebaseAnalyticsMonitoring.setClientForTesting(analytics);
@@ -4063,6 +4080,18 @@ void main() {
           }),
         ]);
         expect(deviceInfoLoginUids, <String>['u_login']);
+        final identityEvents = collectStore.eventsForTesting.where(
+          (event) => const {
+            'before_session_expired',
+            'after_session_expired',
+            'login',
+          }.contains(event.action),
+        );
+        expect(identityEvents.map((event) => (event.action, event.userId)), [
+          ('before_session_expired', 'u_previous'),
+          ('after_session_expired', ''),
+          ('login', 'u_login'),
+        ]);
       },
     );
   }
