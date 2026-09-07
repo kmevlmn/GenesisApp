@@ -6,6 +6,7 @@ import '../../network/models/gem_product.dart';
 import '../../platform/billing/billing_models.dart';
 import '../../utils/gem_amount.dart';
 import 'gem_assets.dart';
+import 'gem_balance_text.dart';
 import 'gem_colors.dart';
 
 const double kGemProductCardHeight = 140;
@@ -78,8 +79,8 @@ class GemBalancePanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              formatGemCent(balanceCent),
+            Text.rich(
+              buildGemBalanceSpan(balanceCent, fontSize: 30),
               key: balanceKey,
               style: const TextStyle(
                 fontSize: 30,

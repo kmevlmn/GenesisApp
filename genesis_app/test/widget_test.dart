@@ -26692,7 +26692,8 @@ void main() {
     expect(
       tester
           .widget<Text>(find.byKey(const ValueKey('user-profile-gems-balance')))
-          .data,
+          .textSpan!
+          .toPlainText(),
       '430.0',
     );
     expect(transport.requestsFor('/api/v1/gem/wallet'), hasLength(1));

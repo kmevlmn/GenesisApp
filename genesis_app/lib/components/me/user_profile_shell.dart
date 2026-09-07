@@ -661,8 +661,11 @@ class _GemsBalanceEntry extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Flexible(
-                                    child: Text(
-                                      formatGemCent(balanceCent ?? 0),
+                                    child: Text.rich(
+                                      buildGemBalanceSpan(
+                                        balanceCent ?? 0,
+                                        fontSize: 18,
+                                      ),
                                       key: const ValueKey(
                                         'user-profile-gems-balance',
                                       ),
