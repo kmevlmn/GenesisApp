@@ -20,9 +20,9 @@ import '../../ui/tokens/genesis_avatar_radii.dart';
 import '../../utils/api_error_message.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/entity_deleted.dart';
-import '../../utils/gem_amount.dart';
 import '../../utils/stat_count_formatter.dart';
 import '../gems/gem_assets.dart';
+import '../gems/gem_balance_text.dart';
 import 'profile_collection_list.dart';
 
 part 'user_profile_shell.dart';
