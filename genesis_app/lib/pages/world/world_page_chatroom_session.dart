@@ -78,7 +78,10 @@ extension _WorldPageChatroomSession on _WorldPageState {
       }
       if (!mounted) return;
 
-      final loggedIn = await ensureGenesisLogin(context);
+      final loggedIn = await ensureGenesisLogin(
+        context,
+        continueAfterLogin: true,
+      );
       if (!mounted) return;
       if (!loggedIn) {
         if (identical(_worldChatroom, oldService)) {

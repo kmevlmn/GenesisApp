@@ -243,21 +243,33 @@ extension _OriginWorldPageLocationChat on _OriginWorldPageState {
     _setLocationChatRoleId(roleId);
   }
 
-  Future<bool> _launchLocationChatMessage(
+  Future<_OriginLocationChatSendResult> _launchLocationChatMessage(
     OriginDetail origin, {
     required String locationId,
     required String message,
     required ChatMentionCatalog mentionCatalog,
   }) async {
-    if (_launching || message.trim().isEmpty) return false;
-    if (!await ensureGenesisLogin(context) || !mounted) return false;
-
+    if (_launching || message.trim().isEmpty) {
+      return _OriginLocationChatSendResult.notLaunched;
+    }
+    // Keep the visible role when signing in adds a profile role to the list.
     final selectedRoleId = _effectiveLocationChatRoleId(origin);
+    _setLocationChatRoleId(selectedRoleId);
+    if (!await ensureGenesisLogin(context)) {
+      if (!mounted) return _OriginLocationChatSendResult.notLaunched;
+      return await hasGenesisLoginSession(context)
+          ? _OriginLocationChatSendResult.loginCompleted
+          : _OriginLocationChatSendResult.notLaunched;
+    }
+    if (!mounted) return _OriginLocationChatSendResult.notLaunched;
+
     OriginRoleLaunchSelection roleSelection;
     String telemetryRoleId;
     if (selectedRoleId == _OriginWorldPageState._profileLocationChatRoleId) {
       final profileRole = _openingProfileRole ?? await _customRoleFromProfile();
-      if (!mounted || profileRole == null) return false;
+      if (!mounted || profileRole == null) {
+        return _OriginLocationChatSendResult.notLaunched;
+      }
       roleSelection = OriginRoleLaunchSelection.custom(profileRole);
       telemetryRoleId = 'current_user';
     } else {
@@ -269,25 +281,29 @@ extension _OriginWorldPageLocationChat on _OriginWorldPageState {
         _setLocationChatRoleId(
           _OriginWorldPageState._profileLocationChatRoleId,
         );
-        return false;
+        return _OriginLocationChatSendResult.notLaunched;
       }
       final characterId = _characterStableId(character);
       roleSelection = OriginRoleLaunchSelection.preset(characterId);
       telemetryRoleId = characterId;
     }
 
-    return await _launchOrigin(
-          origin,
-          roleSelection,
-          telemetryRoleId: telemetryRoleId,
-          launchSource: OriginLaunchSource.openingMessage,
-          initialLocationId: locationId,
-          initialMessageToSend: message,
-          initialMentionCatalog: mentionCatalog,
-        ) !=
-        null;
+    final worldId = await _launchOrigin(
+      origin,
+      roleSelection,
+      telemetryRoleId: telemetryRoleId,
+      launchSource: OriginLaunchSource.openingMessage,
+      initialLocationId: locationId,
+      initialMessageToSend: message,
+      initialMentionCatalog: mentionCatalog,
+    );
+    return worldId == null
+        ? _OriginLocationChatSendResult.notLaunched
+        : _OriginLocationChatSendResult.launched;
   }
 }
+
+enum _OriginLocationChatSendResult { notLaunched, launched, loginCompleted }
 
 class _OriginLocationChatDescriptor {
   const _OriginLocationChatDescriptor({
@@ -340,7 +356,10 @@ class _OriginLocationChatLaunchComposer extends StatefulWidget {
   final OriginRoleAvatarSnapshotStore roleAvatarSnapshots;
   final ChatMentionCatalog mentionCatalog;
   final VoidCallback onSelectRole;
-  final Future<bool> Function(String message, ChatMentionCatalog mentionCatalog)
+  final Future<_OriginLocationChatSendResult> Function(
+    String message,
+    ChatMentionCatalog mentionCatalog,
+  )
   onSend;
   final ChatUiStyleConfig? style;
   final Color roleForegroundColor;
@@ -457,11 +476,18 @@ class _OriginLocationChatLaunchComposerState
     final message = _controller.serializedText;
     if (widget.launching || message.trim().isEmpty) return;
     final mentionCatalog = _controller.composedMentionCatalog;
-    final launched = await widget.onSend(message, mentionCatalog);
+    final result = await widget.onSend(message, mentionCatalog);
     if (!mounted) return;
+    if (result == _OriginLocationChatSendResult.loginCompleted) {
+      // Login and its follow-up dialogs have finished. Restore the draft input
+      // without running the failed-send cleanup that would close it again.
+      _focusNode.requestFocus();
+      return;
+    }
     _focusNode.unfocus();
-    widget.onSendCompleted?.call(launched);
-    if (!launched) return;
+    widget.onSendCompleted?.call(
+      result == _OriginLocationChatSendResult.launched,
+    );
   }
 
   @override
@@ -625,11 +651,7 @@ class _OriginLocationChatRoleSelector extends StatelessWidget {
                     child: SizedBox.square(
                       dimension: _originLocationChatRolePillAvatarSize,
                       child: snapshot == null
-                          ? GenesisAvatarFallback(
-                              name: role.name,
-                              size: _originLocationChatRolePillAvatarSize,
-                              borderRadius: 6,
-                            )
+                          ? null
                           : RawImage(
                               key: ValueKey<String>(
                                 'origin-location-chat-role-snapshot-${role.id}',

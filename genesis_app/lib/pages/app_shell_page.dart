@@ -9,8 +9,8 @@ import '../app/bootstrap/polling_scheduler.dart';
 import '../app/gems/daily_check_in_coordinator.dart';
 import '../app/startup/app_startup_coordinator.dart';
 import '../app/telemetry/genesis_telemetry.dart';
+import '../components/auth/login_guard.dart';
 import '../components/bottom_tabs.dart';
-import '../components/login_sheet.dart';
 import '../network/api_client.dart';
 import '../network/models/unread_summary.dart';
 import '../platform/auth/auth_session.dart';
@@ -334,18 +334,7 @@ class _AppShellPageState extends State<AppShellPage>
     }
   }
 
-  Future<bool> _ensureMainTabLogin() async {
-    if (await _hasLocalLoginSession()) return true;
-    if (!mounted) return false;
-    final loggedIn = await showLoginSheet(
-      context: context,
-      onLogin: _loginWithProvider,
-    );
-    if (!mounted || !loggedIn) return false;
-    await showDailyCheckInAfterLogin(context);
-    if (!mounted) return false;
-    return _hasLocalLoginSession();
-  }
+  Future<bool> _ensureMainTabLogin() => ensureGenesisLogin(context);
 
   Future<bool> _hasLocalLoginSession() async {
     final services = AppServicesScope.read(context);

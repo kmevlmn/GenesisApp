@@ -121,7 +121,7 @@ class _OriginDetailDraggableSheet extends StatefulWidget {
   final ValueChanged<OriginCustomRoleDraft> onSaveProfileRole;
   final _OriginLocationChatRoleOption locationChatRole;
   final ValueChanged<String> onSelectLocationChatRole;
-  final Future<bool> Function(
+  final Future<_OriginLocationChatSendResult> Function(
     String locationId,
     String message,
     ChatMentionCatalog mentionCatalog,

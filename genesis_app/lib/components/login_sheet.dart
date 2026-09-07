@@ -116,6 +116,9 @@ Future<bool> showLoginSheet({
   required BuildContext context,
   required Future<bool> Function(IdentityProvider provider) onLogin,
 }) async {
+  // Forget the field's focus before pushing the route so closing login cannot
+  // restore it and briefly reopen the keyboard.
+  FocusManager.instance.primaryFocus?.unfocus();
   final loggedIn = await showGenesisModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,

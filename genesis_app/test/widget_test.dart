@@ -42,6 +42,7 @@ import 'package:genesis_flutter_android/app/version/app_version_check_service.da
 import 'package:genesis_flutter_android/app/version/force_upgrade_gate.dart';
 import 'package:genesis_flutter_android/main.dart';
 import 'package:genesis_flutter_android/components/ai_content_disclaimer.dart';
+import 'package:genesis_flutter_android/components/auth/login_guard.dart';
 import 'package:genesis_flutter_android/components/chat/shared/chat_ui.dart';
 import 'package:genesis_flutter_android/components/common/copyable_id_label.dart';
 import 'package:genesis_flutter_android/components/common/list_loading_skeleton.dart';
@@ -3702,11 +3703,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Sign in to continue'), findsOneWidget);
+    expect(find.byType(LoginSheet), findsOneWidget);
     expect(find.text('Buy Gems'), findsNothing);
   });
 
-  testWidgets('Home Gem entry continues to Buy Gems after login', (
+  testWidgets('Home Gem entry waits for a second tap after login', (
     WidgetTester tester,
   ) async {
     final sessionStore = MemoryUserSessionStore();
@@ -3746,17 +3747,96 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Continue with Google'));
-    for (
-      var i = 0;
-      i < 40 && find.text('Buy Gems').evaluate().isEmpty;
-      i += 1
-    ) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+    await tester.pumpAndSettle();
 
     expect(backendAuth.loginCount, 1);
+    expect(await sessionStore.readUid(), 'backend_uid');
+    expect(find.byType(LoginSheet), findsNothing);
+    expect(find.text('Buy Gems'), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('home-gem-wallet-entry')),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('Buy Gems'), findsOneWidget);
+    expect(backendAuth.loginCount, 1);
   });
+
+  for (final continueAfterLogin in [false, true]) {
+    testWidgets(
+      continueAfterLogin
+          ? 'login guard resumes automatic recovery after login'
+          : 'login guard waits for a second user action after login',
+      (tester) async {
+        final sessionStore = MemoryUserSessionStore();
+        final backendAuth = _FakeBackendAuthCoordinator(
+          authenticated: false,
+          sessionStore: sessionStore,
+        );
+        final services = await _testServices(
+          initialUid: 'guest_login_guard',
+          sessionStoreOverride: sessionStore,
+          identityAuth: const _FakeIdentityAuthService(
+            signInSession: AuthSession(
+              provider: IdentityProvider.google,
+              providerIdToken: 'google-token',
+              displayName: 'Guard User',
+              photoUrl: '',
+            ),
+          ),
+          backendAuth: backendAuth,
+          transport: _RecordingV1ListTransport(),
+          useMock: false,
+        );
+        var actionCount = 0;
+        await tester.pumpWidget(
+          AppServicesScope(
+            services: services,
+            child: MaterialApp(
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: TextButton(
+                    onPressed: () async {
+                      if (await ensureGenesisLogin(
+                        context,
+                        continueAfterLogin: continueAfterLogin,
+                      )) {
+                        actionCount += 1;
+                      }
+                    },
+                    child: const Text('Run guarded action'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Run guarded action'));
+        await tester.pumpAndSettle();
+        expect(find.byType(LoginSheet), findsOneWidget);
+        await tester.tap(find.byTooltip('Close'));
+        await tester.pumpAndSettle();
+        expect(actionCount, 0);
+        expect(backendAuth.loginCount, 0);
+
+        await tester.tap(find.text('Run guarded action'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Continue with Google'));
+        await tester.pumpAndSettle();
+        expect(find.byType(LoginSheet), findsNothing);
+        expect(await sessionStore.readUid(), 'identity_uid');
+        expect(backendAuth.loginCount, 1);
+        expect(actionCount, continueAfterLogin ? 1 : 0);
+
+        await tester.tap(find.text('Run guarded action'));
+        await tester.pumpAndSettle();
+        expect(actionCount, continueAfterLogin ? 2 : 1);
+        expect(backendAuth.loginCount, 1);
+      },
+    );
+  }
 
   testWidgets('Home keeps its feed when returning from Buy Gems', (
     WidgetTester tester,
@@ -13136,6 +13216,163 @@ void main() {
     },
   );
 
+  testWidgets('Origin message login reopens keyboard once and keeps draft', (
+    WidgetTester tester,
+  ) async {
+    _mockGenesisKeyboardAnimationEvents();
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 900);
+    addTearDown(tester.view.reset);
+    final sessionStore = MemoryUserSessionStore();
+    final backendAuth = _FakeBackendAuthCoordinator(
+      authenticated: false,
+      sessionStore: sessionStore,
+    );
+    final launchResponse = Completer<TransportResponse>();
+    final transport = _RecordingV1ListTransport(
+      originLaunchCompleter: launchResponse,
+    );
+    await tester.pumpWidget(
+      AppServicesScope(
+        services: await _testServices(
+          initialUid: null,
+          sessionStoreOverride: sessionStore,
+          identityAuth: const _FakeIdentityAuthService(
+            signInSession: AuthSession(
+              provider: IdentityProvider.google,
+              providerIdToken: 'google-token',
+              displayName: 'Message User',
+              photoUrl: '',
+            ),
+          ),
+          backendAuth: backendAuth,
+          transport: transport,
+          useMock: false,
+        ),
+        child: const MaterialApp(
+          home: OriginWorldPage(
+            oid: 'o_test_1',
+            originId: 0,
+            showOpeningSheetOnEntry: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final composer = find.descendant(
+      of: find.byKey(const ValueKey('origin-expanded-opening-composer')),
+      matching: find.byType(LocationChatComposerInput),
+    );
+    expect(composer, findsOneWidget);
+    final roleLabel = find.byKey(
+      const ValueKey('origin-location-chat-role-label'),
+    );
+    final selectedRoleName = tester.widget<Text>(roleLabel).data;
+    final controller = tester
+        .widget<LocationChatComposerInput>(composer)
+        .controller;
+    final input = find.descendant(
+      of: composer,
+      matching: find.byKey(const ValueKey('chat-composer-input')),
+    );
+    await tester.enterText(input, 'Keep this message until I send again');
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pumpAndSettle();
+    final focusNode = tester
+        .widget<LocationChatComposerInput>(composer)
+        .focusNode;
+    final focusChanges = <bool>[];
+    void recordFocusChange() => focusChanges.add(focusNode.hasFocus);
+    focusNode.addListener(recordFocusChange);
+    tester.testTextInput.log.clear();
+    final sendButton = find.descendant(
+      of: composer,
+      matching: find.byKey(const ValueKey('chat-composer-send-button')),
+    );
+    await tester.tap(sendButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginSheet), findsOneWidget);
+    expect(focusNode.hasFocus, isFalse);
+    expect(focusChanges, [false]);
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(focusNode.hasFocus, isFalse);
+    expect(focusChanges, [false]);
+    expect(
+      tester.testTextInput.log.where((call) => call.method == 'TextInput.show'),
+      isEmpty,
+      reason: 'Dismissing login must not reopen the keyboard even briefly.',
+    );
+    expect(transport.requestsFor('/api/v1/origin/launch'), isEmpty);
+
+    // Reopen input deliberately before trying again and completing login.
+    await tester.tap(input);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pumpAndSettle();
+    expect(focusNode.hasFocus, isTrue);
+    focusChanges.clear();
+    tester.testTextInput.log.clear();
+    await tester.tap(sendButton);
+    await tester.pumpAndSettle();
+    expect(focusNode.hasFocus, isFalse);
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+
+    expect(backendAuth.loginCount, 1);
+    expect(find.byType(LoginSheet), findsNothing);
+    expect(find.byType(OriginWorldPage), findsOneWidget);
+    expect(find.byType(WorldPage), findsNothing);
+    expect(transport.requestsFor('/api/v1/origin/launch'), isEmpty);
+    expect(tester.widget<Text>(roleLabel).data, selectedRoleName);
+    final readyComposer = tester.widget<LocationChatComposerInput>(composer);
+    expect(readyComposer.controller, same(controller));
+    expect(controller.serializedText, 'Keep this message until I send again');
+    expect(readyComposer.sendEnabled, isTrue);
+    expect(readyComposer.sending, isFalse);
+    expect(focusNode.hasFocus, isTrue);
+    expect(focusChanges, [false, true]);
+    expect(
+      tester.testTextInput.log.where((call) => call.method == 'TextInput.show'),
+      isNotEmpty,
+      reason: 'Successful login restores input without sending the draft.',
+    );
+    tester.testTextInput.log.clear();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 150);
+    await tester.pump();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    for (var frame = 0; frame < 20; frame += 1) {
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(focusNode.hasFocus, isTrue);
+    }
+    expect(focusChanges, [false, true]);
+    expect(
+      tester.testTextInput.log.where((call) => call.method == 'TextInput.hide'),
+      isEmpty,
+      reason: 'The restored keyboard must stay open after login completes.',
+    );
+    focusNode.removeListener(recordFocusChange);
+
+    await tester.tap(sendButton);
+    await _pumpUntilSingleOriginLaunchRequest(tester, transport);
+    expect(backendAuth.loginCount, 1);
+    launchResponse.complete(
+      transport._jsonResponse({
+        'err_no': 5000,
+        'err_msg': 'Launch test completed',
+        'data': <String, Object?>{},
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Launch failed'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets(
     'Origin preset role message launch keeps initial dialogue location',
     (WidgetTester tester) async {
@@ -17540,9 +17777,11 @@ void main() {
     expect(find.text('Continue with Google'), findsNothing);
   });
 
-  testWidgets('Messages login refreshes cached Me session state', (
+  testWidgets('Messages login preserves the tab until a second tap', (
     WidgetTester tester,
   ) async {
+    AppStartupCoordinator.resetForTesting();
+    addTearDown(AppStartupCoordinator.resetForTesting);
     final sessionStore = MemoryUserSessionStore();
     final backendAuth = _FakeBackendAuthCoordinator(
       authenticated: false,
@@ -17588,12 +17827,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(backendAuth.loginCount, 1);
     expect(await sessionStore.readUid(), 'backend_uid');
-
-    tester.widget<BottomTabs>(find.byType(BottomTabs)).onTap(4);
+    expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 4);
+    expect(find.byType(UserProfileContent), findsOneWidget);
+    expect(find.text('Daily Check-in'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Inbox'));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 3);
+    expect(find.text('Private Chats'), findsOneWidget);
     expect(find.text('Continue with Google'), findsNothing);
-    expect(find.byType(UserProfileContent), findsOneWidget);
+    expect(backendAuth.loginCount, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    AppStartupCoordinator.resetForTesting();
   });
 
   testWidgets('signed-out Me view can start Apple login', (
@@ -17678,6 +17926,58 @@ void main() {
     expect(find.text('Continue with Google'), findsOneWidget);
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('Create entry waits for a second tap after login', (
+    WidgetTester tester,
+  ) async {
+    AppStartupCoordinator.resetForTesting();
+    addTearDown(AppStartupCoordinator.resetForTesting);
+    final sessionStore = MemoryUserSessionStore();
+    final backendAuth = _FakeBackendAuthCoordinator(
+      authenticated: false,
+      sessionStore: sessionStore,
+    );
+    await tester.pumpWidget(
+      AppServicesScope(
+        services: await _testServices(
+          initialUid: null,
+          sessionStoreOverride: sessionStore,
+          identityAuth: const _FakeIdentityAuthService(
+            signInSession: AuthSession(
+              provider: IdentityProvider.google,
+              providerIdToken: 'google-token',
+              displayName: 'Create User',
+              photoUrl: '',
+            ),
+          ),
+          backendAuth: backendAuth,
+          transport: _RecordingV1ListTransport(),
+          useMock: false,
+        ),
+        child: const MaterialApp(home: AppShellPage(initialIndex: 0)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final createEntry = find.byKey(const ValueKey('bottom-nav-Create'));
+    await tester.tap(createEntry);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+
+    expect(backendAuth.loginCount, 1);
+    expect(find.byType(LoginSheet), findsNothing);
+    expect(find.byType(CreateOriginPage), findsNothing);
+    expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 0);
+
+    await tester.tap(createEntry);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CreateOriginPage), findsOneWidget);
+    expect(backendAuth.loginCount, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    AppStartupCoordinator.resetForTesting();
   });
 
   testWidgets('tap Create while signed out shows login sheet', (
