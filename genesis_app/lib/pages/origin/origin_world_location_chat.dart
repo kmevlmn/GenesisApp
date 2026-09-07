@@ -479,8 +479,8 @@ class _OriginLocationChatLaunchComposerState
     final result = await widget.onSend(message, mentionCatalog);
     if (!mounted) return;
     if (result == _OriginLocationChatSendResult.loginCompleted) {
-      // Login and its follow-up dialogs have finished. Restore the draft input
-      // without running the failed-send cleanup that would close it again.
+      // Restore the draft input after login without running the failed-send
+      // cleanup that would close it again.
       _focusNode.requestFocus();
       return;
     }

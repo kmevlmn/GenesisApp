@@ -85,14 +85,17 @@ class AppServices {
   final BillingService? billing;
   final AppGlobalConfigStore appGlobalConfig;
   final ValueNotifier<int> sessionRevision;
+  final ValueNotifier<String?> pendingLoginCheckInUid = ValueNotifier(null);
 
   void notifySessionChanged() {
+    pendingLoginCheckInUid.value = null;
     gemWallet.reset();
     billing?.resetForSession();
     sessionRevision.value += 1;
   }
 
   void dispose() {
+    pendingLoginCheckInUid.dispose();
     billing?.dispose();
     gemWallet.dispose();
     appGlobalConfig.dispose();

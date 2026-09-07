@@ -6,22 +6,69 @@ import '../../components/common/genesis_center_toast.dart';
 import '../../components/gems/daily_check_in_dialog.dart';
 import '../../network/models/gem_task.dart';
 import '../../network/models/gem_task_action.dart';
+import '../../platform/session/user_session_store.dart';
 import '../bootstrap/app_services_scope.dart';
 import 'gem_task_analytics.dart';
 
 typedef DailyCheckInTaskAction = Future<GemTaskActionResult> Function();
 typedef DailyCheckInWalletRefresh = Future<void> Function();
 
-Future<void> showDailyCheckInAfterLogin(BuildContext context) async {
+Future<void> scheduleDailyCheckInAfterLogin(BuildContext context) async {
   if (!context.mounted) return;
   final services = AppServicesScope.read(context);
+  final sessionRevision = services.sessionRevision.value;
+  final uid = await services.sessionStore.readLoginUid();
+  if (!context.mounted ||
+      uid == null ||
+      !identical(AppServicesScope.read(context), services) ||
+      services.sessionRevision.value != sessionRevision) {
+    return;
+  }
+  services.pendingLoginCheckInUid.value = uid;
+}
+
+/// Called by the main tabs only. Recheck visibility after the network request
+/// so navigating to a detail page never brings the check-in prompt along with it.
+Future<void> showPendingDailyCheckInAfterLogin(
+  BuildContext context, {
+  required bool Function() canShow,
+}) async {
+  if (!context.mounted || !canShow()) return;
+  final services = AppServicesScope.read(context);
+  final pending = services.pendingLoginCheckInUid;
+  final uid = pending.value;
+  if (uid == null) return;
+  final sessionRevision = services.sessionRevision.value;
+  bool isCurrentRequest() =>
+      context.mounted &&
+      identical(AppServicesScope.read(context), services) &&
+      pending.value == uid &&
+      services.sessionRevision.value == sessionRevision;
+
+  final currentUid = await services.sessionStore.readLoginUid();
+  if (!isCurrentRequest()) return;
+  if (currentUid != uid) {
+    pending.value = null;
+    return;
+  }
+  if (!canShow()) return;
   late final GemTask? task;
   try {
     task = _findDailyCheckInTask((await services.api.v1.gem.tasks()).groups);
   } catch (_) {
+    if (isCurrentRequest() && canShow()) pending.value = null;
     return;
   }
-  if (task == null || !context.mounted) return;
+  if (!isCurrentRequest()) return;
+  final latestUid = await services.sessionStore.readLoginUid();
+  if (!isCurrentRequest()) return;
+  if (latestUid != uid) {
+    pending.value = null;
+    return;
+  }
+  if (!context.mounted || !canShow()) return;
+  pending.value = null;
+  if (task == null) return;
 
   await runDailyCheckInFlow(
     context,

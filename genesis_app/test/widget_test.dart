@@ -43,6 +43,7 @@ import 'package:genesis_flutter_android/app/version/force_upgrade_gate.dart';
 import 'package:genesis_flutter_android/main.dart';
 import 'package:genesis_flutter_android/components/ai_content_disclaimer.dart';
 import 'package:genesis_flutter_android/components/auth/login_guard.dart';
+import 'package:genesis_flutter_android/app/gems/daily_check_in_coordinator.dart';
 import 'package:genesis_flutter_android/components/chat/shared/chat_ui.dart';
 import 'package:genesis_flutter_android/components/common/copyable_id_label.dart';
 import 'package:genesis_flutter_android/components/common/list_loading_skeleton.dart';
@@ -695,6 +696,8 @@ class _RecordingV1ListTransport implements HttpTransport {
     this.worldDefinitionVersion = 1,
     this.originExposureFailuresRemaining = 0,
     this.originCover = '',
+    this.dailyCheckInStatus,
+    this.gemTasksCompleter,
   });
 
   final requests = <TransportRequest>[];
@@ -736,6 +739,8 @@ class _RecordingV1ListTransport implements HttpTransport {
   final int originDefinitionVersion;
   final int worldDefinitionVersion;
   final String originCover;
+  final String? dailyCheckInStatus;
+  final Completer<TransportResponse>? gemTasksCompleter;
   int originExposureFailuresRemaining;
   int _worldDetailRequestIndex = 0;
   int _originLaunchRequestIndex = 0;
@@ -744,6 +749,10 @@ class _RecordingV1ListTransport implements HttpTransport {
   @override
   Future<TransportResponse> send(TransportRequest request) async {
     requests.add(request);
+    if (request.uri.path.endsWith('/gem/tasks') &&
+        (dailyCheckInStatus != null || gemTasksCompleter != null)) {
+      return gemTasksCompleter?.future ?? dailyCheckInResponse();
+    }
     if (request.uri.path.endsWith('/world/map')) {
       final pendingResponse = worldMapCompleter;
       if (pendingResponse != null) return pendingResponse.future;
@@ -1127,6 +1136,24 @@ class _RecordingV1ListTransport implements HttpTransport {
       'data': {'list': list, 'total': responseTotal},
     });
   }
+
+  TransportResponse dailyCheckInResponse() => _jsonResponse({
+    'err_no': 0,
+    'data': {
+      'list': [
+        {
+          'group_code': 'daily',
+          'tasks': [
+            {
+              'task_code': 'daily_checkin',
+              'reward_gems_cent': 5000,
+              'status': dailyCheckInStatus ?? 'in_progress',
+            },
+          ],
+        },
+      ],
+    },
+  });
 
   TransportResponse _jsonResponse(Map<String, Object?> body) {
     return TransportResponse(
@@ -13216,13 +13243,16 @@ void main() {
     },
   );
 
-  testWidgets('Origin message login reopens keyboard once and keeps draft', (
+  testWidgets('Origin message login defers check-in to main tabs', (
     WidgetTester tester,
   ) async {
+    AppStartupCoordinator.resetForTesting();
+    addTearDown(AppStartupCoordinator.resetForTesting);
     _mockGenesisKeyboardAnimationEvents();
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(430, 900);
     addTearDown(tester.view.reset);
+    final navigatorKey = GlobalKey<NavigatorState>();
     final sessionStore = MemoryUserSessionStore();
     final backendAuth = _FakeBackendAuthCoordinator(
       authenticated: false,
@@ -13231,6 +13261,7 @@ void main() {
     final launchResponse = Completer<TransportResponse>();
     final transport = _RecordingV1ListTransport(
       originLaunchCompleter: launchResponse,
+      dailyCheckInStatus: 'in_progress',
     );
     await tester.pumpWidget(
       AppServicesScope(
@@ -13249,8 +13280,17 @@ void main() {
           transport: transport,
           useMock: false,
         ),
-        child: const MaterialApp(
-          home: OriginWorldPage(
+        child: MaterialApp(
+          navigatorKey: navigatorKey,
+          home: const AppShellPage(initialIndex: 0),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    unawaited(
+      navigatorKey.currentState!.push<void>(
+        MaterialPageRoute(
+          builder: (_) => const OriginWorldPage(
             oid: 'o_test_1',
             originId: 0,
             showOpeningSheetOnEntry: true,
@@ -13325,6 +13365,8 @@ void main() {
 
     expect(backendAuth.loginCount, 1);
     expect(find.byType(LoginSheet), findsNothing);
+    expect(find.text('Daily Check-in'), findsNothing);
+    expect(transport.requestsFor('/api/v1/gem/tasks'), isEmpty);
     expect(find.byType(OriginWorldPage), findsOneWidget);
     expect(find.byType(WorldPage), findsNothing);
     expect(transport.requestsFor('/api/v1/origin/launch'), isEmpty);
@@ -13370,7 +13412,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Launch failed'), findsOneWidget);
     await tester.pump(const Duration(seconds: 2));
+    expect(find.text('Daily Check-in'), findsNothing);
+    navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Daily Check-in'), findsOneWidget);
+    expect(transport.requestsFor('/api/v1/gem/tasks'), hasLength(1));
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Daily Check-in'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
+    AppStartupCoordinator.resetForTesting();
   });
 
   testWidgets(
@@ -17735,6 +17786,8 @@ void main() {
   testWidgets('signed-out Me view enters Me after Google login succeeds', (
     WidgetTester tester,
   ) async {
+    AppStartupCoordinator.resetForTesting();
+    addTearDown(AppStartupCoordinator.resetForTesting);
     final sessionStore = MemoryUserSessionStore();
     final backendAuth = _FakeBackendAuthCoordinator(
       authenticated: false,
@@ -17752,6 +17805,7 @@ void main() {
     await tester.pumpWidget(
       GenesisApp(
         services: await _testServices(
+          initialUid: null,
           sessionStoreOverride: sessionStore,
           identityAuth: const _FakeIdentityAuthService(
             signInSession: AuthSession(
@@ -17775,7 +17829,138 @@ void main() {
     expect(backendAuth.loginCount, 1);
     expect(backendAuth.lastLoginProvider, IdentityProvider.google);
     expect(find.text('Continue with Google'), findsNothing);
+    expect(find.text('Daily Check-in'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    AppStartupCoordinator.resetForTesting();
   });
+
+  for (final tabIndex in [0, 1, 3, 4]) {
+    testWidgets('login check-in waits for main tab $tabIndex', (tester) async {
+      AppStartupCoordinator.resetForTesting();
+      addTearDown(AppStartupCoordinator.resetForTesting);
+      final navigatorKey = GlobalKey<NavigatorState>();
+      final transport = _RecordingV1ListTransport(
+        dailyCheckInStatus: 'in_progress',
+      );
+      await tester.pumpWidget(
+        AppServicesScope(
+          services: await _testServices(transport: transport, useMock: false),
+          child: MaterialApp(
+            navigatorKey: navigatorKey,
+            home: AppShellPage(initialIndex: tabIndex),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Daily Check-in'), findsNothing);
+      unawaited(
+        navigatorKey.currentState!.push<void>(
+          MaterialPageRoute(
+            builder: (_) => const Scaffold(body: Text('Secondary page')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final detailContext = tester.element(find.text('Secondary page'));
+      await scheduleDailyCheckInAfterLogin(detailContext);
+      await scheduleDailyCheckInAfterLogin(detailContext);
+      await tester.pumpAndSettle();
+      expect(find.text('Daily Check-in'), findsNothing);
+      expect(transport.requestsFor('/api/v1/gem/tasks'), isEmpty);
+
+      unawaited(
+        navigatorKey.currentState!.push<void>(
+          MaterialPageRoute(
+            builder: (_) =>
+                const Scaffold(body: Text('Another secondary page')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      navigatorKey.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Daily Check-in'), findsNothing);
+      navigatorKey.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Daily Check-in'), findsOneWidget);
+      expect(transport.requestsFor('/api/v1/gem/tasks'), hasLength(1));
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      for (final nextTab in [0, 1, 3, 4]) {
+        tester.widget<BottomTabs>(find.byType(BottomTabs)).onTap(nextTab);
+        await tester.pumpAndSettle();
+        expect(find.text('Daily Check-in'), findsNothing);
+      }
+      expect(transport.requestsFor('/api/v1/gem/tasks'), hasLength(1));
+      await tester.pumpWidget(const SizedBox.shrink());
+      AppStartupCoordinator.resetForTesting();
+    });
+  }
+
+  for (final signOutWhileLoading in [false, true]) {
+    testWidgets(
+      signOutWhileLoading
+          ? 'login check-in discards the pending prompt after logout'
+          : 'login check-in defers when a detail page opens during loading',
+      (tester) async {
+        AppStartupCoordinator.resetForTesting();
+        addTearDown(AppStartupCoordinator.resetForTesting);
+        final navigatorKey = GlobalKey<NavigatorState>();
+        final tasksResponse = Completer<TransportResponse>();
+        final transport = _RecordingV1ListTransport(
+          gemTasksCompleter: tasksResponse,
+        );
+        final services = await _testServices(
+          transport: transport,
+          useMock: false,
+        );
+        await tester.pumpWidget(
+          AppServicesScope(
+            services: services,
+            child: MaterialApp(
+              navigatorKey: navigatorKey,
+              home: const AppShellPage(initialIndex: 0),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await scheduleDailyCheckInAfterLogin(
+          tester.element(find.byType(AppShellPage)),
+        );
+        await tester.pumpAndSettle();
+        expect(transport.requestsFor('/api/v1/gem/tasks'), hasLength(1));
+        unawaited(
+          navigatorKey.currentState!.push<void>(
+            MaterialPageRoute(
+              builder: (_) => const Scaffold(body: Text('Secondary page')),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (signOutWhileLoading) {
+          await services.sessionStore.clearUid();
+          services.notifySessionChanged();
+        }
+        tasksResponse.complete(transport.dailyCheckInResponse());
+        await tester.pumpAndSettle();
+        expect(find.text('Daily Check-in'), findsNothing);
+        navigatorKey.currentState!.pop();
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Daily Check-in'),
+          signOutWhileLoading ? findsNothing : findsOneWidget,
+        );
+        expect(
+          transport.requestsFor('/api/v1/gem/tasks'),
+          hasLength(signOutWhileLoading ? 1 : 2),
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+        AppStartupCoordinator.resetForTesting();
+      },
+    );
+  }
 
   testWidgets('Messages login preserves the tab until a second tap', (
     WidgetTester tester,

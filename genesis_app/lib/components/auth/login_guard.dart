@@ -25,7 +25,7 @@ Future<bool> ensureGenesisLogin(
     },
   );
   if (!loginContext.mounted || !loggedIn) return false;
-  await showDailyCheckInAfterLogin(loginContext);
+  await scheduleDailyCheckInAfterLogin(loginContext);
   if (!loginContext.mounted) return false;
   if (!continueAfterLogin) return false;
   return hasGenesisLoginSession(loginContext);
