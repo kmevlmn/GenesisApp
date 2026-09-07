@@ -15,6 +15,7 @@ import '../../components/common/local_image_crop_page.dart';
 import '../../components/page_header.dart';
 import '../../components/me/signed_out_me_view.dart';
 import '../../components/me/user_profile_content.dart';
+import '../../icons/custom_icon_assets.dart';
 import '../../network/genesis_api.dart';
 import '../../network/json_utils.dart';
 import '../../network/models/origin.dart';
@@ -243,6 +244,21 @@ class _MePageState extends State<MePage> with RouteAware {
                   worldsListenable: _worldsState,
                   avatarUrlListenable: _avatarUrl,
                   displayNameListenable: _displayName,
+                  displayNameTrailing: SizedBox(
+                    width: 24,
+                    // Match the name's line height without moving the edit action.
+                    height: MediaQuery.textScalerOf(context).scale(20),
+                    child: OverflowBox(
+                      minHeight: 24,
+                      maxHeight: 24,
+                      child: SvgPicture.asset(
+                        proCrownFilledIconAsset,
+                        key: const ValueKey('me-profile-crown-icon'),
+                        width: 24,
+                        height: 24,
+                      ),
+                    ),
+                  ),
                   isUpdatingProfileListenable: _isUpdatingProfile,
                   gemWalletStateListenable: gemWalletState,
                   reselectionListenable: widget.reselectionListenable,

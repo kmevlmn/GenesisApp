@@ -1893,6 +1893,14 @@ class _OriginSheetHeaderContent extends StatelessWidget {
                   ),
                   GenesisInlineMetaLabel(
                     text: 'Originator: ${formatUidForDisplay(originator)}',
+                    trailing: origin.ownerDeleted
+                        ? null
+                        : SvgPicture.asset(
+                            proCrownFilledIconAsset,
+                            key: const ValueKey('originator-membership-badge'),
+                            width: 14,
+                            height: 14,
+                          ),
                     onTap: ownerUid.isEmpty || origin.ownerDeleted
                         ? null
                         : () => Navigator.of(context).pushNamed(

@@ -87,6 +87,8 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.titleKey,
     this.onTitleTap,
     this.titleStyle,
+    this.titleWidget,
+    this.titleSideInset,
     this.systemOverlayStyle,
   });
 
@@ -96,6 +98,10 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Key? titleKey;
   final VoidCallback? onTitleTap;
   final TextStyle? titleStyle;
+  final Widget? titleWidget;
+
+  /// Opt into a title centered on the whole page, independent of side actions.
+  final double? titleSideInset;
   final SystemUiOverlayStyle? systemOverlayStyle;
 
   @override
@@ -127,12 +133,25 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
       ),
-      title: GestureDetector(
-        key: titleKey,
-        behavior: HitTestBehavior.translucent,
-        onTap: onTitleTap,
-        child: PageTitleText(pageName: pageName, style: titleStyle),
-      ),
+      flexibleSpace: titleWidget != null && titleSideInset != null
+          ? SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: titleSideInset!),
+                child: Center(child: titleWidget),
+              ),
+            )
+          : null,
+      title: titleWidget != null && titleSideInset != null
+          ? null
+          : GestureDetector(
+              key: titleKey,
+              behavior: HitTestBehavior.translucent,
+              onTap: onTitleTap,
+              child:
+                  titleWidget ??
+                  PageTitleText(pageName: pageName, style: titleStyle),
+            ),
       actions: actions,
     );
   }

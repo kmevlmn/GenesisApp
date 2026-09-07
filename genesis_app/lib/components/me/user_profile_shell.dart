@@ -13,6 +13,7 @@ class UserProfileContent extends StatefulWidget {
     this.isUpdatingProfile = false,
     this.avatarUrlListenable,
     this.displayNameListenable,
+    this.displayNameTrailing,
     this.isUpdatingProfileListenable,
     this.gemWalletStateListenable,
     this.reselectionListenable,
@@ -43,6 +44,7 @@ class UserProfileContent extends StatefulWidget {
   final bool isUpdatingProfile;
   final ValueListenable<String>? avatarUrlListenable;
   final ValueListenable<String>? displayNameListenable;
+  final Widget? displayNameTrailing;
   final ValueListenable<bool>? isUpdatingProfileListenable;
   final ValueListenable<GemWalletState>? gemWalletStateListenable;
   final ValueListenable<int>? reselectionListenable;
@@ -373,6 +375,10 @@ class _UserProfileContentState extends State<UserProfileContent>
                                   widget.displayNameListenable,
                             ),
                           ),
+                          if (widget.displayNameTrailing != null) ...[
+                            const SizedBox(width: 6),
+                            widget.displayNameTrailing!,
+                          ],
                           if (widget.onEditDisplayName != null) ...[
                             const SizedBox(width: 4),
                             _ProfileEditButton(

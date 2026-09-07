@@ -69,6 +69,7 @@ class GenesisInlineMetaLabel extends StatelessWidget {
     this.onTap,
     this.style = CopyableIdLabel.textStyle,
     this.textAlign = TextAlign.left,
+    this.trailing,
     this.trailingIcon,
     this.trailingIconColor = CopyableIdLabel.iconColor,
     this.trailingIconSize = 16,
@@ -79,6 +80,9 @@ class GenesisInlineMetaLabel extends StatelessWidget {
   final VoidCallback? onTap;
   final TextStyle style;
   final TextAlign textAlign;
+
+  /// Optional content between the label and its navigation/action icon.
+  final Widget? trailing;
   final IconData? trailingIcon;
   final Color trailingIconColor;
   final double trailingIconSize;
@@ -107,6 +111,10 @@ class GenesisInlineMetaLabel extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (trailing != null) ...[
+                SizedBox(width: trailingGap),
+                trailing!,
+              ],
               if (trailingIcon != null) ...[
                 SizedBox(width: trailingGap),
                 Icon(

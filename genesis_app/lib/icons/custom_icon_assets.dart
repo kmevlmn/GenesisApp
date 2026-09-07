@@ -48,3 +48,8 @@ const String regenerateIconAsset = 'assets/custom-icons/svg/regenerate.svg';
 const String goOnIconAsset = 'assets/custom-icons/svg/go_on.svg';
 const String editSquareIconAsset = 'assets/custom-icons/svg/edit_square.svg';
 const String inspirationIconAsset = 'assets/custom-icons/svg/inspiration.svg';
+const String proCrownIconAsset = 'assets/custom-icons/svg/pro_crown.svg';
+const String proCrownFilledIconAsset =
+    'assets/custom-icons/svg/pro_crown_filled.svg';
+const String upgradeIconAsset = 'assets/custom-icons/svg/upgrade.svg';
+const String recordsIconAsset = 'assets/custom-icons/svg/records.svg';

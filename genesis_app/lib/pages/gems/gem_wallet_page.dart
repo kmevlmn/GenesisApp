@@ -17,7 +17,10 @@ import '../../components/gems/gem_assets.dart';
 import '../../components/gems/gem_billing_purchase_dialog.dart';
 import '../../components/gems/gem_colors.dart';
 import '../../components/gems/gem_purchase_catalog.dart';
+import '../../components/gems/pro_subscription_content.dart';
+import '../../components/gems/wallet_purchase_tabs.dart';
 import '../../components/page_header.dart';
+import '../../icons/custom_icon_assets.dart';
 import '../../network/models/gem_product.dart';
 import '../../network/models/gem_task.dart';
 import '../../network/models/gem_task_action.dart';
@@ -91,7 +94,7 @@ Future<void> showGemBillingPurchaseOverlayPreview(BuildContext context) async {
 }
 
 class _GemWalletPageState extends State<GemWalletPage>
-    with WidgetsBindingObserver, RouteAware {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver, RouteAware {
   static final Uri _discordUri = Uri.parse('https://discord.gg/wuKHk7cyX7');
   List<GemProduct>? _products;
   List<GemTaskGroup>? _taskGroups;
@@ -114,10 +117,12 @@ class _GemWalletPageState extends State<GemWalletPage>
   bool _billingPurchaseDialogShowing = false;
   bool _billingPurchaseDialogDismissing = false;
   bool _storeRecoveryStarted = false;
+  late final TabController _purchaseTabs;
 
   @override
   void initState() {
     super.initState();
+    _purchaseTabs = TabController(length: 2, initialIndex: 1, vsync: this);
     WidgetsBinding.instance.addObserver(this);
     _trackBuyGemsPageView();
     unawaited(_refreshAll());
@@ -130,6 +135,7 @@ class _GemWalletPageState extends State<GemWalletPage>
     _billingEvents?.cancel();
     _disposeBillingPurchaseDialogState();
     _idleBillingState.dispose();
+    _purchaseTabs.dispose();
     super.dispose();
   }
 
@@ -181,28 +187,36 @@ class _GemWalletPageState extends State<GemWalletPage>
         backgroundColor: Colors.white,
         appBar: GenesisBackAppBar(
           pageName: 'Buy Gems',
+          titleWidget: WalletPurchaseTabs(controller: _purchaseTabs),
+          titleSideInset: 56,
           systemOverlayStyle: kGenesisDefaultSystemUiOverlayStyle,
           actions: [
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () =>
+            IconButton(
+              key: const ValueKey('wallet-records-button'),
+              tooltip: 'Records',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 56, height: 50),
+              onPressed: () =>
                   Navigator.of(context).pushNamed(RouteNames.gemRecords),
-              child: const Padding(
-                padding: EdgeInsets.fromLTRB(12, 10, 20, 10),
-                child: Text(
-                  'Records',
-                  style: TextStyle(
-                    color: Color(0xFF333333),
-                    fontSize: 12,
-                    height: 18 / 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+              icon: SvgPicture.asset(
+                recordsIconAsset,
+                key: const ValueKey('wallet-records-icon'),
+                width: 20,
+                height: 20,
               ),
             ),
           ],
         ),
-        body: SafeArea(child: _buildBody(walletStateListenable)),
+        body: SafeArea(
+          child: TabBarView(
+            key: const ValueKey('wallet-purchase-pages'),
+            controller: _purchaseTabs,
+            children: [
+              const _WalletTabPage(child: ProSubscriptionContent()),
+              _WalletTabPage(child: _buildBody(walletStateListenable)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -236,5 +250,27 @@ class _GemWalletPageState extends State<GemWalletPage>
         onJoinUsTap: _handleJoinUsRowTap,
       ),
     );
+  }
+}
+
+/// Preserve each tab's plan selection and list position during page swipes.
+class _WalletTabPage extends StatefulWidget {
+  const _WalletTabPage({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_WalletTabPage> createState() => _WalletTabPageState();
+}
+
+class _WalletTabPageState extends State<_WalletTabPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

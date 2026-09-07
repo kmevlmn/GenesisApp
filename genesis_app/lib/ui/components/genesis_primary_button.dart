@@ -22,6 +22,7 @@ class GenesisPrimaryButton extends StatelessWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: GenesisSpacing.page),
     this.fontWeight,
     this.fontSize,
+    this.fontFamily,
     this.borderRadius,
     this.minimumSize,
     this.tapTargetSize,
@@ -57,6 +58,7 @@ class GenesisPrimaryButton extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final FontWeight? fontWeight;
   final double? fontSize;
+  final String? fontFamily;
   final BorderRadius? borderRadius;
   final Size? minimumSize;
   final MaterialTapTargetSize? tapTargetSize;
@@ -104,6 +106,7 @@ class GenesisPrimaryButton extends StatelessWidget {
                 disabledForegroundColor ?? defaultDisabledForegroundColor,
             side: side,
             textStyle: defaultTextStyle.copyWith(
+              fontFamily: fontFamily,
               fontSize: fontSize,
               fontWeight: fontWeight,
             ),
