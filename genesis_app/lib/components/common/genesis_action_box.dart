@@ -13,12 +13,16 @@ class GenesisActionBoxAction<T> {
     required this.value,
     this.color,
     this.enabled = true,
+    this.trailing,
+    this.fontWeight = FontWeight.w600,
   });
 
   final String label;
   final T value;
   final Color? color;
   final bool enabled;
+  final Widget? trailing;
+  final FontWeight fontWeight;
 }
 
 Future<T?> showGenesisActionBox<T>({
@@ -310,6 +314,17 @@ class _ActionRow<T> extends StatelessWidget {
     final color =
         action.color ??
         (isPreferred ? _genesisActionBoxDestructive : _genesisActionBoxText);
+    final label = Text(
+      action.label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: color,
+        fontSize: 15,
+        height: 1.2,
+        fontWeight: action.fontWeight,
+      ),
+    );
     return InkWell(
       onTap: !action.enabled
           ? null
@@ -330,17 +345,16 @@ class _ActionRow<T> extends StatelessWidget {
           alignment: Alignment.center,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: Text(
-              action.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 15,
-                height: 1.2,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: action.trailing == null
+                ? label
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(child: label),
+                      const SizedBox(width: 4),
+                      action.trailing!,
+                    ],
+                  ),
           ),
         ),
       ),

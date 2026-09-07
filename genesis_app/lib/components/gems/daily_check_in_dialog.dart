@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../common/genesis_action_box.dart';
 import 'gem_assets.dart';
 import 'gem_colors.dart';
+import 'gem_purchase_bottom_sheet.dart';
 import '../../utils/gem_amount.dart';
 
 const int dailyCheckInPreviewRewardCent = 5000;
@@ -14,13 +15,16 @@ const Duration dailyCheckInSuccessDuration = Duration(seconds: 3);
 
 enum DailyCheckInDialogStatus { checkIn, claim, claimed }
 
+enum _DailyCheckInAction { subscribe, checkIn }
+
 Future<bool> showDailyCheckInDialog(
   BuildContext context, {
   required DailyCheckInDialogStatus status,
   int rewardGemsCent = dailyCheckInPreviewRewardCent,
 }) async {
   final claimed = status == DailyCheckInDialogStatus.claimed;
-  final shouldCheckIn = await showGenesisActionBox<bool>(
+  final showSubscriptionOffer = status == DailyCheckInDialogStatus.checkIn;
+  final action = await showGenesisActionBox<_DailyCheckInAction>(
     context: context,
     title: 'Daily Check-in',
     titleContent: _GemTaskReward(
@@ -29,20 +33,42 @@ Future<bool> showDailyCheckInDialog(
     ),
     titleContentSpacing: 10,
     actions: [
-      GenesisActionBoxAction<bool>(
+      if (showSubscriptionOffer)
+        GenesisActionBoxAction<_DailyCheckInAction>(
+          label: 'Get 100',
+          value: _DailyCheckInAction.subscribe,
+          color: kGemAccentColor,
+          trailing: SvgPicture.asset(
+            gemIconAsset,
+            key: const ValueKey('daily-check-in-subscription-gem'),
+            width: gemSmallIconSize,
+            height: gemSmallIconSize,
+            excludeFromSemantics: true,
+          ),
+        ),
+      GenesisActionBoxAction<_DailyCheckInAction>(
         label: switch (status) {
           DailyCheckInDialogStatus.checkIn => 'Check in',
           DailyCheckInDialogStatus.claim => 'Claim',
           DailyCheckInDialogStatus.claimed => 'Claimed',
         },
-        value: true,
-        color: claimed ? kGemTaskClaimedForegroundColor : kGemAccentColor,
+        value: _DailyCheckInAction.checkIn,
+        fontWeight: showSubscriptionOffer ? FontWeight.w400 : FontWeight.w600,
+        color: claimed
+            ? kGemTaskClaimedForegroundColor
+            : showSubscriptionOffer
+            ? const Color(0xFF111111)
+            : kGemAccentColor,
         enabled: !claimed,
       ),
     ],
     cancelLabel: 'Cancel',
+    showCancel: !showSubscriptionOffer,
   );
-  return shouldCheckIn == true;
+  if (action == _DailyCheckInAction.subscribe && context.mounted) {
+    await showSubscriptionPurchaseBottomSheet(context);
+  }
+  return action == _DailyCheckInAction.checkIn;
 }
 
 Future<void> showDailyCheckInSuccessDialog(
