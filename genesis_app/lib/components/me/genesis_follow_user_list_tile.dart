@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
 import '../../routers/app_router.dart';
 import '../../ui/components/genesis_avatar.dart';
 import '../../ui/tokens/genesis_avatar_radii.dart';
@@ -38,6 +39,13 @@ class GenesisFollowUserListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final neutralFill = dark
+        ? GenesisColors.darkFaintFill
+        : const Color(0xFFE5E5E5);
+    final primary = dark ? GenesisColors.darkTextPrimary : Colors.black;
+    final disabled = dark ? GenesisColors.darkTextTertiary : Colors.black54;
+    final onBrand = dark ? GenesisColors.darkTextPrimary : Colors.white;
     final cleanUid = uid.trim();
     return InkWell(
       borderRadius: BorderRadius.circular(8),
@@ -73,11 +81,11 @@ class GenesisFollowUserListTile extends StatelessWidget {
                     displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       height: 1.2,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black,
+                      color: primary,
                     ),
                   ),
                   SizedBox(
@@ -86,7 +94,11 @@ class GenesisFollowUserListTile extends StatelessWidget {
                   ),
                   Text(
                     'UID: ${deletedAwareIdLabel(formatUidForDisplay(cleanUid), deleted: deleted)}',
-                    style: _uidTextStyle,
+                    style: dark
+                        ? _uidTextStyle.copyWith(
+                            color: GenesisColors.darkTextTertiary,
+                          )
+                        : _uidTextStyle,
                   ),
                 ],
               ),
@@ -108,17 +120,15 @@ class GenesisFollowUserListTile extends StatelessWidget {
                         fixedSize: const Size(_actionWidth, _actionHeight),
                         minimumSize: const Size(_actionWidth, _actionHeight),
                         backgroundColor: isFollowed
-                            ? const Color(0xFFE5E5E5)
-                            : const Color(0xFFFF2442),
+                            ? neutralFill
+                            : GenesisColors.redPrimary,
                         disabledBackgroundColor: isFollowed
-                            ? const Color(0xFFE5E5E5)
-                            : const Color(0xFFFF2442).withValues(alpha: 0.55),
-                        foregroundColor: isFollowed
-                            ? Colors.black
-                            : Colors.white,
+                            ? neutralFill
+                            : GenesisColors.redPrimary.withValues(alpha: 0.55),
+                        foregroundColor: isFollowed ? primary : onBrand,
                         disabledForegroundColor: isFollowed
-                            ? Colors.black54
-                            : Colors.white,
+                            ? disabled
+                            : onBrand,
                         alignment: Alignment.center,
                         padding: EdgeInsets.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -132,9 +142,7 @@ class GenesisFollowUserListTile extends StatelessWidget {
                               height: 15,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: isFollowed
-                                    ? Colors.black54
-                                    : Colors.white,
+                                color: isFollowed ? disabled : onBrand,
                               ),
                             )
                           : Text(

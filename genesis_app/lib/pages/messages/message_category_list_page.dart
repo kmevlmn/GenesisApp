@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../ui/theme/genesis_dark_theme.dart';
+import '../../ui/system/genesis_system_ui.dart';
 import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../components/auth/login_guard.dart';
@@ -224,7 +226,7 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
         GenesisActionBoxAction<_JoinRequestAction>(
           label: 'Reject',
           value: _JoinRequestAction.reject,
-          color: Color(0xFF111111),
+          color: GenesisColors.darkTextPrimary,
         ),
       ],
     );
@@ -377,19 +379,26 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: GenesisBackAppBar(pageName: widget.title),
-      body: GenesisRefreshIndicator(
-        onRefresh: _loadFirstPage,
-        child: _buildBody(context),
+    return GenesisDarkTheme(
+      child: Scaffold(
+        backgroundColor: GenesisColors.darkBackground,
+        appBar: GenesisBackAppBar(
+          pageName: widget.title,
+          backgroundColor: GenesisColors.darkBackground,
+          foregroundColor: GenesisColors.darkTextPrimary,
+          systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+        ),
+        body: GenesisRefreshIndicator(
+          onRefresh: _loadFirstPage,
+          child: _buildBody(context),
+        ),
       ),
     );
   }
 
   Widget _buildBody(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: GenesisLoadingIndicator(strokeWidth: 4));
     }
 
     if (_error != null && _items.isEmpty) {
@@ -401,7 +410,7 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
             child: Text(
               'Failed to load messages.',
               style: TextStyle(
-                color: Color(0xFF94979E),
+                color: GenesisColors.darkTextSecondary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -420,7 +429,7 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
             child: Text(
               widget.emptyText,
               style: const TextStyle(
-                color: Color(0xFF94979E),
+                color: GenesisColors.darkTextSecondary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -434,8 +443,8 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
+        left: 16,
+        right: 16,
         top: 14,
         bottom: 18 + GenesisSafeAreaInsets.bottom(context),
       ),
@@ -450,7 +459,7 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
         if (index >= _items.length) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: GenesisLoadingIndicator(strokeWidth: 4)),
           );
         }
         final item = _items[index];

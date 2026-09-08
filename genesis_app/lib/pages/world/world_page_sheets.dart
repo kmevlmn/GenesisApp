@@ -116,11 +116,7 @@ extension _WorldPageSheets on _WorldPageState {
       titleWidget: _DeleteWorldConfirmationTitle(name: world.name.trim()),
       titleHeight: null,
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Delete',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Delete', value: true),
       ],
       cancelLabel: 'Cancel',
     );
@@ -149,12 +145,12 @@ class _DeleteWorldConfirmationTitle extends StatelessWidget {
   const _DeleteWorldConfirmationTitle({required this.name});
 
   static const _baseStyle = TextStyle(
-    color: Color(0xFF111111),
+    color: GenesisColors.darkTextPrimary,
     fontSize: 15,
     height: 1.16,
     fontWeight: FontWeight.w600,
   );
-  static const _nameStyle = TextStyle(color: Color(0xFF4B6192));
+  static const _nameStyle = TextStyle(color: GenesisColors.redSecondary);
 
   final String name;
 

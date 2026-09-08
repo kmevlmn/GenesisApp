@@ -338,11 +338,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
       context: context,
       title: 'Block this user?',
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Block',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Block', value: true),
       ],
     );
     return confirmed == true;

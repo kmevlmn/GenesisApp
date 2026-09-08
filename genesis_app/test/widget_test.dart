@@ -4350,12 +4350,12 @@ void main() {
       find.text('First direct message preview'),
     );
     expect(lastMessage.style?.fontWeight, FontWeight.w400);
-    expect(lastMessage.style?.color, const Color(0xFF666666));
+    expect(lastMessage.style?.color, GenesisColors.darkTextSecondary);
     final timestamp = tester.widget<Text>(
       find.text(formatGenesisTimestamp(transport.lastMessageAt)),
     );
     expect(timestamp.style?.fontWeight, FontWeight.w400);
-    expect(timestamp.style?.color, const Color(0xFF888888));
+    expect(timestamp.style?.color, GenesisColors.darkTextTertiary);
     final dmAvatar = find.byKey(const ValueKey('dm-avatar-dm_test_001'));
     final dmName = find.text('Penny Direct');
     expect(dmAvatar, findsOneWidget);
@@ -4592,7 +4592,7 @@ void main() {
 
     final text = tester.widget<Text>(emptyText);
     expect(text.style?.fontSize, 14);
-    expect(text.style?.color, const Color(0xFF8A8A8A));
+    expect(text.style?.color, GenesisColors.darkTextSecondary);
     expect(text.style?.fontWeight, FontWeight.w400);
   });
 
@@ -5194,6 +5194,15 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+      GenesisColors.darkBackground,
+    );
+    final header = tester.widget<Text>(find.text('Notifications'));
+    expect(header.style?.fontSize, 20);
+    expect(header.style?.fontWeight, FontWeight.w600);
+    expect(header.style?.color, GenesisColors.darkTextPrimary);
+    expect(tester.getTopLeft(find.text('Notifications')).dx, 49);
     expect(find.text('Join request'), findsOneWidget);
     expect(
       _richTextWithPlainText(
@@ -5273,7 +5282,7 @@ void main() {
     expect(title.style?.fontWeight, FontWeight.w600);
     expect(
       tester.widget<Text>(find.text('Awaiting your approval')).style?.color,
-      GenesisColors.brand,
+      GenesisColors.redSecondary,
     );
   });
 
@@ -6592,7 +6601,7 @@ void main() {
     expect(originRequests.single.uri.queryParameters['tag'], 'Destroyed');
   });
 
-  testWidgets('Origin header displays the compact full logo before search', (
+  testWidgets('Origin header search fills the row without a logo', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -6629,8 +6638,8 @@ void main() {
       find.byKey(const ValueKey<String>('origin-gem-wallet-entry')),
       findsNothing,
     );
-    expect(tester.getSize(logoFinder), const Size(96, 32));
-    expect(searchRect.left, 122);
+    expect(logoFinder, findsNothing);
+    expect(searchRect.left, 16);
     expect(
       searchRect.right,
       tester.getSize(find.byType(OriginPage)).width - 16,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../ui/theme/genesis_dark_theme.dart';
 import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/bootstrap/polling_scheduler.dart';
@@ -209,145 +210,150 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   Widget build(BuildContext context) {
     final unreadSummary = widget.unreadSummary;
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          const PageHeader(pageName: 'Inbox', showSearchBar: false),
-          Expanded(
-            child: ValueListenableBuilder<List<String>>(
-              valueListenable: _conversationStore.orderedConversationIds,
-              builder: (context, conversationIds, _) {
-                return GenesisRefreshIndicator(
-                  onRefresh: _refreshMessagesData,
-                  child: CustomScrollView(
-                    controller: _scrollController,
-                    physics: const BouncingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
-                    ),
-                    slivers: [
-                      const SliverToBoxAdapter(child: SizedBox(height: 10)),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _MessageMenuButton(
-                                  label: 'Notifications',
-                                  routeName: RouteNames.notifications,
-                                  block: 'world_apply',
-                                  emptyText: 'No notifications yet.',
-                                  unreadCount: unreadSummary.systemUnread,
-                                  onMessagesDataRefresh:
-                                      widget.onMessagesDataRefresh,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: _MessageMenuButton(
-                                  label: 'Followers',
-                                  routeName: RouteNames.newFollowers,
-                                  block: 'follow',
-                                  emptyText: 'No new followers yet.',
-                                  unreadCount: unreadSummary.followerUnread,
-                                  onMessagesDataRefresh:
-                                      widget.onMessagesDataRefresh,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: _MessageMenuButton(
-                                  label: 'Comments',
-                                  routeName: RouteNames.comments,
-                                  block: 'interaction',
-                                  emptyText: 'No comments yet.',
-                                  unreadCount: unreadSummary.commentUnread,
-                                  onMessagesDataRefresh:
-                                      widget.onMessagesDataRefresh,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+    return GenesisDarkTheme(
+      child: Scaffold(
+        backgroundColor: GenesisColors.darkBackground,
+        body: Column(
+          children: [
+            const PageHeader(pageName: 'Inbox', showSearchBar: false),
+            Expanded(
+              child: ValueListenableBuilder<List<String>>(
+                valueListenable: _conversationStore.orderedConversationIds,
+                builder: (context, conversationIds, _) {
+                  return GenesisRefreshIndicator(
+                    onRefresh: _refreshMessagesData,
+                    child: CustomScrollView(
+                      controller: _scrollController,
+                      physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
                       ),
-                      const SliverToBoxAdapter(child: SizedBox(height: 20)),
-                      const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 18),
-                          child: Text(
-                            'Private Chats',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                      slivers: [
+                        const SliverToBoxAdapter(child: SizedBox(height: 10)),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _MessageMenuButton(
+                                    label: 'Notifications',
+                                    routeName: RouteNames.notifications,
+                                    block: 'world_apply',
+                                    emptyText: 'No notifications yet.',
+                                    unreadCount: unreadSummary.systemUnread,
+                                    onMessagesDataRefresh:
+                                        widget.onMessagesDataRefresh,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: _MessageMenuButton(
+                                    label: 'Followers',
+                                    routeName: RouteNames.newFollowers,
+                                    block: 'follow',
+                                    emptyText: 'No new followers yet.',
+                                    unreadCount: unreadSummary.followerUnread,
+                                    onMessagesDataRefresh:
+                                        widget.onMessagesDataRefresh,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: _MessageMenuButton(
+                                    label: 'Comments',
+                                    routeName: RouteNames.comments,
+                                    block: 'interaction',
+                                    emptyText: 'No comments yet.',
+                                    unreadCount: unreadSummary.commentUnread,
+                                    onMessagesDataRefresh:
+                                        widget.onMessagesDataRefresh,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ),
-                      const SliverToBoxAdapter(child: SizedBox(height: 8)),
-                      if (!_loadedLocalConversations)
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      else if (conversationIds.isEmpty)
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(
-                            key: ValueKey('direct-messages-empty-state'),
+                        const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                        const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
                             child: Text(
-                              'Chat with your friends on Worldo.',
+                              'Private Chats',
                               style: TextStyle(
+                                color: GenesisColors.darkTextSecondary,
                                 fontSize: 14,
-                                color: Color(0xFF8A8A8A),
-                                fontWeight: FontWeight.w400,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                        )
-                      else
-                        SliverPadding(
-                          padding: EdgeInsets.fromLTRB(
-                            18,
-                            0,
-                            18,
-                            18 + GenesisSafeAreaInsets.bottom(context),
-                          ),
-                          sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate((
-                              context,
-                              index,
-                            ) {
-                              final conversationId = conversationIds[index];
-                              final listenable = _conversationStore
-                                  .rowListenable(conversationId);
-                              if (listenable == null) {
-                                return const SizedBox.shrink();
-                              }
-                              return ValueListenableBuilder<
-                                DirectMessageConversationRecord
-                              >(
-                                key: ValueKey(conversationId),
-                                valueListenable: listenable,
-                                builder: (context, item, _) =>
-                                    _ConversationTile(
-                                      item: item,
-                                      onTap: _openConversation,
-                                      displayTime: item.lastMessageAtTime,
-                                      displayTimeFallback: item.lastMessageAt,
-                                      displayTimeNow: _timeLabelNow,
-                                    ),
-                              );
-                            }, childCount: conversationIds.length),
-                          ),
                         ),
-                    ],
-                  ),
-                );
-              },
+                        const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                        if (!_loadedLocalConversations)
+                          const SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(
+                              child: GenesisLoadingIndicator(strokeWidth: 4),
+                            ),
+                          )
+                        else if (conversationIds.isEmpty)
+                          const SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(
+                              key: ValueKey('direct-messages-empty-state'),
+                              child: Text(
+                                'Chat with your friends on Worldo.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: GenesisColors.darkTextSecondary,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          SliverPadding(
+                            padding: EdgeInsets.fromLTRB(
+                              16,
+                              0,
+                              16,
+                              18 + GenesisSafeAreaInsets.bottom(context),
+                            ),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                final conversationId = conversationIds[index];
+                                final listenable = _conversationStore
+                                    .rowListenable(conversationId);
+                                if (listenable == null) {
+                                  return const SizedBox.shrink();
+                                }
+                                return ValueListenableBuilder<
+                                  DirectMessageConversationRecord
+                                >(
+                                  key: ValueKey(conversationId),
+                                  valueListenable: listenable,
+                                  builder: (context, item, _) =>
+                                      _ConversationTile(
+                                        item: item,
+                                        onTap: _openConversation,
+                                        displayTime: item.lastMessageAtTime,
+                                        displayTimeFallback: item.lastMessageAt,
+                                        displayTimeNow: _timeLabelNow,
+                                      ),
+                                );
+                              }, childCount: conversationIds.length),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -374,7 +380,7 @@ class _MessageMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       key: ValueKey<String>('message-menu-$routeName'),
-      color: GenesisColors.surfacePanel,
+      color: GenesisColors.darkFaintFill,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -407,7 +413,7 @@ class _MessageMenuButton extends StatelessWidget {
                     fontSize: 13,
                     height: 1.2,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF111111),
+                    color: GenesisColors.darkTextPrimary,
                   ),
                 ),
               ),
@@ -452,7 +458,7 @@ class _ConversationTile extends StatelessWidget {
       fallback: 'Unknown user',
     );
     return Material(
-      color: Colors.white,
+      color: GenesisColors.darkBackground,
       child: InkWell(
         onTap: () => unawaited(onTap(item)),
         child: Padding(
@@ -486,7 +492,7 @@ class _ConversationTile extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Colors.black87,
+                              color: GenesisColors.darkTextPrimary,
                             ),
                           ),
                         ),
@@ -502,7 +508,7 @@ class _ConversationTile extends StatelessWidget {
                             textAlign: TextAlign.right,
                             style: const TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF888888),
+                              color: GenesisColors.darkTextTertiary,
                               fontWeight: FontWeight.w400,
                             ),
                           ),
@@ -519,7 +525,7 @@ class _ConversationTile extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w400,
-                          color: Color(0xFF666666),
+                          color: GenesisColors.darkTextSecondary,
                         ),
                       ),
                     ),

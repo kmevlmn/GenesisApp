@@ -294,11 +294,7 @@ extension _WorldPageTickFlow on _WorldPageState {
       context: context,
       title: 'Request to join this World?',
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Request',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Request', value: true),
       ],
     );
     return result ?? false;

@@ -26,7 +26,7 @@ class GenesisPageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GenesisTopSafeArea(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           horizontalPadding,
@@ -36,7 +36,10 @@ class GenesisPageHeader extends StatelessWidget {
         ),
         child: Column(
           children: [
-            GenesisPageTitle(text: title),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: GenesisPageTitle(text: title),
+            ),
             if (showSearchField) ...[
               const SizedBox(height: GenesisSpacing.sm),
               GenesisSearchField(hintText: searchHintText, onTap: onSearchTap),

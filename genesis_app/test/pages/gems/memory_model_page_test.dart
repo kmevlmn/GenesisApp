@@ -64,14 +64,20 @@ void main() {
     expect(find.text('Estimated next message: 4.0 gems'), findsOneWidget);
 
     final pageTitleStyle = tester.widget<Text>(find.text('Model')).style;
-    expect(pageTitleStyle?.fontSize, 16);
-    expect(pageTitleStyle?.height, 22 / 16);
+    expect(pageTitleStyle?.fontSize, 20);
+    expect(pageTitleStyle?.height, 1.4);
     expect(pageTitleStyle?.fontWeight, FontWeight.w600);
     expect(pageTitleStyle?.color, const Color(0xFF111111));
     expect(
       tester.getTopLeft(find.text('Recommended')).dy -
           tester.getRect(find.text('Model')).bottom,
-      closeTo(26, 0.1),
+      closeTo(23, 0.1),
+    );
+    expect(tester.getTopLeft(find.byIcon(Icons.arrow_back_ios_new)).dx, 16);
+    expect(
+      tester.getRect(find.byType(Scaffold)).right -
+          tester.getRect(find.text('Save')).right,
+      16,
     );
 
     final saveButton = tester.widget<TextButton>(

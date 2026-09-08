@@ -626,12 +626,19 @@ class _AppShellPageState extends State<AppShellPage>
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: _selectedIndex == 0 || _selectedIndex == 1 || _selectedIndex == 4
+      value:
+          _selectedIndex == 0 ||
+              _selectedIndex == 1 ||
+              _selectedIndex == 3 ||
+              _selectedIndex == 4
           ? kGenesisLightStatusIconsSystemUiOverlayStyle
           : kGenesisDefaultSystemUiOverlayStyle,
       child: Scaffold(
         backgroundColor:
-            _selectedIndex == 0 || _selectedIndex == 1 || _selectedIndex == 4
+            _selectedIndex == 0 ||
+                _selectedIndex == 1 ||
+                _selectedIndex == 3 ||
+                _selectedIndex == 4
             ? GenesisColors.darkBackground
             : null,
         // Home and Origin own the iOS status-bar gesture so they can route it

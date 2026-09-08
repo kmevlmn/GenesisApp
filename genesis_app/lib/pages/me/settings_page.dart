@@ -120,7 +120,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
               const SizedBox(height: 18),
@@ -371,11 +371,7 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
       context: context,
       title: 'Block this user?',
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Block',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Block', value: true),
       ],
     );
     return confirmed == true;
@@ -408,7 +404,7 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
             if (snapshot.hasError) {
               return Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -441,7 +437,7 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
                 onRefresh: _refresh,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 120, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 120, 16, 24),
                   children: const [
                     Center(
                       child: Text(
@@ -462,7 +458,7 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
               onRefresh: _refresh,
               child: ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 itemCount: items.length,
                 separatorBuilder: (_, __) =>
                     const Divider(height: 1, color: Color(0xFFE7E7E7)),
@@ -687,7 +683,7 @@ class _AccountPageState extends State<AccountPage> {
           children: [
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
                 children: [
                   _CurrentLoginAccountCard(provider: _provider),
                   const SizedBox(height: 42),
@@ -735,7 +731,7 @@ class _AccountPageState extends State<AccountPage> {
             ),
             SafeArea(
               top: false,
-              minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

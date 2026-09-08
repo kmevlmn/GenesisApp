@@ -1,11 +1,15 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import 'genesis_modal_routes.dart';
 
-const Color _genesisActionBoxText = Color(0xFF111111);
-const Color _genesisActionBoxDestructive = Color(0xFFFF2442);
-const Color _genesisActionBoxDivider = Color(0xFFE8E8EA);
+const Color _genesisActionBoxText = GenesisColors.darkTextPrimary;
+const Color _genesisActionBoxAccent = GenesisColors.redSecondary;
+const Color _genesisActionBoxDivider = GenesisColors.darkFaintFill;
 
 class GenesisActionBoxAction<T> {
   const GenesisActionBoxAction({
@@ -85,9 +89,6 @@ class GenesisActionBox<T> extends StatelessWidget {
   static const double defaultRowHeight = 51;
   static const double defaultTitleHeight = 82;
   static const double _maxWidth = 800;
-  static const BorderRadius _borderRadius = BorderRadius.all(
-    Radius.circular(18),
-  );
 
   final String title;
   final Widget? content;
@@ -112,58 +113,60 @@ class GenesisActionBox<T> extends StatelessWidget {
     final dialogWidth = (MediaQuery.sizeOf(context).width * 0.7)
         .clamp(0.0, _maxWidth)
         .toDouble();
-    return Dialog(
-      elevation: 0,
-      insetPadding: EdgeInsets.zero,
-      constraints: BoxConstraints.tightFor(width: dialogWidth),
-      backgroundColor: Colors.transparent,
-      child: SizedBox(
-        width: dialogWidth,
-        child: useDetachedCancelStyle
-            ? _buildDetachedCancelStyle()
-            : _buildAttachedCancelStyle(),
+    return GenesisDarkTheme(
+      child: Dialog(
+        elevation: 0,
+        insetPadding: EdgeInsets.zero,
+        constraints: BoxConstraints.tightFor(width: dialogWidth),
+        backgroundColor: Colors.transparent,
+        child: SizedBox(
+          width: dialogWidth,
+          child: useDetachedCancelStyle
+              ? _buildDetachedCancelStyle()
+              : _buildAttachedCancelStyle(),
+        ),
       ),
     );
   }
 
   Widget _buildAttachedCancelStyle() {
-    return ClipRRect(
+    return _ActionBoxSurface(
       key: const ValueKey('genesis-action-box-attached-cancel'),
-      borderRadius: _borderRadius,
-      child: Material(
-        color: Colors.white,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _TitleRow(
-              title: title,
-              height: titleHeight,
-              titleWidget: titleWidget,
-              content: titleContent,
-              contentSpacing: titleContentSpacing,
-              horizontalPadding: titleHorizontalPadding,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _TitleRow(
+            title: title,
+            height: titleHeight,
+            titleWidget: titleWidget,
+            content: titleContent,
+            contentSpacing: titleContentSpacing,
+            horizontalPadding: titleHorizontalPadding,
+          ),
+          if (content case final content?)
+            DefaultTextStyle.merge(
+              style: const TextStyle(color: GenesisColors.darkTextSecondary),
+              child: content,
             ),
-            if (content case final content?) content,
-            if (actions.isNotEmpty) ...[
-              const _Divider(),
-              for (var index = 0; index < actions.length; index++) ...[
-                _ActionRow<T>(
-                  action: actions[index],
-                  height: actionRowHeight,
-                  isPreferred: true,
-                  onSelected: onActionSelected,
-                ),
-                if (showCancel || index != actions.length - 1) const _Divider(),
-              ],
-            ],
-            if (showCancel)
-              _CancelRow(
-                label: cancelLabel,
-                height: cancelRowHeight,
-                onCancel: onCancel,
+          if (actions.isNotEmpty) ...[
+            const _Divider(),
+            for (var index = 0; index < actions.length; index++) ...[
+              _ActionRow<T>(
+                action: actions[index],
+                height: actionRowHeight,
+                isPreferred: true,
+                onSelected: onActionSelected,
               ),
+              if (showCancel || index != actions.length - 1) const _Divider(),
+            ],
           ],
-        ),
+          if (showCancel)
+            _CancelRow(
+              label: cancelLabel,
+              height: cancelRowHeight,
+              onCancel: onCancel,
+            ),
+        ],
       ),
     );
   }
@@ -173,51 +176,78 @@ class GenesisActionBox<T> extends StatelessWidget {
       key: const ValueKey('genesis-action-box-detached-cancel'),
       mainAxisSize: MainAxisSize.min,
       children: [
-        ClipRRect(
-          borderRadius: _borderRadius,
-          child: Material(
-            color: Colors.white,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _TitleRow(
-                  title: title,
-                  height: titleHeight,
-                  titleWidget: titleWidget,
-                  content: titleContent,
-                  contentSpacing: titleContentSpacing,
-                  horizontalPadding: titleHorizontalPadding,
+        _ActionBoxSurface(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _TitleRow(
+                title: title,
+                height: titleHeight,
+                titleWidget: titleWidget,
+                content: titleContent,
+                contentSpacing: titleContentSpacing,
+                horizontalPadding: titleHorizontalPadding,
+              ),
+              if (content case final content?)
+                DefaultTextStyle.merge(
+                  style: const TextStyle(
+                    color: GenesisColors.darkTextSecondary,
+                  ),
+                  child: content,
                 ),
-                if (content case final content?) content,
-                if (actions.isNotEmpty) ...[
-                  const _Divider(),
-                  for (var index = 0; index < actions.length; index++) ...[
-                    _ActionRow<T>(
-                      action: actions[index],
-                      height: actionRowHeight,
-                      isPreferred: index == 0,
-                      onSelected: onActionSelected,
-                    ),
-                    if (index != actions.length - 1) const _Divider(),
-                  ],
+              if (actions.isNotEmpty) ...[
+                const _Divider(),
+                for (var index = 0; index < actions.length; index++) ...[
+                  _ActionRow<T>(
+                    action: actions[index],
+                    height: actionRowHeight,
+                    isPreferred: index == 0,
+                    onSelected: onActionSelected,
+                  ),
+                  if (index != actions.length - 1) const _Divider(),
                 ],
               ],
-            ),
+            ],
           ),
         ),
         const SizedBox(height: 14),
-        ClipRRect(
-          borderRadius: _borderRadius,
-          child: Material(
-            color: Colors.white,
-            child: _CancelRow(
-              label: cancelLabel,
-              height: cancelRowHeight,
-              onCancel: onCancel,
-            ),
+        _ActionBoxSurface(
+          child: _CancelRow(
+            label: cancelLabel,
+            height: cancelRowHeight,
+            onCancel: onCancel,
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Clip the backdrop blur to each panel and keep text and actions opaque.
+class _ActionBoxSurface extends StatelessWidget {
+  const _ActionBoxSurface({super.key, required this.child});
+
+  static const _borderRadius = BorderRadius.all(Radius.circular(18));
+  static final _blur = ImageFilter.blur(sigmaX: 20, sigmaY: 20);
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: _borderRadius,
+      child: BackdropFilter(
+        filter: _blur,
+        child: Material(
+          color: GenesisColors.darkRaisedBackground.withValues(alpha: 0.4),
+          surfaceTintColor: Colors.transparent,
+          shape: const RoundedRectangleBorder(
+            borderRadius: _borderRadius,
+            side: BorderSide(color: GenesisColors.darkFaintFill, width: 1),
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }
@@ -263,7 +293,10 @@ class _TitleRow extends StatelessWidget {
                 ),
             if (content case final content?) ...[
               SizedBox(height: contentSpacing),
-              content,
+              DefaultTextStyle.merge(
+                style: const TextStyle(color: GenesisColors.darkTextSecondary),
+                child: content,
+              ),
             ],
           ],
         ),
@@ -307,9 +340,10 @@ class _ActionRow<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        action.color ??
-        (isPreferred ? _genesisActionBoxDestructive : _genesisActionBoxText);
+    final color = !action.enabled
+        ? GenesisColors.darkTextTertiary
+        : action.color ??
+              (isPreferred ? _genesisActionBoxAccent : _genesisActionBoxText);
     return InkWell(
       onTap: !action.enabled
           ? null

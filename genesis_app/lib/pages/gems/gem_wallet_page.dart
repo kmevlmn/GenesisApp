@@ -189,7 +189,7 @@ class _GemWalletPageState extends State<GemWalletPage>
               onTap: () =>
                   Navigator.of(context).pushNamed(RouteNames.gemRecords),
               child: const Padding(
-                padding: EdgeInsets.fromLTRB(12, 10, 20, 10),
+                padding: EdgeInsets.fromLTRB(12, 10, 16, 10),
                 child: Text(
                   'Records',
                   style: TextStyle(

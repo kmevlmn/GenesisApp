@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../app/genesis_navigator.dart';
 import '../../components/common/genesis_action_box.dart';
@@ -503,7 +504,7 @@ Widget _successActionBoxTitle({
   required String trailingText,
 }) {
   const baseStyle = TextStyle(
-    color: Color(0xFF111111),
+    color: GenesisColors.darkTextPrimary,
     fontSize: 15,
     height: 1.16,
     fontWeight: FontWeight.w600,
@@ -518,7 +519,7 @@ Widget _successActionBoxTitle({
         TextSpan(text: leadingText),
         TextSpan(
           text: highlightedText,
-          style: baseStyle.copyWith(color: const Color(0xFF4B6192)),
+          style: baseStyle.copyWith(color: GenesisColors.redSecondary),
         ),
         TextSpan(text: trailingText),
       ],

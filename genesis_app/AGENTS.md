@@ -151,8 +151,21 @@ HTTP 映射层的图片规则：
 
 ## 标准页面 Header 标题
 
+- 标准返回 Header 统一复用 `GenesisBackAppBar`，`horizontalInset` 默认 16，无需在页面重复传入；返回图标左侧和无操作按钮时标题区域右侧均留 16。自定义右侧操作需将图标或文字的实际右侧留白对齐到 16，计入按钮内部 padding。未登录 Me、Developer 等非标准 Header 不套用此规则。
+- Settings、Account、Blocked users、About 的正文左右边距统一为 16，包括列表、空态和底部操作区；法律页使用共享 Header，WebView 内部正文间距由网页样式管理。
+
 - 标准页面 Header 标题统一引用 `GenesisTypography.pageTitle`，通过 `GenesisUiTheme.pageTitleStyle` 使用：字号 20、字重 600、行高 1.4；不得在页面重复硬编码同一字号。
-- 深浅色只覆盖标题颜色，保留公共排版参数。标题左对齐、居中、可用宽度和长文本省略由 Header 布局管理，不通过缩小字号适配宽度。
+- 标准标题默认左对齐：无返回按钮时沿用左右 16px 页面边距；有返回按钮时与返回图标保持 12px 间距。深浅色只覆盖标题颜色，保留公共排版参数；长标题单行省略，不通过缩小字号适配宽度。
+- Home、Inbox、Notifications / Followers / Comments 通知内页、已登录 Me、Profile 和 Follow 页的正文左右边距统一为 16 个逻辑像素；Header 两端的内容或图标区域也对齐到 16。带返回按钮时，返回图标从 x=16 开始，标题保留其后的 12 间距；右侧按钮需计入自身内边距，使图标区域距右边为 16，不能把触摸区外边距与图标留白重复叠加。
+
+## 公共操作弹窗
+
+- `GenesisActionBox` 统一使用深色样式，包括从浅色页面打开的情况；主题仅作用于弹窗，不能改变调用页面的主题。
+- 主面板与独立 Cancel 面板均使用 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.4)`（40% 不透明度），叠加局限于面板圆角内的背景模糊（`sigmaX / sigmaY = 20`）；外边框为 1px `darkFaintFill`（约 12% 白），分隔线同样使用 `darkFaintFill`。这些参数在公共组件中集中管理，不在页面重复配置；透明度只作用于面板填充，不给整个弹窗或文字增加 Opacity。
+- 标题与普通操作使用 `darkTextPrimary`，说明正文使用 `darkTextSecondary`，UID / WID / 时间等辅助信息和禁用操作使用 `darkTextTertiary`。
+- 公共弹窗内的红色文字统一使用 `GenesisColors.redSecondary`，包括主要操作、危险操作和红色强调正文，不使用品牌红 `redPrimary`。主要操作默认继承公共组件颜色，调用处不重复覆盖；Cancel、Reject 等普通操作使用一级白字。
+- 自定义标题、正文和输入框也须引用公共 token；输入文字和光标使用 `darkTextPrimary`，Placeholder 使用 `darkInputPlaceholder`，输入边框使用 `darkFaintFill`。保留各交互所需的输入行数和布局。
+- 保留公共弹窗的尺寸、圆角和交互；Report / 消息长按浮动菜单仍按浮动菜单专项规范执行。
 
 ## iOS 字体倾斜规则
 

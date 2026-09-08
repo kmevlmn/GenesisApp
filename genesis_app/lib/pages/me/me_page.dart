@@ -234,30 +234,39 @@ class _MePageState extends State<MePage> with RouteAware {
                         ),
                         Align(
                           alignment: Alignment.centerRight,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                onPressed: _openDiscord,
-                                icon: SizedBox.square(
-                                  dimension: 24,
-                                  child: Center(
-                                    // Clyde fills its viewBox; the settings glyph
-                                    // has inset space inside its 24px icon box.
-                                    child: SvgPicture.asset(
-                                      'assets/custom-icons/svg/discord-clyde-white.svg',
-                                      width: 22,
-                                      height: 16.5,
+                          child: Padding(
+                            // 12px inside the 48px button + 4px = 16px.
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  onPressed: _openDiscord,
+                                  icon: SizedBox.square(
+                                    dimension: 24,
+                                    child: Center(
+                                      // Clyde fills its viewBox; the settings glyph
+                                      // has inset space inside its 24px icon box.
+                                      child: SvgPicture.asset(
+                                        'assets/custom-icons/svg/discord-clyde-white.svg',
+                                        width: 22,
+                                        height: 16.5,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              IconButton(
-                                onPressed: _openSettings,
-                                icon: const Icon(Icons.settings, size: 24),
-                                color: GenesisColors.darkTextPrimary,
-                              ),
-                            ],
+                                IconButton(
+                                  onPressed: _openSettings,
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 48,
+                                    height: 48,
+                                  ),
+                                  padding: const EdgeInsets.all(12),
+                                  icon: const Icon(Icons.settings, size: 24),
+                                  color: GenesisColors.darkTextPrimary,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],

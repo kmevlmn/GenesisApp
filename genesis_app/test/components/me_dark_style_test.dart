@@ -77,7 +77,9 @@ void main() {
             ),
           ),
         );
-        expect(tester.getTopLeft(find.text(name)).dx, 49);
+        expect(tester.getTopLeft(find.text(name)).dx, 45);
+        expect(tester.getTopLeft(find.byIcon(Icons.arrow_back_ios_new)).dx, 16);
+        expect(tester.getTopRight(find.text(name)).dx, width - 16);
         final title = tester.widget<Text>(find.text(name));
         final paragraph = tester.renderObject<RenderParagraph>(
           find.descendant(of: find.text(name), matching: find.byType(RichText)),
@@ -96,7 +98,8 @@ void main() {
           home: Scaffold(appBar: GenesisBackAppBar(pageName: 'Default')),
         ),
       );
-      expect(tester.widget<AppBar>(find.byType(AppBar)).centerTitle, isTrue);
+      expect(tester.widget<AppBar>(find.byType(AppBar)).centerTitle, isFalse);
+      expect(tester.getTopLeft(find.text('Default')).dx, 45);
     },
   );
 

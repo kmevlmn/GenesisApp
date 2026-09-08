@@ -39,7 +39,7 @@ class AboutUsPage extends StatelessWidget {
           children: [
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 40, 20, 24),
+                padding: const EdgeInsets.fromLTRB(16, 40, 16, 24),
                 children: [
                   const _AboutBrandHeader(),
                   const SizedBox(height: 8),
@@ -50,7 +50,7 @@ class AboutUsPage extends StatelessWidget {
               ),
             ),
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: 16),
               child: _AboutLegalLinks(),
             ),
             const SizedBox(height: 20),

@@ -4,9 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../common/genesis_action_box.dart';
 import 'gem_assets.dart';
-import 'gem_colors.dart';
 
 enum GemBillingPurchaseDialogPhase { processing, success }
 
@@ -82,10 +83,7 @@ class GemBillingPurchaseDialog extends StatelessWidget {
                   const SizedBox(
                     width: 28,
                     height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.6,
-                      color: kGemAccentColor,
-                    ),
+                    child: GenesisLoadingIndicator(strokeWidth: 2.6),
                   ),
                   const SizedBox(height: 18),
                 ],
@@ -119,7 +117,7 @@ class _GemBillingPurchaseGrantedMessage extends StatelessWidget {
     fontSize: 14,
     height: 20 / 14,
     fontWeight: FontWeight.w400,
-    color: Color(0xFF111111),
+    color: GenesisColors.darkTextPrimary,
   );
 
   @override
@@ -135,7 +133,7 @@ class _GemBillingPurchaseGrantedMessage extends StatelessWidget {
             fontSize: 16,
             height: 20 / 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF111111),
+            color: GenesisColors.darkTextPrimary,
           ),
         ),
         const SizedBox(
@@ -168,7 +166,7 @@ class _GemBillingPurchaseGrantedMessage extends StatelessWidget {
                   ),
                   TextSpan(
                     text: grantedText,
-                    style: const TextStyle(color: kGemAccentColor),
+                    style: const TextStyle(color: GenesisColors.redSecondary),
                   ),
                   const TextSpan(text: ' Gems have been granted.'),
                 ],
@@ -218,7 +216,7 @@ class _ProcessingPaymentTextState extends State<_ProcessingPaymentText> {
       height: 20 / 15,
       letterSpacing: 0,
       fontWeight: FontWeight.w400,
-      color: Color(0xFF111111),
+      color: GenesisColors.darkTextPrimary,
     );
     return SizedBox(
       width: double.infinity,

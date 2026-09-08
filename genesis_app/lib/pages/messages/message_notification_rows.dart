@@ -90,7 +90,7 @@ class _UnreadDot extends StatelessWidget {
       width: 7,
       height: 7,
       decoration: const BoxDecoration(
-        color: Color(0xFFFF2442),
+        color: GenesisColors.redPrimary,
         shape: BoxShape.circle,
       ),
     );
@@ -144,7 +144,7 @@ class _JoinRequestListItem extends StatelessWidget {
         const Text(
           'Join request',
           style: TextStyle(
-            color: Color(0xFF111111),
+            color: GenesisColors.darkTextPrimary,
             fontSize: 14,
             height: 1.2,
             fontWeight: FontWeight.w600,
@@ -171,7 +171,7 @@ class _JoinRequestReviewSummaryText extends StatelessWidget {
     return Text.rich(
       TextSpan(
         style: const TextStyle(
-          color: Color(0xFF111111),
+          color: GenesisColors.darkTextSecondary,
           fontSize: 12,
           height: 1.25,
           fontWeight: FontWeight.w400,
@@ -180,7 +180,7 @@ class _JoinRequestReviewSummaryText extends StatelessWidget {
           const TextSpan(text: 'You request to join '),
           TextSpan(
             text: item.requestWorldSummaryName,
-            style: _originBlueTextStyle,
+            style: _notificationNameStyle,
           ),
           if (item.requestWorldIdLabel.trim().isNotEmpty)
             TextSpan(text: ' (${item.requestWorldIdLabel})'),
@@ -200,15 +200,15 @@ class _JoinRequestSummaryText extends StatelessWidget {
     return Text.rich(
       TextSpan(
         style: const TextStyle(
-          color: Color(0xFF111111),
+          color: GenesisColors.darkTextSecondary,
           fontSize: 12,
           height: 1.25,
           fontWeight: FontWeight.w400,
         ),
         children: [
-          TextSpan(text: item.requesterName, style: _originBlueTextStyle),
+          TextSpan(text: item.requesterName, style: _notificationNameStyle),
           const TextSpan(text: ' request to join '),
-          TextSpan(text: item.requestWorldName, style: _originBlueTextStyle),
+          TextSpan(text: item.requestWorldName, style: _notificationNameStyle),
           if (item.requestWorldIdLabel.trim().isNotEmpty)
             TextSpan(text: ' (${item.requestWorldIdLabel})'),
         ],
@@ -294,45 +294,45 @@ class _CommentNotificationListItem extends StatelessWidget {
 }
 
 const _notificationTitleStyle = TextStyle(
-  color: Color(0xFF111111),
+  color: GenesisColors.darkTextPrimary,
   fontSize: 14,
   height: 1.18,
   fontWeight: FontWeight.w600,
 );
 
 const _notificationBodyStyle = TextStyle(
-  color: Color(0xFF111111),
+  color: GenesisColors.darkTextSecondary,
   fontSize: 12,
   height: 1.25,
   fontWeight: FontWeight.w400,
 );
 
 const _notificationMetaStyle = TextStyle(
-  color: Color(0xFF8A8D93),
+  color: GenesisColors.darkTextTertiary,
   fontSize: 12,
   height: 1.2,
   fontWeight: FontWeight.w400,
 );
 
 const _commentNotificationTitleStyle = TextStyle(
-  color: Color(0xFF111111),
+  color: GenesisColors.darkTextPrimary,
   fontSize: 14,
   height: 1.18,
   fontWeight: FontWeight.w600,
 );
 
 const _commentNotificationBodyStyle = TextStyle(
-  color: Color(0xFF111111),
+  color: GenesisColors.darkTextSecondary,
   fontSize: 12,
   height: 1.25,
   fontWeight: FontWeight.w400,
 );
 
 const _commentNotificationMetaStyle = TextStyle(
-  color: Color(0xFF8A8D93),
+  color: GenesisColors.darkTextTertiary,
   fontSize: 12,
   height: 1.2,
   fontWeight: FontWeight.w400,
 );
 
-const _originBlueTextStyle = TextStyle(color: Color(0xFF2F4F7A));
+const _notificationNameStyle = TextStyle(color: GenesisColors.darkTextPrimary);

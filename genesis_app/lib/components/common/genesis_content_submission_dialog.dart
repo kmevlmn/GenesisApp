@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+
 import 'genesis_action_box.dart';
 import 'genesis_center_toast.dart';
 import 'genesis_modal_routes.dart';
@@ -94,26 +96,26 @@ class _GenesisContentSubmissionDialogState
         key: widget.contentInputKey,
         controller: _controller,
         focusNode: _focusNode,
-        cursorColor:
-            Theme.of(context).textTheme.bodyLarge?.color ??
-            const Color(0xFF111111),
+        cursorColor: GenesisColors.darkTextPrimary,
+        style: const TextStyle(color: GenesisColors.darkTextPrimary),
         autofocus: true,
         minLines: 3,
         maxLines: 3,
         textInputAction: TextInputAction.newline,
         decoration: InputDecoration(
           hintText: 'Describe the issue',
+          hintStyle: const TextStyle(color: GenesisColors.darkInputPlaceholder),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 12,
             vertical: 10,
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFD8D8DE)),
+            borderSide: const BorderSide(color: GenesisColors.darkFaintFill),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFD8D8DE)),
+            borderSide: const BorderSide(color: GenesisColors.darkFaintFill),
           ),
         ),
         onChanged: (_) => setState(() {}),

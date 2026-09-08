@@ -144,7 +144,7 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.center,
         style: const TextStyle(
-          color: Color(0xFF666666),
+          color: GenesisColors.darkTextSecondary,
           fontSize: 13,
           height: 1.3,
           fontWeight: FontWeight.w400,
@@ -152,11 +152,7 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
       ),
       titleHeight: 104,
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Delete',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Delete', value: true),
       ],
       cancelLabel: 'Cancel',
     );
@@ -177,7 +173,7 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
         'This is the Opening location. Deleting it will also clear the Opening.',
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: Color(0xFF666666),
+          color: GenesisColors.darkTextSecondary,
           fontSize: 13,
           height: 1.3,
           fontWeight: FontWeight.w400,
@@ -185,11 +181,7 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
       ),
       titleHeight: 120,
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Delete',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Delete', value: true),
       ],
       cancelLabel: 'Cancel',
     );

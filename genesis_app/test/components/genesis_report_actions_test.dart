@@ -7,6 +7,8 @@ import 'package:genesis_flutter_android/app/config/app_config.dart';
 import 'package:genesis_flutter_android/components/common/genesis_action_box.dart';
 import 'package:genesis_flutter_android/components/common/genesis_report_actions.dart';
 
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
+
 void main() {
   testWidgets('report button menu appears to the left with icon', (
     tester,
@@ -235,6 +237,12 @@ void main() {
 
     final input = tester.widget<TextField>(
       find.byKey(const ValueKey<String>('genesis-report-content-input')),
+    );
+    expect(input.style?.color, GenesisColors.darkTextPrimary);
+    expect(input.cursorColor, GenesisColors.darkTextPrimary);
+    expect(
+      input.decoration?.hintStyle?.color,
+      GenesisColors.darkInputPlaceholder,
     );
     expect(input.minLines, 3);
     expect(input.maxLines, 3);

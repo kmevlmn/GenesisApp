@@ -391,7 +391,6 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
           const GenesisActionBoxAction<_DraftLeaveAction>(
             label: 'Discard',
             value: _DraftLeaveAction.discard,
-            color: createFormText,
           ),
         ],
       );

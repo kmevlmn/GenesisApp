@@ -288,7 +288,8 @@ class _ModelSaveAction extends StatelessWidget {
         key: const ValueKey('gem-model-save'),
         onPressed: enabled && !saving ? onPressed : null,
         style: TextButton.styleFrom(
-          padding: const EdgeInsets.only(right: 20),
+          padding: const EdgeInsets.only(right: 16),
+          alignment: Alignment.centerRight,
           backgroundColor: Colors.transparent,
           overlayColor: Colors.transparent,
           foregroundColor: const Color(0xFF111111),

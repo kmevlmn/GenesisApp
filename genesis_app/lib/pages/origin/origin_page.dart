@@ -12,7 +12,6 @@ import '../../app/startup/app_startup_coordinator.dart';
 import '../../app/telemetry/firebase_performance_operation.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/common/list_loading_skeleton.dart';
-import '../../components/genesis_logo.dart';
 import '../../components/origin/origin_item_card.dart';
 import '../../components/page_header.dart';
 import '../../components/search_bar.dart';
@@ -253,33 +252,6 @@ class _OriginPageState extends State<OriginPage> with WidgetsBindingObserver {
                               offset: const Offset(0, 5),
                               child: Row(
                                 children: [
-                                  SizedBox(
-                                    key: const ValueKey<String>(
-                                      'origin-brand-logo',
-                                    ),
-                                    width: 96,
-                                    height: 32,
-                                    child: const DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color: GenesisColors.redPrimary,
-                                        borderRadius: BorderRadius.all(
-                                          Radius.circular(12),
-                                        ),
-                                      ),
-                                      child: Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 4,
-                                        ),
-                                        child: GenesisLogo(
-                                          width: 84,
-                                          height: 24,
-                                          semanticsLabel: 'Worldo',
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: SearchBarPlaceholder(
                                       backgroundColor:

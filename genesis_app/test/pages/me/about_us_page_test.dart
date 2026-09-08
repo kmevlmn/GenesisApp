@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:genesis_flutter_android/pages/me/about_us_page.dart';
 import 'package:genesis_flutter_android/platform/channels/genesis_method_channels.dart';
@@ -13,6 +14,7 @@ void main() {
   });
 
   testWidgets('shows app version name from app metadata', (tester) async {
+    SharedPreferences.setMockInitialValues({});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(GenesisMethodChannels.device, (call) async {
           if (call.method == GenesisMethodChannels.getAppVersion) {
@@ -26,7 +28,7 @@ void main() {
         });
 
     await tester.pumpWidget(const MaterialApp(home: AboutUsPage()));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('v0.1.0'), findsOneWidget);
     expect(find.text('v1.0.0'), findsNothing);
