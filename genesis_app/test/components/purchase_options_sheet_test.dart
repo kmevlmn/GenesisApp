@@ -1,12 +1,101 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/components/gems/gem_purchase_bottom_sheet.dart';
+import 'package:genesis_flutter_android/app/gems/gem_wallet_store.dart';
+import 'package:genesis_flutter_android/network/models/gem_wallet.dart';
+import 'package:genesis_flutter_android/network/chatroom/world_chatroom_service.dart';
+import 'package:genesis_flutter_android/platform/billing/billing_service.dart';
+import 'package:genesis_flutter_android/platform/billing/billing_models.dart';
 import 'package:genesis_flutter_android/components/common/genesis_modal_routes.dart';
 import 'package:genesis_flutter_android/components/gems/pro_subscription_content.dart';
 import 'package:genesis_flutter_android/components/gems/purchase_options_sheet.dart';
 import 'package:genesis_flutter_android/components/gems/wallet_purchase_tabs.dart';
 import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
 
+import '../support/membership_fixtures.dart';
+
 void main() {
+  for (final initialTab in PurchaseSheetTab.values) {
+    testWidgets(
+      'sheet loads only selected tab $initialTab, including canceled swipes',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        var memberships = 0;
+        var products = 0;
+        var balances = 0;
+        final wallet = GemWalletStore(
+          readUid: () async => 'u_test',
+          loadWallet: () async {
+            balances++;
+            return const GemWallet(balanceCent: 43000);
+          },
+        );
+        final billing = _SheetBillingService();
+        addTearDown(wallet.dispose);
+        addTearDown(billing.state.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: GenesisTheme.light(),
+            home: Scaffold(
+              body: PurchaseOptionsSheet(
+                initialTab: initialTab,
+                membershipProductsLoader: () {
+                  memberships++;
+                  return loadTestMembershipOffers();
+                },
+                gemsBuilder: (_) => GemPurchaseBottomSheet(
+                  embedded: true,
+                  alert: const GemBalanceAlert(kind: GemBalanceAlertKind.low),
+                  productsLoader: () async {
+                    products++;
+                    return [];
+                  },
+                  walletStore: wallet,
+                  billingService: billing,
+                  payTrackPageId: 'test',
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final subscriptionFirst = initialTab == PurchaseSheetTab.subscription;
+        expect(memberships, subscriptionFirst ? 1 : 0);
+        expect(products, subscriptionFirst ? 0 : 1);
+        expect(balances, products);
+        expect(billing.starts, products);
+        final pages = find.byKey(const ValueKey('purchase-sheet-pages'));
+        final gesture = await tester.startGesture(tester.getCenter(pages));
+        final direction = subscriptionFirst ? -1.0 : 1.0;
+        await gesture.moveBy(Offset(direction * 60, 0));
+        await tester.pump();
+        expect(memberships, subscriptionFirst ? 1 : 0);
+        expect(products, subscriptionFirst ? 0 : 1);
+        await gesture.moveBy(Offset(-direction * 60, 0));
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(memberships, subscriptionFirst ? 1 : 0);
+        expect(products, subscriptionFirst ? 0 : 1);
+        await tester.drag(pages, Offset(direction * 330, 0));
+        await tester.pumpAndSettle();
+        expect([memberships, products, balances, billing.starts], [1, 1, 1, 1]);
+        for (final key in [
+          'wallet-subscription-tab',
+          'wallet-buy-gems-tab',
+          'wallet-subscription-tab',
+        ]) {
+          await tester.tap(find.byKey(ValueKey(key)));
+          await tester.pumpAndSettle();
+        }
+        expect([memberships, products, balances, billing.starts], [1, 1, 1, 1]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('both purchase tabs dismiss downward only at the list top', (
     tester,
   ) async {
@@ -27,6 +116,7 @@ void main() {
                 builder: (_) => FractionallySizedBox(
                   heightFactor: .8,
                   child: PurchaseOptionsSheet(
+                    membershipProductsLoader: loadTestMembershipOffers,
                     initialTab: PurchaseSheetTab.subscription,
                     gemsBuilder: (_) => ListView.builder(
                       key: const ValueKey('scrollable-gems'),
@@ -95,6 +185,7 @@ void main() {
             child: FractionallySizedBox(
               heightFactor: .8,
               child: PurchaseOptionsSheet(
+                membershipProductsLoader: loadTestMembershipOffers,
                 initialTab: PurchaseSheetTab.subscription,
                 gemsBuilder: (_) {
                   gemsBuilds++;
@@ -136,4 +227,21 @@ void main() {
     expect(find.text('Preserved'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+}
+
+class _SheetBillingService implements BillingService {
+  int starts = 0;
+  @override
+  final ValueNotifier<BillingState> state = ValueNotifier<BillingState>(
+    BillingState(storeAvailable: true),
+  );
+  @override
+  Stream<BillingUiEvent> get events => const Stream.empty();
+  @override
+  Future<void> start() async {
+    starts++;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -6,11 +6,22 @@ import 'package:genesis_flutter_android/network/genesis_api.dart';
 import 'package:genesis_flutter_android/network/local_mock_genesis_transport.dart';
 import 'package:genesis_flutter_android/network/mock_data/mock_v1_data.dart';
 import 'package:genesis_flutter_android/network/models/gem_purchase_report.dart';
+import 'package:genesis_flutter_android/network/models/membership_product.dart';
 import 'package:genesis_flutter_android/network/models/origin.dart';
 import 'package:genesis_flutter_android/network/models/search_v2.dart';
 import 'package:genesis_flutter_android/network/models/world.dart';
 
 void main() {
+  test('local membership catalog uses the documented empty response', () async {
+    final api = GenesisApi(useMock: true);
+    for (final provider in MembershipProvider.values) {
+      expect(
+        (await api.v1.membership.products(provider: provider)).products,
+        isEmpty,
+      );
+    }
+  });
+
   test('WorldDetail parses last chat location compatibly', () {
     expect(
       WorldDetail.fromJson(const {

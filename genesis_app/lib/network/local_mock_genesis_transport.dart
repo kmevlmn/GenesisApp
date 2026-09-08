@@ -745,6 +745,20 @@ class LocalMockGenesisTransport implements HttpTransport {
       return _v1Ok(_state.v1GemProducts());
     }
 
+    if (method == 'GET' && path == 'membership/products') {
+      // No mock store catalog: mirror the documented empty-list response.
+      // Device/store configurations must come from the real endpoint.
+      final provider = query['provider'];
+      if (provider != 'apple' && provider != 'google') {
+        return _ok(<String, dynamic>{
+          'err_no': 4004,
+          'err_msg': 'param invalid',
+          'data': <String, dynamic>{},
+        });
+      }
+      return _v1Ok(<String, dynamic>{'list': <Object>[]});
+    }
+
     if (method == 'GET' && path == 'gem/tasks') {
       return _v1Ok(_state.v1GemTasks());
     }

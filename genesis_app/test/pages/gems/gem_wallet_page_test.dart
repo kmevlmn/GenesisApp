@@ -10,6 +10,7 @@ import 'package:genesis_flutter_android/app/gems/gem_wallet_store.dart';
 import 'package:genesis_flutter_android/app/telemetry/genesis_telemetry.dart';
 import 'package:genesis_flutter_android/components/common/genesis_action_box.dart';
 import 'package:genesis_flutter_android/components/gems/gem_purchase_catalog.dart';
+import 'package:genesis_flutter_android/components/gems/pro_colors.dart';
 import 'package:genesis_flutter_android/network/models/gem_product.dart';
 import 'package:genesis_flutter_android/network/models/gem_records.dart';
 import 'package:genesis_flutter_android/network/models/gem_task.dart';
@@ -25,12 +26,163 @@ import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_typography.dart';
 import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
 
+import '../../support/membership_fixtures.dart';
+
 const _wrappingTaskDescription =
     'Create an Origin and launch a world, then continue exploring locations '
     'and interacting with characters to move its story forward.';
 
 void main() {
   tearDown(GenesisTelemetry.resetForTesting);
+
+  for (final subscriptionFirst in [true, false]) {
+    for (final swipe in [false, true]) {
+      testWidgets(
+        'wallet loads only initial tab subscription=$subscriptionFirst and visits other via swipe=$swipe',
+        (tester) async {
+          tester.view.physicalSize = const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          var memberships = 0;
+          var products = 0;
+          var tasks = 0;
+          var balances = 0;
+          final telemetry = _CapturingTelemetrySink();
+          GenesisTelemetry.setSinkForTesting(telemetry);
+          final wallet = GemWalletStore(
+            readUid: () async => 'u_test',
+            loadWallet: () async {
+              balances++;
+              return const GemWallet(balanceCent: 43000);
+            },
+          );
+          final billing = _FakeBillingService();
+          addTearDown(wallet.dispose);
+          addTearDown(billing.dispose);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: GenesisTheme.light(),
+              home: GemWalletPage(
+                showSubscriptionInitially: subscriptionFirst,
+                walletStore: wallet,
+                billingService: billing,
+                membershipProductsLoader: () {
+                  memberships++;
+                  return loadTestMembershipOffers();
+                },
+                productsLoader: (_) async {
+                  products++;
+                  return _products();
+                },
+                tasksLoader: (_) async {
+                  tasks++;
+                  return [];
+                },
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(memberships, subscriptionFirst ? 1 : 0);
+          expect(products, subscriptionFirst ? 0 : 1);
+          expect(tasks, products);
+          expect(balances, products);
+          expect(billing.startCount, products);
+          expect(billing.storeRecoveryCount, products);
+          expect(
+            telemetry.events
+                .where((event) => event.name == 'buy_page_show')
+                .length,
+            products,
+          );
+
+          if (subscriptionFirst) {
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.paused,
+            );
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.resumed,
+            );
+            await tester.pumpAndSettle();
+            expect(products, 0);
+            expect(tasks, 0);
+            expect(balances, 0);
+            expect(billing.startCount, 0);
+          }
+          final pages = find.byKey(const ValueKey('wallet-purchase-pages'));
+          final otherTab = find.byKey(
+            ValueKey(
+              subscriptionFirst
+                  ? 'wallet-buy-gems-tab'
+                  : 'wallet-subscription-tab',
+            ),
+          );
+          if (swipe) {
+            await tester.drag(pages, Offset(subscriptionFirst ? -330 : 330, 0));
+          } else {
+            await tester.tap(otherTab);
+          }
+          await tester.pumpAndSettle();
+          expect(
+            [
+              memberships,
+              products,
+              tasks,
+              balances,
+              billing.startCount,
+              billing.storeRecoveryCount,
+            ],
+            [1, 1, 1, 1, 1, 1],
+          );
+          expect(
+            telemetry.events
+                .where((event) => event.name == 'buy_page_show')
+                .length,
+            1,
+          );
+
+          await tester.tap(
+            find.byKey(
+              ValueKey(
+                subscriptionFirst
+                    ? 'wallet-subscription-tab'
+                    : 'wallet-buy-gems-tab',
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(otherTab);
+          await tester.pumpAndSettle();
+          expect(
+            [
+              memberships,
+              products,
+              tasks,
+              balances,
+              billing.startCount,
+              billing.storeRecoveryCount,
+            ],
+            [1, 1, 1, 1, 1, 1],
+          );
+          // Returning to the foreground while Subscription is selected must
+          // not issue background Gems page requests, even after visiting Gems.
+          await tester.tap(
+            find.byKey(const ValueKey('wallet-subscription-tab')),
+          );
+          await tester.pumpAndSettle();
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.paused,
+          );
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+          await tester.pumpAndSettle();
+          expect([products, tasks, balances], [1, 1, 1]);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   testWidgets(
     'only benefits scroll and wallet tabs stay centered on the page',
@@ -51,6 +203,7 @@ void main() {
           theme: GenesisTheme.light(),
           scrollBehavior: const GenesisScrollBehavior(),
           home: GemWalletPage(
+            membershipProductsLoader: loadTestMembershipOffers,
             walletStore: wallet,
             productsLoader: (_) async => [],
             tasksLoader: (_) async => [],
@@ -107,7 +260,7 @@ void main() {
           final rendered = tester.widget<SvgPicture>(finder);
           expect(
             rendered.colorFilter,
-            ColorFilter.mode(color, BlendMode.srcIn),
+            const ColorFilter.mode(proCopperAccent, BlendMode.srcIn),
           );
           expect(rendered.semanticsLabel, 'Improved with Pro');
         } else {
@@ -177,6 +330,7 @@ void main() {
           theme: GenesisTheme.light(),
           scrollBehavior: const GenesisScrollBehavior(),
           home: GemWalletPage(
+            membershipProductsLoader: loadTestMembershipOffers,
             walletStore: wallet,
             billingService: billing,
             productsLoader: (_) async {
@@ -284,6 +438,7 @@ void main() {
           theme: GenesisTheme.light(),
           scrollBehavior: const GenesisScrollBehavior(),
           home: GemWalletPage(
+            membershipProductsLoader: loadTestMembershipOffers,
             walletStore: wallet,
             productsLoader: (_) => products.future,
             tasksLoader: (_) => tasks.future,
@@ -294,6 +449,16 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('wallet-subscription-tab')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
+      // Wait for the newly visited tab without waiting on the unresolved Gems
+      // requests and their loading indicators.
+      for (
+        var frame = 0;
+        frame < 10 &&
+            find.byKey(const ValueKey('pro-plan-yearly')).evaluate().isEmpty;
+        frame++
+      ) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
       expect(find.byKey(const ValueKey('pro-plan-yearly')), findsOneWidget);
       products.completeError(StateError('offline'));
       tasks.completeError(StateError('offline'));
@@ -2146,6 +2311,7 @@ class _FakeBillingService implements BillingService {
   bool storeRecoveryResult = true;
   Object? storeRecoveryError;
   int storeRecoveryCount = 0;
+  int startCount = 0;
   List<GemProduct>? recoveredProductCatalog;
 
   @override
@@ -2189,7 +2355,9 @@ class _FakeBillingService implements BillingService {
   void resetForSession() {}
 
   @override
-  Future<void> start() async {}
+  Future<void> start() async {
+    startCount++;
+  }
 
   void emitProcessing() {
     _events.add(

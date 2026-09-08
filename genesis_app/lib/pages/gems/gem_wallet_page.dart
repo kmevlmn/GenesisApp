@@ -9,6 +9,7 @@ import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/debug_page_tracker.dart';
 import '../../app/gems/gem_task_analytics.dart';
 import '../../app/gems/gem_wallet_store.dart';
+import '../../app/membership/membership_catalog.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/common/genesis_center_toast.dart';
 import '../../components/common/genesis_modal_routes.dart';
@@ -47,6 +48,7 @@ class GemWalletPage extends StatefulWidget {
     super.key,
     this.showSubscriptionInitially = false,
     this.productsLoader,
+    this.membershipProductsLoader,
     this.tasksLoader,
     this.walletStore,
     this.billingService,
@@ -56,6 +58,7 @@ class GemWalletPage extends StatefulWidget {
   });
 
   final GemProductsLoader? productsLoader;
+  final MembershipCatalogLoader? membershipProductsLoader;
   final bool showSubscriptionInitially;
   final GemTasksLoader? tasksLoader;
   final GemWalletStore? walletStore;
@@ -120,18 +123,40 @@ class _GemWalletPageState extends State<GemWalletPage>
   bool _billingPurchaseDialogDismissing = false;
   bool _storeRecoveryStarted = false;
   late final TabController _purchaseTabs;
+  late bool _subscriptionVisited;
+  late bool _gemsVisited;
 
   @override
   void initState() {
     super.initState();
+    _subscriptionVisited = widget.showSubscriptionInitially;
+    _gemsVisited = !widget.showSubscriptionInitially;
     _purchaseTabs = TabController(
       length: 2,
       initialIndex: widget.showSubscriptionInitially ? 0 : 1,
       vsync: this,
     );
+    _purchaseTabs.addListener(_visitCurrentTab);
     WidgetsBinding.instance.addObserver(this);
-    _trackBuyGemsPageView();
-    unawaited(_refreshAll());
+    if (_gemsVisited) {
+      _trackBuyGemsPageView();
+      unawaited(_refreshAll());
+    }
+  }
+
+  void _visitCurrentTab() {
+    if (_purchaseTabs.index == 0) {
+      if (!_subscriptionVisited) {
+        setState(() => _subscriptionVisited = true);
+      }
+    } else if (!_gemsVisited) {
+      setState(() => _gemsVisited = true);
+      final billingService =
+          widget.billingService ?? AppServicesScope.maybeRead(context)?.billing;
+      if (billingService != null) _bindBillingService(billingService);
+      _trackBuyGemsPageView();
+      unawaited(_refreshAll());
+    }
   }
 
   @override
@@ -141,6 +166,7 @@ class _GemWalletPageState extends State<GemWalletPage>
     _billingEvents?.cancel();
     _disposeBillingPurchaseDialogState();
     _idleBillingState.dispose();
+    _purchaseTabs.removeListener(_visitCurrentTab);
     _purchaseTabs.dispose();
     super.dispose();
   }
@@ -156,12 +182,14 @@ class _GemWalletPageState extends State<GemWalletPage>
     }
     final billingService =
         widget.billingService ?? AppServicesScope.maybeOf(context)?.billing;
-    if (billingService != null) _bindBillingService(billingService);
+    if (_gemsVisited && billingService != null) {
+      _bindBillingService(billingService);
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && _purchaseTabs.index == 1) {
       unawaited(_refreshAll(silent: _hasPageData));
     }
   }
@@ -186,7 +214,6 @@ class _GemWalletPageState extends State<GemWalletPage>
 
   @override
   Widget build(BuildContext context) {
-    final walletStateListenable = _walletStateListenable;
     return PopScope(
       canPop: !_billingPurchaseDialogShowing,
       child: Scaffold(
@@ -218,8 +245,18 @@ class _GemWalletPageState extends State<GemWalletPage>
             key: const ValueKey('wallet-purchase-pages'),
             controller: _purchaseTabs,
             children: [
-              const _WalletTabPage(child: ProSubscriptionContent()),
-              _WalletTabPage(child: _buildBody(walletStateListenable)),
+              _WalletTabPage(
+                child: _subscriptionVisited
+                    ? ProSubscriptionContent(
+                        productsLoader: widget.membershipProductsLoader,
+                      )
+                    : const SizedBox.expand(),
+              ),
+              _WalletTabPage(
+                child: _gemsVisited
+                    ? _buildBody(_walletStateListenable)
+                    : const SizedBox.expand(),
+              ),
             ],
           ),
         ),

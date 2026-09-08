@@ -10,6 +10,7 @@ import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/network/genesis_api.dart';
 import 'package:genesis_flutter_android/network/gateway_auth.dart';
 import 'package:genesis_flutter_android/network/models/gem_purchase_report.dart';
+import 'package:genesis_flutter_android/network/models/membership_product.dart';
 import 'package:genesis_flutter_android/network/http_transport.dart';
 import 'package:genesis_flutter_android/network/local_mock_genesis_transport.dart';
 import 'package:genesis_flutter_android/network/models/search_v2.dart';
@@ -371,6 +372,101 @@ void main() {
         ),
         throwsA(isA<ApiException>()),
       );
+    },
+  );
+
+  test(
+    'membership products send the requested provider and parse server configuration',
+    () async {
+      for (final provider in MembershipProvider.values) {
+        final apiTransport = _FakeTransport(
+          handler: (request) => TransportResponse(
+            statusCode: 200,
+            headers: const {'content-type': 'application/json'},
+            body: jsonEncode({
+              'err_no': 0,
+              'err_msg': 'succ',
+              'data': {
+                'list': [
+                  {
+                    'plan_code': 'pro_yearly',
+                    'provider': provider.name,
+                    'store_product_id': 'test_store_product',
+                    if (provider == MembershipProvider.google)
+                      'base_plan_id': 'test-annual',
+                    if (provider == MembershipProvider.google)
+                      'offer_id': 'test-offer',
+                    'billing_months': 12,
+                    'monthly_gems_cent': 180025,
+                    'config_version': 'test-config',
+                    'sale_enabled': false,
+                  },
+                ],
+              },
+            }),
+          ),
+        );
+        final api = _apiWith(
+          apiTransport,
+          _FakeTransport(
+            handler: (_) => const TransportResponse(
+              statusCode: 200,
+              headers: {},
+              body: '{"status":"ok"}',
+            ),
+          ),
+        );
+        final result = await api.v1.membership.products(provider: provider);
+        expect(apiTransport.requests.single.method, 'GET');
+        expect(
+          apiTransport.requests.single.uri.path,
+          '/api/v1/membership/products',
+        );
+        expect(apiTransport.requests.single.uri.queryParameters, {
+          'provider': provider.name,
+        });
+        expect(result.products.single.monthlyGemsCent, 180025);
+        expect(result.products.single.billingMonths, 12);
+        expect(result.products.single.configVersion, 'test-config');
+        expect(result.products.single.saleEnabled, isFalse);
+        expect(
+          result.products.single.offerId,
+          provider == MembershipProvider.google ? 'test-offer' : '',
+        );
+      }
+    },
+  );
+
+  test(
+    'membership products propagate business errors and reject malformed successful lists',
+    () async {
+      for (final code in [10001, 4004, 5000, 0]) {
+        final apiTransport = _FakeTransport(
+          handler: (_) => TransportResponse(
+            statusCode: 200,
+            headers: const {'content-type': 'application/json'},
+            body: jsonEncode({
+              'err_no': code,
+              'err_msg': 'test error',
+              'data': {},
+            }),
+          ),
+        );
+        final api = _apiWith(
+          apiTransport,
+          _FakeTransport(
+            handler: (_) => const TransportResponse(
+              statusCode: 200,
+              headers: {},
+              body: '{}',
+            ),
+          ),
+        );
+        await expectLater(
+          api.v1.membership.products(provider: MembershipProvider.google),
+          throwsA(code == 0 ? isA<FormatException>() : isA<ApiException>()),
+        );
+      }
     },
   );
 

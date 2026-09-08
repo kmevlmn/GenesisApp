@@ -2357,3 +2357,21 @@ World：
 - `GET /api/points/{pointId}/messages`
 - `POST /api/points/{pointId}/messages/enqueue`
 - `GET /health`
+
+
+## Pro 会员商品列表（2026-09-08 核对）
+
+来源：[Apifox 会员商品列表](https://app.apifox.com/link/project/8297783/apis/api-512137864)，使用最新 OpenAPI 的 `/api/v1/membership/products`、`MembershipProductListResp`、`MembershipProductInfo` 核对。
+
+- `GET /api/v1/membership/products?provider=google|apple`，需要登录，复用现有 Authorization 与 Gateway 签名链路；不发送文档中的调试身份头。
+- 响应为 `{err_no, err_msg, data: {list: [...]}}`；成功但无配置时 `list=[]`。业务错误 `10001` 未登录、`4004` 参数错误、`5000` 服务不可用，继续使用统一错误处理。
+- 每项必含 `plan_code`（`pro_monthly`/`pro_yearly`）、`provider`、`store_product_id`、`billing_months`（1/12）、`monthly_gems_cent`、`config_version`、`sale_enabled`。Google 还必含 `base_plan_id`，可选 `offer_id`；Apple 不返回 base plan。
+- `monthly_gems_cent` 是每个会员月的额度，100 cent = 1 Gem；年付也是逐月发放。月付和年付允许配置不同额度，本次保留原有权益文案。
+- `sale_enabled=false` 表示不开放新购买，不代表已有会员失效。
+- 本接口不含价格及 offer token。商品列表由 `GenesisApi.v1.membership.products` 读取，再从商店 SDK 查询本地化价格。Google 精确匹配商品 ID、base plan 和可选 offer，不将同一商品下首个方案当作默认答案；配置 offer 不可用时不擅自换成基础方案。
+- Google 多阶段优惠使用与付费周期匹配的常规续费价格；年付卡片填入按商店年价计算的月均价，底部填入商店返回的完整年价。双方价格币种和月额度相同、无首购阶段时计算年付折扣。
+- 共享 `ProSubscriptionContent` 同时覆盖钱包页和购买弹层，保留原有布局、样式、权益文案及两个套餐卡片，仅绑定真实价格与折扣数据；不增加加载、错误、登录、空列表、停售或首购优惠的 UI。缺少数据时金额和折扣文字留空，不回退到预览价格；账号切换会清空并重取，旧请求不能覆盖新账号状态。缺少商品或价格时，点击原按钮可重新查询。
+- `sale_enabled` 仅用于业务拦截，不改变按钮、卡片、文案或价格展示；停售配置仍查询对应商店价格。
+- 钱包页和购买弹层初始仅加载当前 TAB，另一个 TAB 首次切换到时加载，后续切换复用已加载内容。
+- 此步骤只接商品配置和价格展示，尚未接购买、恢复、购买确认或权益同步；按钮仍沿用未开通购买提示。其余既有静态权益图示不由这个接口确认。
+- 本地 mock 仅返回契约允许的空列表，不伪造商店商品或价格。

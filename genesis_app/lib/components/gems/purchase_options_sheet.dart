@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/membership/membership_catalog.dart';
 
 import '../common/genesis_bottom_sheet_panel.dart';
 import '../common/genesis_modal_routes.dart';
@@ -14,10 +15,12 @@ class PurchaseOptionsSheet extends StatefulWidget {
     super.key,
     required this.gemsBuilder,
     this.initialTab = PurchaseSheetTab.buyGems,
+    this.membershipProductsLoader,
   });
 
   final WidgetBuilder gemsBuilder;
   final PurchaseSheetTab initialTab;
+  final MembershipCatalogLoader? membershipProductsLoader;
 
   @override
   State<PurchaseOptionsSheet> createState() => _PurchaseOptionsSheetState();
@@ -27,32 +30,33 @@ class _PurchaseOptionsSheetState extends State<PurchaseOptionsSheet>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   late bool _gemsVisited;
+  late bool _subscriptionVisited;
 
   @override
   void initState() {
     super.initState();
     _gemsVisited = widget.initialTab == PurchaseSheetTab.buyGems;
+    _subscriptionVisited = widget.initialTab == PurchaseSheetTab.subscription;
     _tabs = TabController(
       length: 2,
       initialIndex: widget.initialTab.index,
       vsync: this,
     );
-    _tabs.addListener(_visitGems);
-    _tabs.animation!.addListener(_visitGems);
+    _tabs.addListener(_visitCurrentTab);
   }
 
-  void _visitGems() {
-    if (!_gemsVisited &&
-        (_tabs.index == PurchaseSheetTab.buyGems.index ||
-            _tabs.animation!.value > 0)) {
+  void _visitCurrentTab() {
+    if (_tabs.index == PurchaseSheetTab.subscription.index &&
+        !_subscriptionVisited) {
+      setState(() => _subscriptionVisited = true);
+    } else if (_tabs.index == PurchaseSheetTab.buyGems.index && !_gemsVisited) {
       setState(() => _gemsVisited = true);
     }
   }
 
   @override
   void dispose() {
-    _tabs.removeListener(_visitGems);
-    _tabs.animation!.removeListener(_visitGems);
+    _tabs.removeListener(_visitCurrentTab);
     _tabs.dispose();
     super.dispose();
   }
@@ -89,7 +93,13 @@ class _PurchaseOptionsSheetState extends State<PurchaseOptionsSheet>
           key: const ValueKey('purchase-sheet-pages'),
           controller: _tabs,
           children: [
-            const _PurchaseSheetPage(child: ProSubscriptionContent()),
+            _PurchaseSheetPage(
+              child: _subscriptionVisited
+                  ? ProSubscriptionContent(
+                      productsLoader: widget.membershipProductsLoader,
+                    )
+                  : const SizedBox.expand(),
+            ),
             _PurchaseSheetPage(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),

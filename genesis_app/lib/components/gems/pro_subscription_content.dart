@@ -1,6 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 
+import '../../app/bootstrap/app_services_scope.dart';
+import '../../app/bootstrap/service_registry.dart';
+import '../../app/membership/membership_catalog.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../routers/app_router.dart';
 import '../../ui/components/genesis_primary_button.dart';
@@ -10,29 +16,106 @@ import '../../ui/tokens/genesis_typography.dart';
 import '../common/genesis_center_toast.dart';
 import 'pro_colors.dart';
 
-// Demo prices and benefits only, not store products or entitlement rules.
-enum _PreviewProPlan {
-  yearly('Yearly', '99.99', '8.33', 'year'),
-  monthly('Monthly', '9.99', '9.99', 'month');
+enum _ProPlan {
+  yearly('pro_yearly', 'Yearly', 'year'),
+  monthly('pro_monthly', 'Monthly', 'month');
 
-  const _PreviewProPlan(this.label, this.total, this.perMonth, this.period);
+  const _ProPlan(this.code, this.label, this.period);
+  final String code;
   final String label;
-  final String total;
-  final String perMonth;
   final String period;
 }
 
 enum _PreviewBenefitStatus { upgraded, unchanged, locked }
 
 class ProSubscriptionContent extends StatefulWidget {
-  const ProSubscriptionContent({super.key});
+  const ProSubscriptionContent({super.key, this.productsLoader});
+
+  final MembershipCatalogLoader? productsLoader;
 
   @override
   State<ProSubscriptionContent> createState() => _ProSubscriptionContentState();
 }
 
 class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
-  _PreviewProPlan _plan = _PreviewProPlan.yearly;
+  _ProPlan _plan = _ProPlan.yearly;
+  AppServices? _services;
+  List<MembershipOffer> _offers = [];
+  bool _loading = false;
+  bool _started = false;
+  int _requestGeneration = 0;
+
+  MembershipOffer? _offerFor(_ProPlan plan) {
+    for (final offer in _offers) {
+      if (offer.product.planCode == plan.code) return offer;
+    }
+    return null;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final services = AppServicesScope.maybeOf(context);
+    if (!_started || !identical(services, _services)) {
+      _services?.sessionRevision.removeListener(_sessionChanged);
+      _services = services;
+      services?.sessionRevision.addListener(_sessionChanged);
+      _started = true;
+      unawaited(_load());
+    }
+  }
+
+  @override
+  void didUpdateWidget(ProSubscriptionContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.productsLoader != widget.productsLoader) unawaited(_load());
+  }
+
+  void _sessionChanged() {
+    _plan = _ProPlan.yearly;
+    unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _requestGeneration++;
+    _services?.sessionRevision.removeListener(_sessionChanged);
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final request = ++_requestGeneration;
+    setState(() {
+      _loading = true;
+      _offers = [];
+    });
+    try {
+      final loader = widget.productsLoader ?? _services?.membershipCatalog.load;
+      if (loader == null) throw MembershipPlatformUnavailable();
+      final offers = await loader();
+      if (!mounted || request != _requestGeneration) return;
+      setState(() {
+        _offers = offers;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted || request != _requestGeneration) return;
+      debugPrint('[Membership] catalog load failed: ${error.runtimeType}');
+      setState(() => _loading = false);
+    }
+  }
+
+  void _onSubscribePressed() {
+    if (_loading) return;
+    final offer = _offerFor(_plan);
+    if (offer == null || offer.price == null) {
+      unawaited(_load());
+      return;
+    }
+    // Sale availability is a business guard, not a presentation state.
+    if (!offer.product.saleEnabled) return;
+    showGenesisToast(context, 'Pro subscriptions are coming soon.');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,12 +223,18 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
             children: [
               Row(
                 children: [
-                  for (final plan in _PreviewProPlan.values) ...[
-                    if (plan == _PreviewProPlan.monthly)
-                      const SizedBox(width: 20),
+                  for (final plan in _ProPlan.values) ...[
+                    if (plan == _ProPlan.monthly) const SizedBox(width: 20),
                     Expanded(
                       child: _ProPlanCard(
                         plan: plan,
+                        offer: _offerFor(plan),
+                        savings: _offerFor(plan) == null
+                            ? null
+                            : membershipYearlySavings(
+                                _offerFor(plan)!,
+                                _offers,
+                              ),
                         selected: _plan == plan,
                         onTap: () => setState(() => _plan = plan),
                       ),
@@ -172,15 +261,13 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
                   backgroundColor: Colors.transparent,
                   foregroundColor: proPurchaseInk,
                   side: const BorderSide(color: Color(0xFFC69A45)),
-                  label: '${_plan.label}: \$${_plan.total}',
+                  label:
+                      '${_plan.label}: ${_offerFor(_plan)?.price?.formattedPrice ?? ''}',
                   height: 44,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                   borderRadius: BorderRadius.circular(8),
-                  onPressed: () => showGenesisToast(
-                    context,
-                    'Pro subscriptions are coming soon.',
-                  ),
+                  onPressed: _onSubscribePressed,
                 ),
               ),
               const SizedBox(height: 14),
@@ -309,20 +396,34 @@ class _ProBenefit extends StatelessWidget {
 class _ProPlanCard extends StatelessWidget {
   const _ProPlanCard({
     required this.plan,
+    required this.offer,
+    required this.savings,
     required this.selected,
     required this.onTap,
   });
 
-  final _PreviewProPlan plan;
+  final _ProPlan plan;
+  final MembershipOffer? offer;
+  final int? savings;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final price = offer?.price;
+    final monthlyPrice = price == null
+        ? ''
+        : plan == _ProPlan.yearly
+        ? NumberFormat.simpleCurrency(
+            locale: Localizations.localeOf(context).toString(),
+            name: price.currencyCode,
+          ).format(price.amountMicros / 1000000 / offer!.product.billingMonths)
+        : price.formattedPrice;
     return Semantics(
       button: true,
       selected: selected,
-      label: '${plan.label} Pro, \$${plan.total} per ${plan.period}',
+      label:
+          '${plan.label} Pro, ${price?.formattedPrice ?? ''} per ${plan.period}',
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -363,7 +464,7 @@ class _ProPlanCard extends StatelessWidget {
                           TextSpan(
                             children: [
                               TextSpan(
-                                text: '\$${plan.perMonth}',
+                                text: monthlyPrice,
                                 style: TextStyle(
                                   fontSize: 24,
                                   height: 28 / 24,
@@ -388,7 +489,7 @@ class _ProPlanCard extends StatelessWidget {
               ),
             ),
           ),
-          if (plan == _PreviewProPlan.yearly)
+          if (plan == _ProPlan.yearly)
             Positioned(
               left: 0,
               top: -9,
@@ -405,7 +506,7 @@ class _ProPlanCard extends StatelessWidget {
                       bottomRight: Radius.circular(12),
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
@@ -415,7 +516,7 @@ class _ProPlanCard extends StatelessWidget {
                       ),
                       SizedBox(width: 3),
                       Text(
-                        'Save 17%',
+                        savings == null ? '' : 'Save $savings%',
                         style: TextStyle(
                           fontSize: 11,
                           height: 1,

@@ -24,6 +24,8 @@ import '../config/app_global_config.dart';
 import '../config/platform_config.dart';
 import '../debug/location_chat_debug_storage.dart';
 import '../gems/gem_wallet_store.dart';
+import '../membership/membership_catalog.dart';
+import '../../platform/billing/membership_product_store.dart';
 import '../telemetry/device_info_telemetry.dart';
 import '../telemetry/genesis_telemetry.dart';
 import '../version/app_version_check_service.dart';
@@ -51,9 +53,19 @@ class AppServices {
     this.gatewayAuth,
     GemWalletStore? gemWallet,
     this.billing,
+    MembershipCatalog? membershipCatalog,
     ValueNotifier<int>? sessionRevision,
     AppGlobalConfigStore? appGlobalConfig,
-  }) : deviceInfoTelemetry =
+  }) : membershipCatalog =
+           membershipCatalog ??
+           MembershipCatalog(
+             readLoginUid: sessionStore.readLoginUid,
+             loadProducts: (provider) =>
+                 api.v1.membership.products(provider: provider),
+             loadPrices: MembershipProductStore().loadPrices,
+             provider: MembershipCatalog.currentProvider,
+           ),
+       deviceInfoTelemetry =
            deviceInfoTelemetry ??
            DeviceInfoTelemetryReporter(deviceIdService: deviceId),
        gemWallet =
@@ -84,6 +96,7 @@ class AppServices {
   final GatewayAuthCoordinator? gatewayAuth;
   final GemWalletStore gemWallet;
   final BillingService? billing;
+  final MembershipCatalog membershipCatalog;
   final AppGlobalConfigStore appGlobalConfig;
   final ValueNotifier<int> sessionRevision;
   final ValueNotifier<String?> pendingLoginCheckInUid = ValueNotifier(null);
