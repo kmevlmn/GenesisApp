@@ -148,7 +148,7 @@ void main() {
       tester
           .widget<Icon>(find.byIcon(Icons.add_photo_alternate_outlined))
           .color,
-      GenesisColors.createAdd,
+      GenesisColors.brand,
     );
 
     await tester.tapAt(const Offset(20, 20));

@@ -178,7 +178,7 @@ ChatUiStyleConfig get kLocationChatStyle => ChatUiStyleConfig.standard.copyWith(
   inputBackdropBlurSigma: 4,
   inputBorderRadius: 8,
   inputTextStyle: ChatUiStyleConfig.standard.inputTextStyle.copyWith(
-    color: Colors.white,
+    color: const Color(0xF2FFFFFF),
     fontSize: 14,
     height: 1.4,
   ),

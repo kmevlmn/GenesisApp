@@ -33,8 +33,12 @@ class _DiscussComposerPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       key: const ValueKey('discuss-composer-sheet'),
-      color: Colors.white,
-      borderRadius: GenesisBottomSheetPanel.borderRadius,
+      color: _discussComposerSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: GenesisBottomSheetPanel.borderRadius,
+        side: BorderSide(color: _discussComposerBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
         child: Padding(
@@ -43,12 +47,17 @@ class _DiscussComposerPanel extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: GenesisBottomSheetPanel.titleStyle),
+              Text(
+                title,
+                style: GenesisBottomSheetPanel.titleStyle.copyWith(
+                  color: _discussComposerPrimary,
+                ),
+              ),
               const SizedBox(height: 18),
               TextField(
                 controller: controller,
                 focusNode: focusNode,
-                cursorColor: const Color(0xFF111111),
+                cursorColor: _discussComposerPrimary,
                 keyboardType: TextInputType.multiline,
                 textInputAction: TextInputAction.newline,
                 minLines: _discussComposerMinTextLines,
@@ -57,7 +66,7 @@ class _DiscussComposerPanel extends StatelessWidget {
                   fontSize: _discussComposerFontSize,
                   height: _discussComposerLineHeight,
                   fontWeight: FontWeight.w400,
-                  color: Color(0xFF111111),
+                  color: _discussComposerPrimary,
                 ),
                 decoration: InputDecoration(
                   hintText: placeholder,
@@ -66,7 +75,7 @@ class _DiscussComposerPanel extends StatelessWidget {
                     height: _discussComposerLineHeight,
                     fontWeight: FontWeight.w400,
                     letterSpacing: 0,
-                    color: Color(0xFFB8B8B8),
+                    color: _discussComposerMuted,
                   ),
                   border: InputBorder.none,
                   isCollapsed: true,
@@ -98,15 +107,15 @@ class _DiscussComposerPanel extends StatelessWidget {
                       icon: const Icon(
                         Icons.add_photo_alternate_outlined,
                         size: 30,
-                        color: GenesisColors.createAdd,
+                        color: GenesisColors.brand,
                       ),
                     ),
                   const Spacer(),
                   TextButton(
                     onPressed: canSend ? onSend : null,
                     style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF4B5F8E),
-                      disabledForegroundColor: const Color(0xFF9BA4B8),
+                      foregroundColor: GenesisColors.brand,
+                      disabledForegroundColor: _discussComposerMuted,
                       textStyle: const TextStyle(
                         fontSize: 16,
                         height: 1.1,
@@ -116,7 +125,10 @@ class _DiscussComposerPanel extends StatelessWidget {
                     child: submitting
                         ? const SizedBox.square(
                             dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: GenesisColors.brand,
+                            ),
                           )
                         : const Text('Send'),
                   ),

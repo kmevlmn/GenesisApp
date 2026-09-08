@@ -77,9 +77,13 @@ class _DiscussImageAddTile extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE3E3E3), width: 1.4),
+          border: Border.all(color: _discussComposerBorder, width: 1.4),
         ),
-        child: const Icon(Icons.add, size: 28, color: Color(0xFF8E8E8E)),
+        child: const Icon(
+          Icons.add,
+          size: 28,
+          color: _discussComposerSecondary,
+        ),
       ),
     );
   }
@@ -130,7 +134,7 @@ class _DiscussImageTile extends StatelessWidget {
                         child: const Center(
                           child: Icon(
                             Icons.error_outline,
-                            color: Colors.white,
+                            color: _discussComposerPrimary,
                             size: 22,
                           ),
                         ),
@@ -151,7 +155,7 @@ class _DiscussImageTile extends StatelessWidget {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4F4F4F),
+                  color: _discussComposerSurface,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
@@ -161,7 +165,11 @@ class _DiscussImageTile extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.close, color: Colors.white, size: 18),
+                child: const Icon(
+                  Icons.close,
+                  color: _discussComposerPrimary,
+                  size: 18,
+                ),
               ),
             ),
           ),
