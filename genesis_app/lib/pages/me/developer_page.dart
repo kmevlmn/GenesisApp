@@ -12,6 +12,7 @@ import 'package:genesis_flutter_android/platform/device/device_id_service.dart';
 import '../../app/agent_control/agent_control_status.dart';
 import '../../app/config/app_endpoint_overrides.dart';
 import '../../app/config/app_config.dart';
+import '../../app/config/app_global_config.dart';
 import '../../app/debug_floating_button_visibility.dart';
 import '../../app/debug_page_tracker.dart';
 import '../../app/debug/location_chat_bubble_layout_settings.dart';
@@ -52,6 +53,7 @@ part 'developer_endpoint_actions.dart';
 part 'developer_version_actions.dart';
 part 'developer_previews.dart';
 part 'developer_components.dart';
+part 'developer_app_config_section.dart';
 part 'developer_capture_components.dart';
 part 'developer_network_tab.dart';
 part 'developer_websocket_tab.dart';
@@ -586,6 +588,8 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
         ..._buildEndpointSection(),
         const SizedBox(height: 18),
         ..._buildVersionOverrideSection(),
+        const SizedBox(height: 18),
+        const _DeveloperAppConfigSection(),
       ],
     );
   }

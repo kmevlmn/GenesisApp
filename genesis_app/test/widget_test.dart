@@ -25775,6 +25775,89 @@ void main() {
     },
   );
 
+  for (final inSheet in [false, true]) {
+    testWidgets(
+      'developer app config expands and updates in ${inSheet ? 'sheet' : 'page'}',
+      (WidgetTester tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        var response = Completer<Map<String, dynamic>>();
+        final config = AppGlobalConfigStore(
+          loadConfig: ({String? uid}) => response.future,
+        );
+        final request = config.refresh();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.iOS),
+            home: AppServicesScope(
+              services: await _testServices(appGlobalConfig: config),
+              child: inSheet
+                  ? const Material(child: DeveloperPageSheet())
+                  : const DeveloperPage(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final section = find.byKey(
+          const PageStorageKey<String>('developer-app-config-expanded'),
+        );
+        final scrollable = find
+            .descendant(
+              of: find.byKey(
+                const PageStorageKey<String>('developer-info-tab-scroll'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(section, 300, scrollable: scrollable);
+        await tester.ensureVisible(section);
+        await tester.pumpAndSettle();
+        expect(find.text('Request in progress…'), findsNothing);
+
+        await tester.tap(find.text('App Config'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('Request in progress…'), findsOneWidget);
+
+        response.complete({
+          'show_opening_sheet': true,
+          'future_config': {
+            'values': [1, '中文', null],
+          },
+        });
+        await request;
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('show_opening_sheet'), findsOneWidget);
+        expect(find.text('true'), findsOneWidget);
+        expect(find.text('future_config'), findsOneWidget);
+
+        for (var i = 0; i < 2; i += 1) {
+          await tester.tap(find.text('App Config'));
+          await tester.pumpAndSettle();
+          expect(find.text('show_opening_sheet'), findsNothing);
+          await tester.tap(find.text('App Config'));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(find.text('show_opening_sheet'), findsOneWidget);
+        }
+
+        response = Completer<Map<String, dynamic>>();
+        final update = config.refresh();
+        await tester.pumpAndSettle();
+        response.complete({'show_opening_sheet': false});
+        await update;
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('false'), findsOneWidget);
+        expect(find.text('future_config'), findsNothing);
+      },
+    );
+  }
+
   testWidgets('developer page sheet leaves keyboard avoidance to route', (
     WidgetTester tester,
   ) async {
