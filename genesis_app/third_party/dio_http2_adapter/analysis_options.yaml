@@ -1,0 +1,6 @@
+include: package:flutter_lints/flutter.yaml
+
+# Retain the upstream library directive; the runtime patch only releases sockets.
+linter:
+  rules:
+    unnecessary_library_name: false

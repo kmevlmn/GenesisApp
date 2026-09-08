@@ -863,7 +863,8 @@ void main() {
     expect(
       tester
           .widget<Text>(find.byKey(const ValueKey('gem-wallet-balance')))
-          .data,
+          .textSpan!
+          .toPlainText(),
       '430.0',
     );
     expect(find.text('Starter'), findsNothing);

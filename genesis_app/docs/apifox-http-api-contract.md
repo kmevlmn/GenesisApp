@@ -2124,19 +2124,19 @@ query：
 
 ### POST `https://collect.worldo.ai/api/v1/collect`
 
-批量提交客户端行为事件。客户端在事件发生时先写入独立 SQLite 队列；冷启动的 `startup_first_report` 和 `launch_startup` 在 Collect recorder 准备完成后立即记录，早于 `runApp` 和 Firebase/Telemetry 完整初始化。Telemetry 初始化完成后再由独立上传器消费；每次按 FIFO 最多领取 500 条，批次成功后删除，失败时整批恢复为待发送状态。
+批量提交客户端行为事件。客户端在事件发生时先写入独立 SQLite 队列；冷启动的 `startup_first_report` 和 `launch_startup` 在 Collect recorder 准备完成后立即记录，早于 `runApp` 和 Firebase/Telemetry 完整初始化。Telemetry 初始化完成后再由独立上传器消费；每次按 FIFO 最多领取 100 条，客户端批次同时限制为 256 KiB。只有收到 2xx、有效 JSON 对象且 `err_no=0` 后才删除；所有未确认成功的事件保留原 `event_id` 和内容并恢复待发送。HTTP 400/413/422 可拆批重试，失败单条和超限单条仍保留；不再写入会被清理的内存 dead letter。失败记录移到队尾，给后续未尝试事件发送机会。
 
-请求 header 在实际上传时按当前上下文生成：
+请求 header 在实际上传时按事件入队时保存的身份和环境快照生成；不同上下文分批，重新登录不改写旧事件的 UID：
 
 - `X-Platform`: `android` 或 `ios`
-- `X-App-Version`: 当前 App version name
+- `X-App-Version`: 事件发生时的 App version name
 - `x-app-environment`: `production` 或 `test`
 - `X-Device-ID`: 当前设备 ID；允许匿名事件明确省略
-- `X-UID`: 已登录用户 uid；未登录或允许匿名事件不传
+- `X-UID`: 事件发生时已登录用户 uid；未登录或允许匿名事件不传
 
 请求 body：
 
-- `events*`: array，本批事件，按本地入队顺序排列，最多 500 条
+- `events*`: array，本批事件，按本地入队顺序排列；客户端默认最多 100 条，接口原约定上限为 500 条
 - `events[].event_id*`: string，客户端生成的 UUID v4；重试保持不变，供服务端幂等去重
 - `events[].action_type*`: string，事件类型，例如 `pageview`、`event`、`monitor`、`pay_event`；`api_req_start`、`api_req_success`、`api_req_fail_tech`、`api_req_fail_biz` 使用 `monitor`
 - `events[].action*`: string，页面名或事件名
@@ -2169,7 +2169,7 @@ query：
 }
 ```
 
-成功判定：HTTP 状态码为 2xx，且 JSON 响应中的 `err_no` 为数值 `0` 或字符串 `"0"`。非 2xx、超时、网络异常、无效 JSON 或非零 `err_no` 都视为整批失败，不支持单批部分成功。
+成功判定：HTTP 状态码为 2xx，且 JSON 响应中的 `err_no` 为数值 `0` 或字符串 `"0"`。非 2xx、超时、网络异常、无效 JSON 或非零 `err_no` 都视为该次请求失败，不支持在一个响应内确认部分事件。客户端因大小限制或请求被拒绝而拆成多个子请求时，每个成功子批次会按 `event_id` 独立确认，只重试尚未成功的部分；本地删除失败的已成功事件保持 in-flight。写库超时后的迟到记录会与内存副本按同一 ID 归并，避免两个队列再次发送。 内存备用队列不再按原 300 条阈值淘汰未确认数据；数据库恢复后补写入库。若数据库始终不可写且进程退出，内存记录仍有丢失风险，详见 [失败保留策略](/Users/long/Project/GenesisApp_2/genesis_app/docs/collect-failure-retention.md)。
 
 响应示例：
 

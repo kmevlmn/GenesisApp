@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:dio_http2_adapter/dio_http2_adapter.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:http2/http2.dart';
 
 import '../app/telemetry/firebase_performance_monitoring.dart';
 import 'devtools_http_profile.dart';
@@ -15,11 +18,14 @@ class DioHttpTransport implements HttpTransport {
   DioHttpTransport({
     Dio? dio,
     String? proxy,
+    SecurityContext? securityContext,
     Duration http2IdleTimeout = const Duration(seconds: 15),
     HttpRequestPerformanceMetricFactory? performanceMetricFactory,
     HttpRequestPerformanceMetricUrlFilter? performanceMetricUrlFilter,
     HttpRequestPerformanceMetricReady? performanceMetricReady,
-  }) : _dio = _prepareDio(dio ?? _createDio(proxy, http2IdleTimeout)),
+  }) : _dio = _prepareDio(
+         dio ?? _createDio(proxy, http2IdleTimeout, securityContext),
+       ),
        _performanceMetricFactory =
            performanceMetricFactory ?? createFirebasePerformanceMetric,
        _performanceMetricUrlFilter =
@@ -34,7 +40,14 @@ class DioHttpTransport implements HttpTransport {
   final HttpRequestPerformanceMetricReady _performanceMetricReady;
 
   @override
-  Future<TransportResponse> send(TransportRequest request) async {
+  Future<TransportResponse> send(TransportRequest request) =>
+      runWithNetworkDeadline(
+        timeout: Duration(milliseconds: request.timeoutMs),
+        cancellationToken: request.cancellationToken,
+        action: (token) => _send(request.withCancellationToken(token)),
+      );
+
+  Future<TransportResponse> _send(TransportRequest request) async {
     request.cancellationToken?.throwIfCancelled();
     final metric = await startPerformanceMetric(
       request,
@@ -42,17 +55,20 @@ class DioHttpTransport implements HttpTransport {
       urlFilter: _performanceMetricUrlFilter,
       ready: _performanceMetricReady,
     );
+    final stopMetric = performanceMetricStopper(metric);
     final devToolsProfile = DevToolsHttpProfile.start(request);
-    await devToolsProfile?.completeRequest(request);
+    unawaited(devToolsProfile?.completeRequest(request));
     final dioCancelToken = CancelToken();
     final removeCancelListener = request.cancellationToken?.addCancelListener(
       () {
+        stopMetric();
         if (!dioCancelToken.isCancelled) {
           dioCancelToken.cancel(const NetworkRequestCancelledException());
         }
       },
     );
     try {
+      request.cancellationToken?.throwIfCancelled();
       final timeout = Duration(milliseconds: request.timeoutMs);
       final response = await _dio.request<Object?>(
         request.uri.toString(),
@@ -78,15 +94,6 @@ class DioHttpTransport implements HttpTransport {
       final httpProtocolVersion = response
           .extra[HttpClientAdapter.extraKeyHttpVersion]
           ?.toString();
-      if (request.uri.scheme.toLowerCase() == 'https' &&
-          httpProtocolVersion != '2.0') {
-        throw DioException.connectionError(
-          requestOptions: response.requestOptions,
-          reason:
-              'HTTPS requires HTTP/2, but the negotiated protocol was '
-              '${httpProtocolVersion ?? 'unknown'}.',
-        );
-      }
       final bodyBytes = _responseBodyBytes(response.data);
       final normalizedProtocol = normalizeHttpProtocolVersion(
         httpProtocolVersion,
@@ -104,22 +111,22 @@ class DioHttpTransport implements HttpTransport {
       );
       recordPerformanceMetricProtocol(metric, normalizedProtocol);
       recordPerformanceMetricResponse(metric, transportResponse);
-      await devToolsProfile?.completeResponse(transportResponse);
+      unawaited(devToolsProfile?.completeResponse(transportResponse));
       return transportResponse;
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) {
         const cancellationError = NetworkRequestCancelledException();
-        await devToolsProfile?.completeWithError(cancellationError);
+        unawaited(devToolsProfile?.completeWithError(cancellationError));
         throw cancellationError;
       }
-      await devToolsProfile?.completeWithError(error);
+      unawaited(devToolsProfile?.completeWithError(error));
       rethrow;
     } catch (error) {
-      await devToolsProfile?.completeWithError(error);
+      unawaited(devToolsProfile?.completeWithError(error));
       rethrow;
     } finally {
       removeCancelListener?.call();
-      unawaited(stopPerformanceMetric(metric));
+      stopMetric();
     }
   }
 }
@@ -130,38 +137,85 @@ Object? _requestBodyData(List<int>? bodyBytes) {
   return Uint8List.fromList(bodyBytes);
 }
 
-Dio _createDio(String? proxy, Duration http2IdleTimeout) {
+Dio _createDio(
+  String? proxy,
+  Duration http2IdleTimeout,
+  SecurityContext? securityContext,
+) {
   final normalizedProxy = normalizeHttpProxyAddress(proxy);
   final dio = Dio();
   final httpAdapter = IOHttpClientAdapter(
-    createHttpClient: () => createProxyAwareHttpClient(normalizedProxy),
+    createHttpClient: () => createProxyAwareHttpClient(
+      normalizedProxy,
+      securityContext: securityContext,
+    ),
   );
   final proxyUri = _proxyUri(normalizedProxy);
   final httpsAdapter = Http2Adapter(
-    ConnectionManager(
-      idleTimeout: http2IdleTimeout,
-      onClientCreate: (_, setting) {
-        setting.proxy = proxyUri;
-        if (proxyUri != null &&
-            !const bool.fromEnvironment('dart.vm.product')) {
-          setting.onBadCertificate = (_) => true;
-        }
-      },
+    CancellationAwareHttp2ConnectionManager(
+      ConnectionManager(
+        idleTimeout: http2IdleTimeout,
+        onClientCreate: (_, setting) {
+          setting.context = securityContext;
+          setting.proxy = proxyUri;
+          if (proxyUri != null &&
+              !const bool.fromEnvironment('dart.vm.product')) {
+            setting.onBadCertificate = (_) => true;
+          }
+        },
+      ),
     ),
     fallbackAdapter: httpAdapter,
-    onNotSupported: (options, requestStream, cancelFuture, error) {
-      throw DioException.connectionError(
-        requestOptions: options,
-        reason: 'HTTPS endpoint does not support the required HTTP/2 protocol.',
-        error: error,
-      );
-    },
   );
   dio.httpClientAdapter = SchemeRoutingHttpClientAdapter(
     httpsAdapter: httpsAdapter,
     otherAdapter: httpAdapter,
   );
   return dio;
+}
+
+/// The adapter creates a request stream immediately after getConnection.
+/// Check again here because establishing a shared connection can outlive the
+/// request that asked for it. Do not close a connection used by other requests.
+class CancellationAwareHttp2ConnectionManager implements ConnectionManager {
+  CancellationAwareHttp2ConnectionManager(this.delegate);
+
+  final ConnectionManager delegate;
+
+  void _throwIfCancelled(RequestOptions options) {
+    final error = options.cancelToken?.cancelError;
+    if (error != null) throw error;
+  }
+
+  @override
+  Future<ClientTransportConnection> getConnection(
+    RequestOptions options,
+    List<RedirectRecord> redirects,
+  ) async {
+    _throwIfCancelled(options);
+    try {
+      final connection = await delegate.getConnection(options, redirects);
+      _throwIfCancelled(options);
+      return connection;
+    } catch (_) {
+      // This also prevents late H2-not-supported from starting the fallback.
+      _throwIfCancelled(options);
+      rethrow;
+    }
+  }
+
+  @override
+  void removeConnection(ClientTransportConnection transport) =>
+      delegate.removeConnection(transport);
+
+  @override
+  void close({bool force = false}) => delegate.close(force: force);
+
+  @override
+  @visibleForTesting
+  // ConnectionManager requires this diagnostic getter on every implementation.
+  // ignore: invalid_use_of_visible_for_testing_member
+  int get cachedConnectionsCount => delegate.cachedConnectionsCount;
 }
 
 Dio _prepareDio(Dio dio) {

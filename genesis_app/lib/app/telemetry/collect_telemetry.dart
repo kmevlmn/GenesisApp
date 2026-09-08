@@ -50,6 +50,8 @@ class CollectTelemetryHealth {
   final DateTime? lastUploadFailureAt;
 }
 
+// `permanent` is retained as a compatibility name for batch rejection. It only
+// permits splitting a request; even a rejected single event must stay queued.
 enum CollectUploadFailureKind { transient, permanent, authorization }
 
 class CollectUploadException implements Exception {
@@ -137,7 +139,11 @@ abstract interface class CollectEventStore {
   Future<void> recoverInFlight();
   Future<ClaimedCollectEventBatch?> claimPending({required int limit});
   Future<void> deleteClaimed(String batchId);
-  Future<void> releaseClaimed(String batchId);
+  Future<void> deleteEvents(List<String> eventIds);
+  Future<void> releaseClaimed(
+    String batchId, {
+    List<String> excludingEventIds = const [],
+  });
   Future<void> resetConnection();
 }
 
@@ -293,6 +299,16 @@ class SqfliteCollectEventStore implements CollectEventStore {
   }
 
   @override
+  Future<void> deleteEvents(List<String> eventIds) async {
+    if (eventIds.isEmpty) return;
+    await (await _db).delete(
+      'collect_events',
+      where: 'event_id IN (${List.filled(eventIds.length, '?').join(',')})',
+      whereArgs: eventIds,
+    );
+  }
+
+  @override
   Future<void> deleteClaimed(String batchId) async {
     await (await _db).delete(
       'collect_events',
@@ -302,13 +318,40 @@ class SqfliteCollectEventStore implements CollectEventStore {
   }
 
   @override
-  Future<void> releaseClaimed(String batchId) async {
-    await (await _db).update(
-      'collect_events',
-      <String, Object?>{'state': _pendingState, 'batch_id': null},
-      where: 'state = ? AND batch_id = ?',
-      whereArgs: <Object>[_inFlightState, batchId],
-    );
+  Future<void> releaseClaimed(
+    String batchId, {
+    List<String> excludingEventIds = const [],
+  }) async {
+    await (await _db).transaction((txn) async {
+      final rows = await txn.query(
+        'collect_events',
+        columns: ['event_id'],
+        where:
+            'state = ? AND batch_id = ?'
+            '${excludingEventIds.isEmpty ? '' : ' AND event_id NOT IN (${List.filled(excludingEventIds.length, '?').join(',')})'}',
+        whereArgs: <Object>[_inFlightState, batchId, ...excludingEventIds],
+        orderBy: 'sequence_id ASC',
+      );
+      if (rows.isEmpty) return;
+      final maximum = await txn.rawQuery(
+        'SELECT COALESCE(MAX(sequence_id), 0) AS last_sequence FROM collect_events',
+      );
+      var sequence = (maximum.single['last_sequence'] as num).toInt();
+      for (final row in rows) {
+        // Move failed rows behind untouched pending events without deleting or
+        // changing their event ID, captured timestamp, identity or payload.
+        await txn.update(
+          'collect_events',
+          <String, Object?>{
+            'state': _pendingState,
+            'batch_id': null,
+            'sequence_id': ++sequence,
+          },
+          where: 'state = ? AND batch_id = ? AND event_id = ?',
+          whereArgs: <Object>[_inFlightState, batchId, row['event_id']!],
+        );
+      }
+    });
   }
 
   Future<void> close() async {
@@ -385,6 +428,12 @@ class MemoryCollectEventStore implements CollectEventStore {
   }
 
   @override
+  Future<void> deleteEvents(List<String> eventIds) async {
+    final ids = eventIds.toSet();
+    _rows.removeWhere((row) => ids.contains(row.event.eventId));
+  }
+
+  @override
   Future<void> deleteClaimed(String batchId) async {
     _rows.removeWhere(
       (row) => row.state == _inFlightState && row.batchId == batchId,
@@ -392,10 +441,18 @@ class MemoryCollectEventStore implements CollectEventStore {
   }
 
   @override
-  Future<void> releaseClaimed(String batchId) async {
+  Future<void> releaseClaimed(
+    String batchId, {
+    List<String> excludingEventIds = const [],
+  }) async {
     for (final row in _rows) {
-      if (row.state != _inFlightState || row.batchId != batchId) continue;
+      if (row.state != _inFlightState ||
+          row.batchId != batchId ||
+          excludingEventIds.contains(row.event.eventId)) {
+        continue;
+      }
       row
+        ..sequence = _nextSequence++
         ..state = _pendingState
         ..batchId = null;
     }
@@ -441,6 +498,7 @@ abstract interface class CollectTelemetryClient {
   Future<void> collectBatch(
     List<CollectEvent> events, {
     Map<String, String> headers = const <String, String>{},
+    NetworkCancellationToken? cancellationToken,
   });
 }
 
@@ -465,6 +523,7 @@ class SdkCollectTelemetryClient implements CollectTelemetryClient {
   Future<void> collectBatch(
     List<CollectEvent> events, {
     Map<String, String> headers = const <String, String>{},
+    NetworkCancellationToken? cancellationToken,
   }) async {
     final response = await _transport.send(
       TransportRequest(
@@ -481,15 +540,16 @@ class SdkCollectTelemetryClient implements CollectTelemetryClient {
           }),
         ),
         timeoutMs: timeoutMs,
+        cancellationToken: cancellationToken,
       ),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final statusCode = response.statusCode;
       final kind = statusCode == 401 || statusCode == 403
           ? CollectUploadFailureKind.authorization
-          : statusCode == 408 || statusCode == 429 || statusCode >= 500
-          ? CollectUploadFailureKind.transient
-          : CollectUploadFailureKind.permanent;
+          : statusCode == 400 || statusCode == 413 || statusCode == 422
+          ? CollectUploadFailureKind.permanent
+          : CollectUploadFailureKind.transient;
       throw CollectUploadException(
         message: 'Collect request failed',
         kind: kind,
@@ -515,11 +575,25 @@ class SdkCollectTelemetryClient implements CollectTelemetryClient {
     if (errNo != 0 && errNo?.toString() != '0') {
       throw CollectUploadException(
         message: 'Collect response err_no is not zero',
-        kind: CollectUploadFailureKind.permanent,
+        // The response does not establish that the event itself is invalid.
+        kind: CollectUploadFailureKind.transient,
         errNo: _asInt(errNo),
       );
     }
   }
+}
+
+// Retained only while a timed-out write and its memory copy need reconciling.
+class _CollectStoreWrite {
+  _CollectStoreWrite(this.eventId);
+
+  final String eventId;
+  bool settled = false;
+  bool failed = false;
+  bool fallback = false;
+  bool acknowledged = false;
+  bool databaseOwned = false;
+  Future<void>? cleanup;
 }
 
 class CollectTelemetryUploader {
@@ -547,6 +621,7 @@ class CollectTelemetryUploader {
   final Duration _interval;
   final int _batchSize;
   final int _maxBatchBytes;
+  // Compatibility setting: caps concurrent unresolved writes, never retention.
   final int _memoryFallbackLimit;
   final Duration _storeTimeout;
   final Duration _requestTimeout;
@@ -557,7 +632,7 @@ class CollectTelemetryUploader {
   CollectUploadContext _context = const CollectUploadContext();
   Future<void> _pendingWrites = Future<void>.value();
   final List<CollectEvent> _memoryFallback = <CollectEvent>[];
-  final List<CollectEvent> _deadLetters = <CollectEvent>[];
+  final Map<String, _CollectStoreWrite> _storeWrites = {};
   Timer? _timer;
   Timer? _immediateCheckTimer;
   Timer? _storeRecoveryTimer;
@@ -578,13 +653,12 @@ class CollectTelemetryUploader {
   bool get isStartedForTesting => _started;
   bool get hasTimerForTesting => _timer != null;
   bool get isCheckingForTesting => _checking;
-  List<CollectEvent> get deadLettersForTesting =>
-      List<CollectEvent>.unmodifiable(_deadLetters);
+  List<CollectEvent> get deadLettersForTesting => const <CollectEvent>[];
 
   CollectTelemetryHealth get health => CollectTelemetryHealth(
     storeStatus: _storeStatus,
     memoryFallbackCount: _memoryFallback.length,
-    deadLetterCount: _deadLetters.length,
+    deadLetterCount: 0,
     droppedEventCount: _droppedEventCount,
     consecutiveUploadFailures: _consecutiveUploadFailures,
     lastError: _lastError,
@@ -688,14 +762,115 @@ class CollectTelemetryUploader {
       _recordStoreFailure('write_chain', error);
     }
     try {
-      await _store.enqueue(event).timeout(_storeTimeout);
-      _markStoreHealthy();
-    } catch (error) {
-      _addMemoryFallback(event);
-      _recordStoreFailure('enqueue', error);
+      await _writeToStore(event);
     } finally {
       _scheduleImmediateCheck();
     }
+  }
+
+  Future<bool> _writeToStore(
+    CollectEvent event, {
+    bool fromMemory = false,
+  }) async {
+    // A hung store must not create an unbounded set of outstanding writes.
+    if (_storeWrites.length >= max(1, _memoryFallbackLimit)) {
+      _addMemoryFallback(event);
+      return false;
+    }
+    final state = _CollectStoreWrite(event.eventId);
+    _storeWrites[event.eventId] = state;
+    final write = Future<void>.sync(() => _store.enqueue(event)).then(
+      (_) {
+        state.settled = true;
+        if (state.fallback) unawaited(_reconcileStoreWrite(state));
+      },
+      onError: (Object error, StackTrace stack) {
+        state.settled = true;
+        state.failed = true;
+        _storeWrites.remove(state.eventId);
+        Error.throwWithStackTrace(error, stack);
+      },
+    );
+    try {
+      await write.timeout(_storeTimeout);
+      _storeWrites.remove(event.eventId);
+      if (fromMemory) {
+        _memoryFallback.removeWhere((item) => item.eventId == event.eventId);
+      }
+      _markStoreHealthy();
+      return true;
+    } catch (error) {
+      state.fallback = true;
+      if (!state.acknowledged && !state.databaseOwned) {
+        _addMemoryFallback(event);
+      }
+      _recordStoreFailure('enqueue', error);
+      await _reconcileStoreWrite(state);
+      return false;
+    }
+  }
+
+  Future<bool> _persistMemoryFallback() async {
+    // checkNow owns the upload lock, so a successful write can transfer this
+    // memory copy to SQLite before another upload starts. Keep timed-out writes
+    // tracked until they settle, using the same late-write reconciliation.
+    var persisted = false;
+    final batch = _memoryFallback.take(_batchSize).toList(growable: false);
+    for (final event in batch) {
+      final state = _storeWrites[event.eventId];
+      if (state != null) {
+        if (state.settled && !state.failed && !state.acknowledged) {
+          _memoryFallback.removeWhere((item) => item.eventId == event.eventId);
+          _storeWrites.remove(event.eventId);
+          persisted = true;
+        }
+        continue;
+      }
+      if (!await _writeToStore(event, fromMemory: true)) break;
+      persisted = true;
+    }
+    return persisted;
+  }
+
+  Future<void> _reconcileStoreWrite(_CollectStoreWrite state) async {
+    if (!state.settled || state.failed) return;
+    if (!state.acknowledged) {
+      if (!_memoryFallback.any((event) => event.eventId == state.eventId)) {
+        _storeWrites.remove(state.eventId);
+      }
+      return;
+    }
+    final cleanup = state.cleanup;
+    if (cleanup != null) return cleanup;
+    final operation = _deleteAcknowledgedWrite(state);
+    state.cleanup = operation;
+    try {
+      await operation;
+    } finally {
+      state.cleanup = null;
+    }
+  }
+
+  Future<void> _deleteAcknowledgedWrite(_CollectStoreWrite state) async {
+    try {
+      await _store.deleteEvents([state.eventId]).timeout(_storeTimeout);
+      _storeWrites.remove(state.eventId);
+    } catch (error) {
+      // Keep the acknowledgement so a later claim cannot upload this ID again.
+      _recordStoreFailure('late_write_cleanup', error);
+    }
+  }
+
+  void _markAcknowledged(List<CollectEvent> events) {
+    for (final event in events) {
+      _storeWrites[event.eventId]?.acknowledged = true;
+    }
+  }
+
+  Future<void> _reconcileStoreWrites() async {
+    await Future.wait(
+      _storeWrites.values.toList(growable: false).map(_reconcileStoreWrite),
+    );
   }
 
   void start() {
@@ -721,10 +896,6 @@ class CollectTelemetryUploader {
 
   Future<void> checkNow({bool force = false}) async {
     if (!_enabled || _client == null || _checking || _disposed) return;
-    final nextUploadAt = _nextUploadAt;
-    if (!force && nextUploadAt != null && _clock().isBefore(nextUploadAt)) {
-      return;
-    }
     _checking = true;
     ClaimedCollectEventBatch? batch;
     try {
@@ -734,8 +905,24 @@ class CollectTelemetryUploader {
         _recordStoreFailure('pending_writes', error);
       }
 
-      final fallbackCompleted = await _uploadMemoryFallback();
+      // Network backoff must not prevent recovered storage from preserving
+      // events that previously existed only in memory.
+      final persistedFallback = await _persistMemoryFallback();
+      final nextUploadAt = _nextUploadAt;
+      if (!force && nextUploadAt != null && _clock().isBefore(nextUploadAt)) {
+        return;
+      }
+      // Newly persisted older events keep priority over the memory tail.
+      final fallbackCompleted =
+          persistedFallback || await _uploadMemoryFallback();
       if (!fallbackCompleted) return;
+      await _reconcileStoreWrites();
+      // Cleanup can finish while claimPending is awaiting SQLite. Preserve the
+      // known acknowledgements even if the corresponding write tracker retires.
+      final acknowledgedIds = _storeWrites.values
+          .where((state) => state.acknowledged)
+          .map((state) => state.eventId)
+          .toSet();
 
       try {
         batch = await _store
@@ -748,27 +935,62 @@ class CollectTelemetryUploader {
       }
       if (batch == null || batch.events.isEmpty) return;
 
-      final completed = await _uploadWithIsolation(batch.events);
-      if (completed) {
+      // A timed-out insert may have committed while its Future is still pending.
+      // Remove acknowledged copies before allowing any claimed event to upload.
+      final acknowledged = batch.events
+          .where(
+            (event) =>
+                acknowledgedIds.contains(event.eventId) ||
+                _storeWrites[event.eventId]?.acknowledged == true,
+          )
+          .map((event) => event.eventId)
+          .toList(growable: false);
+      final events = batch.events
+          .where((event) => !acknowledged.contains(event.eventId))
+          .toList(growable: false);
+      final acceptedIds = acknowledged.toSet();
+      var acknowledgementFailed = false;
+      Future<void> acknowledge(List<String> ids) async {
+        acceptedIds.addAll(ids);
         try {
-          await _store.deleteClaimed(batch.batchId).timeout(_storeTimeout);
-          _markStoreHealthy();
-          _recordUploadSuccess();
+          await _store.deleteEvents(ids).timeout(_storeTimeout);
         } catch (error) {
-          // Keep the accepted batch in-flight. Later pending events can still
-          // advance; a future app start will recover and retry these event IDs.
+          acknowledgementFailed = true;
           _recordStoreFailure('delete_after_upload', error);
         }
-      } else {
-        try {
-          await _store.releaseClaimed(batch.batchId).timeout(_storeTimeout);
-          _markStoreHealthy();
-        } catch (error) {
-          // Leaving the batch in-flight is safer than putting it back at the
-          // queue head and blocking every later event.
-          _recordStoreFailure('release_after_failure', error);
-        }
       }
+
+      try {
+        await acknowledge(acknowledged);
+        // The claimed row now owns any unacknowledged memory copy.
+        final claimedIds = events.map((event) => event.eventId).toSet();
+        for (final id in claimedIds) {
+          _storeWrites[id]?.databaseOwned = true;
+        }
+        _memoryFallback.removeWhere(
+          (event) => claimedIds.contains(event.eventId),
+        );
+        final completed = await _uploadWithIsolation(events, (accepted) async {
+          _markAcknowledged(accepted);
+          await acknowledge(accepted.map((event) => event.eventId).toList());
+        });
+        if (completed) {
+          if (events.isNotEmpty) _recordUploadSuccess();
+        } else {
+          // Preserve accepted rows whose local deletion failed, but let the
+          // unaccepted remainder retry without waiting for an app restart.
+          await _store
+              .releaseClaimed(
+                batch.batchId,
+                excludingEventIds: acceptedIds.toList(),
+              )
+              .timeout(_storeTimeout);
+        }
+        if (!acknowledgementFailed) _markStoreHealthy();
+      } catch (error) {
+        _recordStoreFailure('release_after_failure', error);
+      }
+      await _reconcileStoreWrites();
     } finally {
       _checking = false;
     }
@@ -781,47 +1003,77 @@ class CollectTelemetryUploader {
         .where((event) => _hasSameUploadContext(event, oldest))
         .take(_batchSize)
         .toList(growable: false);
-    final completed = await _uploadWithIsolation(batch);
-    if (!completed) return false;
-    final uploadedIds = batch.map((event) => event.eventId).toSet();
-    _memoryFallback.removeWhere((event) => uploadedIds.contains(event.eventId));
-    _recordUploadSuccess();
-    return true;
+    final completed = await _uploadWithIsolation(batch, (accepted) async {
+      _markAcknowledged(accepted);
+      final ids = accepted.map((event) => event.eventId).toSet();
+      _memoryFallback.removeWhere((event) => ids.contains(event.eventId));
+      await _reconcileStoreWrites();
+    });
+    if (completed) {
+      _recordUploadSuccess();
+    } else {
+      // Failed memory-only entries stay queued, behind events not tried yet.
+      final batchIds = batch.map((event) => event.eventId).toSet();
+      final retry = _memoryFallback
+          .where((event) => batchIds.contains(event.eventId))
+          .toList(growable: false);
+      _memoryFallback.removeWhere((event) => batchIds.contains(event.eventId));
+      _memoryFallback.addAll(retry);
+    }
+    return completed;
   }
 
-  Future<bool> _uploadWithIsolation(List<CollectEvent> events) async {
+  Future<bool> _uploadWithIsolation(
+    List<CollectEvent> events,
+    Future<void> Function(List<CollectEvent>) acknowledge,
+  ) async {
     if (events.isEmpty) return true;
-    if (_encodedBatchSize(events) > _maxBatchBytes) {
-      if (events.length == 1) {
-        _addDeadLetter(events.single, 'payload_too_large');
-        return true;
-      }
+    Future<bool> split() async {
       final middle = events.length ~/ 2;
-      final left = await _uploadWithIsolation(events.sublist(0, middle));
-      final right = await _uploadWithIsolation(events.sublist(middle));
+      final left = await _uploadWithIsolation(
+        events.sublist(0, middle),
+        acknowledge,
+      );
+      final right = await _uploadWithIsolation(
+        events.sublist(middle),
+        acknowledge,
+      );
       return left && right;
     }
 
+    if (_encodedBatchSize(events) > _maxBatchBytes) {
+      if (events.length > 1) return split();
+      _recordUploadFailure(
+        const CollectUploadException(
+          message:
+              'Collect event exceeds the request size limit; retained for retry',
+          kind: CollectUploadFailureKind.permanent,
+        ),
+      );
+      return false;
+    }
+
     try {
-      await _client!
-          .collectBatch(events, headers: _headers(events.first))
-          .timeout(_requestTimeout);
-      return true;
+      await runWithNetworkDeadline(
+        timeout: _requestTimeout,
+        action: (token) => _client!.collectBatch(
+          events,
+          headers: _headers(events.first),
+          cancellationToken: token,
+        ),
+      );
     } catch (error) {
       final kind = _uploadFailureKind(error);
-      if (kind == CollectUploadFailureKind.permanent) {
-        if (events.length == 1) {
-          _addDeadLetter(events.single, _safeError(error));
-          return true;
-        }
-        final middle = events.length ~/ 2;
-        final left = await _uploadWithIsolation(events.sublist(0, middle));
-        final right = await _uploadWithIsolation(events.sublist(middle));
-        return left && right;
+      if (kind == CollectUploadFailureKind.permanent && events.length > 1) {
+        return split();
       }
       _recordUploadFailure(error);
       return false;
     }
+    // Only the normal SDK success path can acknowledge and delete event IDs.
+    // Keep local storage errors outside the network failure/isolation catch.
+    await acknowledge(events);
+    return true;
   }
 
   void handleAppResumed() {
@@ -877,22 +1129,9 @@ class CollectTelemetryUploader {
 
   void _addMemoryFallback(CollectEvent event) {
     if (_memoryFallback.any((item) => item.eventId == event.eventId)) return;
-    if (_memoryFallbackLimit <= 0) {
-      _droppedEventCount += 1;
-      return;
-    }
-    while (_memoryFallback.length >= _memoryFallbackLimit) {
-      _memoryFallback.removeAt(0);
-      _droppedEventCount += 1;
-    }
+    // Storage is unavailable. Retain the event until upload acknowledgement or
+    // successful persistence; a capacity threshold cannot authorize data loss.
     _memoryFallback.add(event);
-  }
-
-  void _addDeadLetter(CollectEvent event, String reason) {
-    if (_deadLetters.length >= 100) _deadLetters.removeAt(0);
-    _deadLetters.add(event);
-    _lastError = 'dead_letter:${event.action}:${_boundedString(reason, 256)}';
-    debugPrint('[Collect] isolated invalid event ${event.eventId}: $reason');
   }
 
   void _recordUploadSuccess() {
@@ -998,7 +1237,7 @@ bool _hasKnownCollectAppVersion(String value) {
 class _MemoryCollectEventRow {
   _MemoryCollectEventRow(this.sequence, this.event);
 
-  final int sequence;
+  int sequence;
   final CollectEvent event;
   String state = _pendingState;
   String? batchId;

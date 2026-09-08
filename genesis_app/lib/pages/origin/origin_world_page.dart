@@ -23,7 +23,6 @@ import '../../components/common/copyable_id_label.dart';
 import '../../components/discuss/discuss_post_input.dart';
 import '../../components/discuss/origin_discuss_list.dart';
 import '../../components/gems/pro_membership_badge.dart';
-import '../../components/login_sheet.dart';
 import '../../components/origin/origin_role_launch_sheet.dart';
 import '../../components/origin/origin_character_form.dart';
 import '../../components/origin/origin_role_recommendation.dart';
@@ -41,7 +40,6 @@ import '../../network/json_utils.dart';
 import '../../network/models/location_tree.dart';
 import '../../network/models/origin.dart';
 import '../create/create_form_widgets.dart';
-import '../../platform/auth/auth_session.dart';
 import '../../platform/keyboard/genesis_keyboard_animation.dart';
 import '../../platform/session/user_session_store.dart';
 import '../../routers/app_router.dart';
@@ -56,7 +54,6 @@ import '../../ui/tokens/genesis_avatar_radii.dart';
 import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_radii.dart';
 import '../../app/bootstrap/app_services_scope.dart';
-import '../../app/gems/daily_check_in_coordinator.dart';
 import '../../utils/entity_deleted.dart';
 import '../../utils/genesis_timestamp_formatter.dart';
 import '../../utils/display_name_formatter.dart';
@@ -951,47 +948,7 @@ class _OriginWorldPageState extends State<OriginWorldPage> {
     );
   }
 
-  Future<bool> _ensureProfileFillLogin() async {
-    if (await _hasLocalLoginSession()) return true;
-    if (!mounted) return false;
-    final loggedIn = await showLoginSheet(
-      context: context,
-      onLogin: _loginWithProvider,
-    );
-    if (!mounted || !loggedIn) return false;
-    await showDailyCheckInAfterLogin(context);
-    if (!mounted) return false;
-    return _hasLocalLoginSession();
-  }
-
-  Future<bool> _hasLocalLoginSession() async {
-    final services = AppServicesScope.read(context);
-    return await services.sessionStore.readLoginUid() != null;
-  }
-
-  Future<bool> _loginWithProvider(IdentityProvider provider) async {
-    final services = AppServicesScope.read(context);
-    final session = await services.identityAuth.signIn(provider);
-    final user = await services.backendAuth.loginWithIdentity(session);
-    if (user.uid.trim().isNotEmpty) {
-      await services.sessionStore.saveUid(user.uid);
-    }
-    final cachedUserInfo = await services.sessionStore.readUserInfo();
-    final loginUserInfo = <String, dynamic>{
-      if (cachedUserInfo != null) ...cachedUserInfo,
-      'uid': user.uid,
-      'login_provider': provider.name,
-    };
-    if (user.nickname.trim().isNotEmpty) {
-      loginUserInfo['name'] = user.nickname;
-    }
-    if (user.avatar.trim().isNotEmpty) {
-      loginUserInfo['avatar'] = user.avatar;
-    }
-    await services.sessionStore.saveUserInfo(loginUserInfo);
-    services.notifySessionChanged();
-    return true;
-  }
+  Future<bool> _ensureProfileFillLogin() => ensureGenesisLogin(context);
 
   @override
   Widget build(BuildContext context) {

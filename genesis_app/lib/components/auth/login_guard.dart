@@ -6,7 +6,14 @@ import '../../platform/auth/auth_session.dart';
 import '../../platform/session/user_session_store.dart';
 import '../login_sheet.dart';
 
-Future<bool> ensureGenesisLogin(BuildContext context) async {
+/// Whether the caller may continue its current operation.
+///
+/// User actions must be repeated after an interactive login. Only automatic
+/// authentication recovery should opt in to [continueAfterLogin].
+Future<bool> ensureGenesisLogin(
+  BuildContext context, {
+  bool continueAfterLogin = false,
+}) async {
   if (await hasGenesisLoginSession(context)) return true;
   if (!context.mounted) return false;
   final loginContext = context;
@@ -18,8 +25,9 @@ Future<bool> ensureGenesisLogin(BuildContext context) async {
     },
   );
   if (!loginContext.mounted || !loggedIn) return false;
-  await showDailyCheckInAfterLogin(loginContext);
+  await scheduleDailyCheckInAfterLogin(loginContext);
   if (!loginContext.mounted) return false;
+  if (!continueAfterLogin) return false;
   return hasGenesisLoginSession(loginContext);
 }
 

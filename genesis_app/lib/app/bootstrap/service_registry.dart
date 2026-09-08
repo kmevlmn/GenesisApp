@@ -25,6 +25,7 @@ import '../config/platform_config.dart';
 import '../debug/location_chat_debug_storage.dart';
 import '../gems/gem_wallet_store.dart';
 import '../telemetry/device_info_telemetry.dart';
+import '../telemetry/genesis_telemetry.dart';
 import '../version/app_version_check_service.dart';
 import '../../platform/billing/app_store_billing_platform.dart';
 import '../../platform/billing/billing_service.dart';
@@ -85,14 +86,17 @@ class AppServices {
   final BillingService? billing;
   final AppGlobalConfigStore appGlobalConfig;
   final ValueNotifier<int> sessionRevision;
+  final ValueNotifier<String?> pendingLoginCheckInUid = ValueNotifier(null);
 
   void notifySessionChanged() {
+    pendingLoginCheckInUid.value = null;
     gemWallet.reset();
     billing?.resetForSession();
     sessionRevision.value += 1;
   }
 
   void dispose() {
+    pendingLoginCheckInUid.dispose();
     billing?.dispose();
     gemWallet.dispose();
     appGlobalConfig.dispose();
@@ -139,6 +143,7 @@ class ServiceRegistry {
       if (handlingSessionExpired) return;
       handlingSessionExpired = true;
       try {
+        GenesisTelemetry.clearUser();
         await sessionStore.clearUid();
         gemWalletStore?.reset();
         sessionRevision.value += 1;
