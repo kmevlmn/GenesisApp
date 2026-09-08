@@ -187,28 +187,41 @@ void main() {
     },
   );
 
-  test('rejects HTTPS when native client negotiates HTTP/1.1', () async {
-    final transport = PlatformHttp3Transport(
-      client: _RecordingClient(
-        response: http.StreamedResponse(const Stream.empty(), 200),
-      ),
-      protocolResolver: (_) => 'http/1.1',
-      performanceMetricReady: () => false,
-    );
-
-    await expectLater(
-      transport.send(
+  for (final protocol in ['http/1.1', 'h2', 'h3', null]) {
+    test('accepts HTTPS response over $protocol without replay', () async {
+      final client = _RecordingClient(
+        response: http.StreamedResponse(
+          Stream.value(utf8.encode('{"err_no":10001}')),
+          200,
+        ),
+      );
+      final metric = _FakePerformanceMetric(
+        url: 'https://api.worldo.ai',
+        method: HttpMethod.Post,
+      );
+      final transport = PlatformHttp3Transport(
+        client: client,
+        protocolResolver: (_) => protocol,
+        performanceMetricReady: () => true,
+        performanceMetricUrlFilter: (_) => true,
+        performanceMetricFactory: (_, __) => metric,
+      );
+      final response = await transport.send(
         TransportRequest(
-          method: 'GET',
-          uri: Uri.parse('https://api.worldo.ai/health'),
-          headers: const <String, String>{},
-          bodyBytes: null,
+          method: 'POST',
+          uri: Uri.parse('https://api.worldo.ai/api/v1/health'),
+          headers: const {},
+          bodyBytes: utf8.encode('{}'),
           timeoutMs: 5000,
         ),
-      ),
-      throwsA(isA<http.ClientException>()),
-    );
-  });
+      );
+      expect(response.statusCode, 200);
+      expect(response.body, '{"err_no":10001}');
+      expect(response.httpProtocolVersion, protocol);
+      expect(client.requests, hasLength(1));
+      expect(metric.attributes['network_protocol'], protocol);
+    });
+  }
 
   test('maps cancellation to NetworkRequestCancelledException', () async {
     final cancellationToken = NetworkCancellationToken();

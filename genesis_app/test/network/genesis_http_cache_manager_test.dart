@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,53 @@ import 'package:genesis_flutter_android/network/network_capture.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  for (final warmUpFails in [false, true]) {
+    test(
+      'native business request does not wait for warm-up ($warmUpFails)',
+      () async {
+        final transport = _PendingWarmUpTransport();
+        final pool = GenesisHttpTransportPool.platform(
+          transportBuilder: () => transport,
+        );
+        final warmUp = pool.warmUp(
+          Uri.parse('https://cdn-001.worldo.ai/robots.txt'),
+        );
+        final checkedWarmUp = warmUpFails
+            ? expectLater(warmUp, throwsStateError)
+            : warmUp;
+        final response = await pool.send(
+          TransportRequest(
+            method: 'POST',
+            uri: Uri.parse('https://cdn-001.worldo.ai/send'),
+            headers: const {},
+            bodyBytes: [1],
+            timeoutMs: 100,
+          ),
+        );
+        expect(response.statusCode, 200);
+        expect(transport.methods, ['HEAD', 'POST']);
+        if (warmUpFails) {
+          transport.pending.completeError(StateError('warm-up failed'));
+        } else {
+          transport.pending.complete(response);
+        }
+        await checkedWarmUp;
+        expect(
+          (await pool.send(
+            TransportRequest(
+              method: 'POST',
+              uri: Uri.parse('https://cdn-001.worldo.ai/send'),
+              headers: const {},
+              bodyBytes: [2],
+              timeoutMs: 100,
+            ),
+          )).statusCode,
+          200,
+        );
+        expect(transport.methods, ['HEAD', 'POST', 'POST']);
+      },
+    );
+  }
   setUp(() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
   });
@@ -279,6 +327,17 @@ void main() {
       false,
     );
   });
+}
+
+class _PendingWarmUpTransport implements HttpTransport {
+  final pending = Completer<TransportResponse>();
+  final methods = <String>[];
+  @override
+  Future<TransportResponse> send(TransportRequest request) async {
+    methods.add(request.method);
+    if (request.method == 'HEAD') return pending.future;
+    return const TransportResponse(statusCode: 200, headers: {}, body: 'ok');
+  }
 }
 
 class _RecordingTransport implements HttpTransport {

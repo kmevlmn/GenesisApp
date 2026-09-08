@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/app/telemetry/genesis_telemetry.dart';
 import 'package:genesis_flutter_android/network/api_exception.dart';
+import 'package:genesis_flutter_android/network/api_client.dart';
 import 'package:genesis_flutter_android/network/gateway_auth.dart';
 import 'package:genesis_flutter_android/network/http_transport.dart';
 import 'package:genesis_flutter_android/platform/device/device_id_service.dart';
@@ -221,6 +222,70 @@ void main() {
       contains('/aitown-chat/ws\nworld_id=world-1'),
     );
   });
+
+  test(
+    'expired request leaves shared Gateway initialization available to another caller',
+    () async {
+      final release = Completer<void>();
+      final entered = Completer<void>();
+      final authTransport = _FakeTransport(
+        handler: (request) async {
+          if (request.uri.path == '/apix/v1/time') {
+            if (!entered.isCompleted) entered.complete();
+            await release.future;
+          }
+          return _gatewayAuthResponse(request);
+        },
+      );
+      final keyStore = _FakeKeyStore();
+      final coordinator = GatewayAuthCoordinator(
+        gatewayBaseUrl: 'https://gateway.test/apix/',
+        appHeaderProvider: _testAppHeaders,
+        deviceIdService: const _TestDeviceIdService(),
+        keyStore: keyStore,
+        registrationStore: _MemoryGatewayRegistrationStore(),
+        transport: authTransport,
+      );
+      final business = _FakeTransport(
+        handler: (_) => _json({'err_no': 0, 'data': {}}),
+      );
+      final client = ApiClient(
+        baseUrl: 'https://gateway.test/',
+        transport: business,
+        timeoutMs: 50,
+        requestInterceptor: GatewayRequestInterceptor(
+          coordinator: coordinator,
+        ).call,
+      );
+      final expired = expectLater(
+        client.post('/api/v1/expired'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.transportErrorKind,
+            'kind',
+            TransportErrorKind.timeout,
+          ),
+        ),
+      );
+      await entered.future;
+      final live = client.copyWith(timeoutMs: 5000).post('/api/v1/live');
+      await expired;
+      expect(business.requests, isEmpty);
+      release.complete();
+      await live;
+      expect(business.requests.map((e) => e.uri.path), ['/api/v1/live']);
+      expect(
+        authTransport.requests.where((e) => e.uri.path == '/apix/v1/time'),
+        hasLength(1),
+      );
+      expect(
+        authTransport.requests.where(
+          (e) => e.uri.path == '/apix/v1/app/device/register',
+        ),
+        hasLength(1),
+      );
+    },
+  );
 
   test('interceptor syncs server time and retries once on 20502', () async {
     final keyStore = _FakeKeyStore();

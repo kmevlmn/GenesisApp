@@ -307,6 +307,16 @@ class ApiClient {
     ApiRequestTracePolicy tracePolicy = ApiRequestTracePolicy.standard,
   }) async {
     final stopwatch = Stopwatch()..start();
+    final budget = Duration(milliseconds: _timeoutMs);
+    Duration remainingBudget() {
+      cancellationToken?.throwIfCancelled();
+      final remaining = budget - stopwatch.elapsed;
+      if (remaining <= Duration.zero) {
+        throw TimeoutException('HTTP request deadline exceeded.', budget);
+      }
+      return remaining;
+    }
+
     late final Uri uri;
     try {
       uri = _resolveUri(path, query);
@@ -331,7 +341,11 @@ class ApiClient {
     late final TransportRequest request;
     var requestPreparationFailureCode = ApiClientFailureCode.requestHeaders;
     try {
-      final runtimeHeaders = await _resolveRequestHeaders();
+      final runtimeHeaders = await runWithNetworkDeadline(
+        timeout: remainingBudget(),
+        cancellationToken: cancellationToken,
+        action: (_) => _resolveRequestHeaders(),
+      );
       final mergedHeaders = <String, String>{
         ..._defaultHeaders,
         ...runtimeHeaders,
@@ -361,6 +375,11 @@ class ApiClient {
         clientFailureCode: ApiClientFailureCode.cancelled,
       );
       rethrow;
+    } on TimeoutException catch (error) {
+      stopwatch.stop();
+      final apiError = _transportApiException(error, uri);
+      collectRequest?.failure(duration: stopwatch.elapsed, error: apiError);
+      throw apiError;
     } on ApiException catch (error) {
       stopwatch.stop();
       collectRequest?.failure(duration: stopwatch.elapsed, error: error);
@@ -378,15 +397,23 @@ class ApiClient {
     TransportResponse transportResponse;
     late Stopwatch attemptStopwatch;
     Duration? transportDuration;
+    Stopwatch? activeTransportStopwatch;
+    Duration attemptDuration() =>
+        transportDuration ??
+        activeTransportStopwatch?.elapsed ??
+        attemptStopwatch.elapsed;
     var attempt = 1;
     var retryCount = 0;
     while (true) {
       attemptStopwatch = Stopwatch()..start();
       transportDuration = null;
+      activeTransportStopwatch = null;
       Future<TransportResponse> sendWithTiming(
         TransportRequest outgoingRequest,
       ) async {
         final transportStopwatch = Stopwatch()..start();
+        activeTransportStopwatch = transportStopwatch;
+        transportDuration = null;
         try {
           return await _send(outgoingRequest);
         } finally {
@@ -396,16 +423,30 @@ class ApiClient {
       }
 
       try {
-        final interceptor = _requestInterceptor;
-        transportResponse = interceptor == null
-            ? await sendWithTiming(request)
-            : await interceptor(request, sendWithTiming);
+        transportResponse = await runWithNetworkDeadline(
+          timeout: remainingBudget(),
+          cancellationToken: cancellationToken,
+          action: (token) {
+            final outgoing = request.withCancellationToken(token);
+            Future<TransportResponse> send(TransportRequest signed) {
+              // A shared initialization can finish after this request times out.
+              // It may serve other callers, but this caller must never dispatch.
+              token.throwIfCancelled();
+              return sendWithTiming(signed.withCancellationToken(token));
+            }
+
+            final interceptor = _requestInterceptor;
+            return interceptor == null
+                ? send(outgoing)
+                : interceptor(outgoing, send);
+          },
+        );
         break;
       } on NetworkRequestCancelledException catch (e) {
         attemptStopwatch.stop();
         stopwatch.stop();
         collectRequest?.failure(
-          duration: transportDuration ?? attemptStopwatch.elapsed,
+          duration: attemptDuration(),
           error: e,
           clientFailureCode: ApiClientFailureCode.cancelled,
           retryCount: retryCount,
@@ -421,11 +462,13 @@ class ApiClient {
         );
         rethrow;
       } on ApiException catch (error) {
-        if (_retryPolicy.shouldRetry(
-          request: request,
-          error: error,
-          attempt: attempt,
-        )) {
+        if (stopwatch.elapsed < budget &&
+            cancellationToken?.isCancelled != true &&
+            _retryPolicy.shouldRetry(
+              request: request,
+              error: error,
+              attempt: attempt,
+            )) {
           attemptStopwatch.stop();
           retryCount += 1;
           _recordHttpRetryTelemetry(
@@ -440,7 +483,7 @@ class ApiClient {
         attemptStopwatch.stop();
         stopwatch.stop();
         collectRequest?.failure(
-          duration: transportDuration ?? attemptStopwatch.elapsed,
+          duration: attemptDuration(),
           error: error,
           retryCount: retryCount,
         );
@@ -458,11 +501,13 @@ class ApiClient {
         rethrow;
       } catch (error) {
         final apiError = _transportApiException(error, uri);
-        if (_retryPolicy.shouldRetry(
-          request: request,
-          error: apiError,
-          attempt: attempt,
-        )) {
+        if (stopwatch.elapsed < budget &&
+            cancellationToken?.isCancelled != true &&
+            _retryPolicy.shouldRetry(
+              request: request,
+              error: apiError,
+              attempt: attempt,
+            )) {
           attemptStopwatch.stop();
           retryCount += 1;
           _recordHttpRetryTelemetry(
@@ -477,7 +522,7 @@ class ApiClient {
         attemptStopwatch.stop();
         stopwatch.stop();
         collectRequest?.failure(
-          duration: transportDuration ?? attemptStopwatch.elapsed,
+          duration: attemptDuration(),
           error: apiError,
           retryCount: retryCount,
         );
@@ -526,7 +571,7 @@ class ApiClient {
     collectRequest?.inspectResponse(
       response: apiResponse,
       responseType: responseType,
-      duration: transportDuration ?? attemptStopwatch.elapsed,
+      duration: attemptDuration(),
       retryCount: retryCount,
     );
 
@@ -534,9 +579,7 @@ class ApiClient {
     try {
       final processed = processor(apiResponse);
       stopwatch.stop();
-      collectRequest?.success(
-        duration: transportDuration ?? attemptStopwatch.elapsed,
-      );
+      collectRequest?.success(duration: attemptDuration());
       _recordHttpTelemetry(
         request: request,
         response: apiResponse,
@@ -550,7 +593,7 @@ class ApiClient {
       attemptStopwatch.stop();
       stopwatch.stop();
       collectRequest?.failure(
-        duration: transportDuration ?? attemptStopwatch.elapsed,
+        duration: attemptDuration(),
         error: error,
         response: apiResponse,
         retryCount: retryCount,

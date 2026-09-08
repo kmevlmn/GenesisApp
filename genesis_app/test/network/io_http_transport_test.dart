@@ -625,6 +625,9 @@ class _FakeHttpClientRequest implements HttpClientRequest {
   void abort([Object? exception, StackTrace? stackTrace]) {}
 
   @override
+  Future<HttpClientResponse> get done => close();
+
+  @override
   Future<HttpClientResponse> close() async {
     return _FakeHttpClientResponse(
       statusCode: statusCode,

@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'dio_http_transport.dart';
 import 'http_transport.dart';
 import 'io_http_transport.dart';
-import 'ios_adaptive_http_transport.dart';
 import 'platform_http3_transport.dart';
 
 const int genesisHttp3ConnectionCount = 1;
@@ -43,17 +42,6 @@ class GenesisHttpTransportPool implements HttpTransport {
         transportBuilder != null || Platform.isAndroid || Platform.isIOS;
     if (attemptNative) {
       try {
-        if (transportBuilder == null && Platform.isIOS) {
-          return GenesisHttpTransportPool(
-            transports: <HttpTransport>[
-              IosAdaptiveHttpTransport(
-                http3TransportBuilder: buildNative,
-                http2TransportBuilder: buildFallback,
-                http2ConnectionCount: genesisHttp2ConnectionCount,
-              ),
-            ],
-          );
-        }
         return GenesisHttpTransportPool(
           transports: <HttpTransport>[buildNative()],
         );

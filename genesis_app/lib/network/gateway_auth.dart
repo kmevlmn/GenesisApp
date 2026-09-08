@@ -31,6 +31,7 @@ class GatewayRequestInterceptor {
     TransportRequest request,
     ApiRequestSender send,
   ) async {
+    request.cancellationToken?.throwIfCancelled();
     if (!isGatewaySignedRequest(request.uri)) {
       return send(_stripVerifiedHeaders(request));
     }
@@ -40,11 +41,14 @@ class GatewayRequestInterceptor {
     var registrationRetried = false;
 
     while (true) {
+      request.cancellationToken?.throwIfCancelled();
       final context = await _coordinator.signingContext();
+      request.cancellationToken?.throwIfCancelled();
       TransportRequest signed;
       final signStopwatch = Stopwatch()..start();
       try {
         signed = await _signer.sign(request, context);
+        request.cancellationToken?.throwIfCancelled();
         signStopwatch.stop();
         _gatewayTelemetry(
           'gateway.sign',
@@ -56,6 +60,7 @@ class GatewayRequestInterceptor {
           },
         );
       } on ApiException catch (error) {
+        request.cancellationToken?.throwIfCancelled();
         signStopwatch.stop();
         _gatewayTelemetry(
           'gateway.sign',
@@ -85,7 +90,9 @@ class GatewayRequestInterceptor {
         }
         rethrow;
       }
+      request.cancellationToken?.throwIfCancelled();
       final response = await send(signed);
+      request.cancellationToken?.throwIfCancelled();
       final errNo = gatewayErrNo(response.body);
       if (errNo == 20502 && !timeRetried) {
         timeRetried = true;

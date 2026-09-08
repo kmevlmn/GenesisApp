@@ -25130,11 +25130,7 @@ void main() {
       find.byKey(const ValueKey<String>('developer-world-update-push-only')),
       findsNothing,
     );
-    expect(
-      find.byKey(const ValueKey<String>('developer-tilemap-panel')),
-      findsOneWidget,
-    );
-    expect(find.text('Telemetry Debug Upload'), findsOneWidget);
+    expect(find.text('Telemetry Upload'), findsOneWidget);
     expect(
       find.text('Automatic upload blocked · non-release build'),
       findsOneWidget,
@@ -25155,6 +25151,7 @@ void main() {
       expect(uploadSwitch, findsOneWidget);
       expect(tester.widget<Switch>(uploadSwitch).value, isFalse);
 
+      await tester.ensureVisible(uploadSwitch);
       await tester.tap(uploadSwitch);
       await tester.pumpAndSettle();
 
@@ -25166,6 +25163,67 @@ void main() {
     expect(find.text('Debug channels enabled · test'), findsOneWidget);
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getBool(switches.values.first), isTrue);
+
+    const productionConfig = AppConfig(
+      apiBaseUrl: 'https://api.worldo.ai/api/',
+      gatewayApiBaseUrl: 'https://api.worldo.ai/apix/',
+      chatroomHttpBaseUrl: 'https://api.worldo.ai/',
+      chatroomWsBaseUrl: 'wss://api.worldo.ai/aitown-chat/ws',
+      useMock: false,
+    );
+    TelemetryUploadPolicy.setStateForTesting(
+      evaluateTelemetryUploadPolicy(
+        config: productionConfig,
+        isReleaseBuild: true,
+        isProductionFlavor: true,
+        debugOverrides: const TelemetryDebugOverrides.none(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Production policy active'), findsOneWidget);
+    expect(find.text('On automatically'), findsNWidgets(4));
+    for (final key in switches.keys) {
+      final uploadSwitch = tester.widget<Switch>(find.byKey(key));
+      expect(uploadSwitch.value, isTrue);
+      expect(uploadSwitch.onChanged, isNull);
+    }
+
+    TelemetryUploadPolicy.setStateForTesting(
+      evaluateTelemetryUploadPolicy(
+        config: productionConfig.copyWith(
+          apiBaseUrl: 'https://dev.hushie.ai/api/',
+        ),
+        isReleaseBuild: true,
+        isProductionFlavor: true,
+        debugOverrides: const TelemetryDebugOverrides.none(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('On automatically'), findsOneWidget);
+    for (final key in switches.keys) {
+      final uploadSwitch = tester.widget<Switch>(find.byKey(key));
+      final isPerformance =
+          key.value == 'developer-telemetry-performance-switch';
+      expect(uploadSwitch.value, isPerformance);
+      expect(uploadSwitch.onChanged == null, isPerformance);
+    }
+
+    final tilemapPanel = find.byKey(
+      const ValueKey<String>('developer-tilemap-panel'),
+    );
+    await tester.scrollUntilVisible(
+      tilemapPanel,
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byKey(
+              const PageStorageKey<String>('developer-test-switch-tab-scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(tilemapPanel, findsOneWidget);
   });
 
   testWidgets('developer button tab previews the world update Push', (

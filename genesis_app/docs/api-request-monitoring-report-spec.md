@@ -203,7 +203,7 @@ tech_http_<HTTP状态码>
 | `tech_client_1012` | 连接被拒绝 | `client_network` |
 | `tech_client_1013` | 连接被重置或连接丢失 | `client_network` |
 | `tech_client_1014` | 连接提前关闭、broken pipe | `client_network` |
-| `tech_client_1015` | HTTP/2、HTTP/3 或 QUIC 协议协商失败 | `client_protocol` |
+| `tech_client_1015` | 实际 HTTP/2、HTTP/3 或 QUIC 协议协商失败；正常回退 HTTP/1.1 或协议元数据缺失不算失败 | `client_protocol` |
 | `tech_client_1019` | 其他已确认的连接类错误 | `client_network_other` |
 
 #### TLS 与证书 `1020-1021`
@@ -449,6 +449,7 @@ apiTraceSamplingRate: float，范围 [0, 1]
 - 不包含之前失败 attempt 的累计时间；
 - 已实际发送业务请求时，不包含发送前的 Gateway 注册、时间同步和签名准备时间；这些耗时由独立 `/apix/...` 接口监控及启动阶段诊断承载；
 - 请求发送前失败时，记录 URI、header、body 等准备阶段实际已经消耗的时间。
+- ApiClient 从请求头准备起共享总超时预算；预算耗尽仍记 `tech_client_1004`。这不会改变上面的耗时口径：已经开始发送时，以最后一次 transport 已消耗的时间为准，即使取消收尾尚未完成。
 
 因此 `object4` 适合衡量“最终一次接口尝试”的性能，不等同于用户从首次调用到自动重试结束的完整等待时间。
 

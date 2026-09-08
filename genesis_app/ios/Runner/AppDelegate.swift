@@ -183,7 +183,6 @@ final class GenesisAppLifecycleStreamHandler: NSObject, FlutterStreamHandler {
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, PHPickerViewControllerDelegate {
   private let channelName = "com.worldo.ai/device"
-  private let httpProtocolChannelName = "com.worldo.ai/network"
   private let discussImagePickerChannelName = "com.worldo.ai/discuss_image_picker"
   private let keyboardAnimationChannelName = "com.worldo.ai/keyboard_animation"
   private let appLifecycleChannelName = "com.worldo.ai/app_lifecycle"
@@ -200,7 +199,6 @@ final class GenesisAppLifecycleStreamHandler: NSObject, FlutterStreamHandler {
   private let prefs = UserDefaults.standard
   private var pendingDiscussImagePickerResult: FlutterResult?
   private var pendingDiscussImagePickerNormalizeForUpload = false
-  private var httpProtocolProbes: [UUID: GenesisHttpProtocolProbe] = [:]
   private var storeKit2AnalyticsInFlightIds = Set<UInt64>()
   private var cachedDeviceIdResolution: DeviceIdResolution?
   private var keyboardAnimationStreamHandler: GenesisKeyboardAnimationStreamHandler?
@@ -216,7 +214,6 @@ final class GenesisAppLifecycleStreamHandler: NSObject, FlutterStreamHandler {
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     configureGenesisMethodChannel(messenger: engineBridge.applicationRegistrar.messenger())
-    configureHttpProtocolChannel(messenger: engineBridge.applicationRegistrar.messenger())
     configureDiscussImagePickerChannel(messenger: engineBridge.applicationRegistrar.messenger())
     configureFirebaseAnalyticsChannel(messenger: engineBridge.applicationRegistrar.messenger())
     configureKeyboardAnimationChannel(messenger: engineBridge.applicationRegistrar.messenger())
@@ -319,51 +316,6 @@ final class GenesisAppLifecycleStreamHandler: NSObject, FlutterStreamHandler {
     var loggedIds = Set(prefs.stringArray(forKey: loggedStoreKit2TransactionIdsKey) ?? [])
     guard loggedIds.insert(transactionId).inserted else { return }
     prefs.set(loggedIds.sorted(), forKey: loggedStoreKit2TransactionIdsKey)
-  }
-
-  private func configureHttpProtocolChannel(messenger: FlutterBinaryMessenger) {
-    let channel = FlutterMethodChannel(
-      name: httpProtocolChannelName,
-      binaryMessenger: messenger
-    )
-    channel.setMethodCallHandler { [weak self] call, result in
-      guard let self = self else {
-        result(FlutterError(code: "unavailable", message: "AppDelegate released", details: nil))
-        return
-      }
-      guard call.method == "probeHttpProtocol" else {
-        result(FlutterMethodNotImplemented)
-        return
-      }
-      let args = call.arguments as? [String: Any]
-      let rawUrl = (args?["url"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-      guard let url = URL(string: rawUrl), url.scheme?.lowercased() == "https" else {
-        result(FlutterError(code: "invalid_url", message: "An HTTPS URL is required.", details: rawUrl))
-        return
-      }
-
-      let probeId = UUID()
-      let probe = GenesisHttpProtocolProbe(url: url) { [weak self] protocolName, error in
-        DispatchQueue.main.async {
-          self?.httpProtocolProbes.removeValue(forKey: probeId)
-          if let protocolName = protocolName, !protocolName.isEmpty {
-            result(protocolName)
-          } else if let error = error {
-            result(
-              FlutterError(
-                code: "protocol_probe_failed",
-                message: error.localizedDescription,
-                details: rawUrl
-              )
-            )
-          } else {
-            result(nil)
-          }
-        }
-      }
-      httpProtocolProbes[probeId] = probe
-      probe.start()
-    }
   }
 
   private func configureGenesisMethodChannel(messenger: FlutterBinaryMessenger) {
@@ -1172,65 +1124,5 @@ final class GenesisAppLifecycleStreamHandler: NSObject, FlutterStreamHandler {
 
   private func normalizedString(_ value: Any?) -> String {
     return (value as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-}
-
-private final class GenesisHttpProtocolProbe: NSObject, URLSessionTaskDelegate {
-  private let url: URL
-  private let completion: (String?, Error?) -> Void
-  private var session: URLSession?
-  private var negotiatedProtocol: String?
-  private var completed = false
-
-  init(url: URL, completion: @escaping (String?, Error?) -> Void) {
-    self.url = url
-    self.completion = completion
-  }
-
-  func start() {
-    let configuration = URLSessionConfiguration.ephemeral
-    configuration.urlCache = nil
-    configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-    configuration.timeoutIntervalForRequest = 10
-    configuration.timeoutIntervalForResource = 10
-
-    let session = URLSession(
-      configuration: configuration,
-      delegate: self,
-      delegateQueue: nil
-    )
-    self.session = session
-
-    var request = URLRequest(url: url)
-    request.httpMethod = "HEAD"
-    request.timeoutInterval = 10
-    request.cachePolicy = .reloadIgnoringLocalCacheData
-    request.assumesHTTP3Capable = true
-    session.dataTask(with: request).resume()
-  }
-
-  func urlSession(
-    _ session: URLSession,
-    task: URLSessionTask,
-    didFinishCollecting metrics: URLSessionTaskMetrics
-  ) {
-    negotiatedProtocol = metrics.transactionMetrics
-      .last(where: { $0.networkProtocolName != nil })?
-      .networkProtocolName
-  }
-
-  func urlSession(
-    _ session: URLSession,
-    task: URLSessionTask,
-    didCompleteWithError error: Error?
-  ) {
-    guard !completed else {
-      return
-    }
-    completed = true
-    let protocolName = negotiatedProtocol
-    session.finishTasksAndInvalidate()
-    self.session = nil
-    completion(protocolName, error)
   }
 }
