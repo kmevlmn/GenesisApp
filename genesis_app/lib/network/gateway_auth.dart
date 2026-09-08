@@ -86,6 +86,14 @@ class GatewayRequestInterceptor {
         rethrow;
       }
       final response = await send(signed);
+      // These writes have no idempotency key. Preserve signing, but leave any
+      // retry after a server response to the caller, including Gateway errors.
+      if (request.method == 'POST' &&
+          RegExp(
+            r'^/aitown-chat/api/v1/worlds/[^/]+/locations/[^/]+/llm-messages/(batch|select)$',
+          ).hasMatch(request.uri.path)) {
+        return response;
+      }
       final errNo = gatewayErrNo(response.body);
       if (errNo == 20502 && !timeRetried) {
         timeRetried = true;

@@ -634,6 +634,26 @@ extension _LocationChatPanelConnection on _LocationChatPanelState {
 
   void _handleChatroomState(WorldChatroomState state) {
     if (!mounted) return;
+    final historyChanged =
+        (_chatroomState.historyGenerationByLocation[widget.locationId] ?? 0) !=
+        (state.historyGenerationByLocation[widget.locationId] ?? 0);
+    if (historyChanged) {
+      _olderMessagesExhaustedByRemote = false;
+      _olderMessagesExhaustedByCursorlessContent = false;
+      _hasMoreOlderMessages = true;
+      _cancelOlderMessagesLoadSchedule();
+      _messageGapFillKeys.clear();
+      _messageGapFillAttempts.clear();
+      _messageGapFillBeforeLocationMessageIds.clear();
+      _releasedMessageGapKeys.clear();
+    }
+    final snapshotHasMore = state.historyHasMoreByLocation[widget.locationId];
+    if (snapshotHasMore != null &&
+        (historyChanged ||
+            snapshotHasMore !=
+                _chatroomState.historyHasMoreByLocation[widget.locationId])) {
+      _olderMessagesExhaustedByRemote = !snapshotHasMore;
+    }
     final service = _service;
     if (service != null) _syncSenderIdentity(service);
     if (state.joinedLocationId == widget.locationId) {
@@ -685,6 +705,7 @@ extension _LocationChatPanelConnection on _LocationChatPanelState {
     final tickProgressResolved = _resolveTickProgressMessageIfAvailable();
     final changedHasMoreOlder = _syncHasMoreOlderMessagesForSource(nextSource);
     final shouldRebuild =
+        historyChanged ||
         changedMessages ||
         changedHasMoreOlder ||
         mentionCatalogChanged ||

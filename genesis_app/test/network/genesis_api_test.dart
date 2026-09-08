@@ -1,3 +1,4 @@
+import 'package:genesis_flutter_android/network/chatroom/chatroom_http_models.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -1165,6 +1166,181 @@ void main() {
         'Your account is logged in on another device.',
       );
       expect(apiTransport.lastRequest!.uri.path, '/api/v1/user/info');
+    },
+  );
+
+  test(
+    'message mutation errors notify once and preserve business exceptions',
+    () async {
+      var code = 1001;
+      final messages = <String>[];
+      final transport = _FakeTransport(
+        handler: (_) => TransportResponse(
+          statusCode: 200,
+          headers: const {'content-type': 'application/json'},
+          body: jsonEncode({
+            'err_no': code,
+            'err_msg': 'server message $code',
+            'data': false,
+          }),
+        ),
+      );
+      final api = GenesisApi(
+        transport: transport,
+        useMock: false,
+        sessionStore: MemoryUserSessionStore(),
+        appHeaderProvider: () async => {},
+        onSessionExpired: (_) async => fail('Unexpected session expiry'),
+        onPageNotFound: (_) async =>
+            fail('Message errors must only show a toast'),
+        onChatroomMessageMutationError: messages.add,
+      );
+      for (final errorCode in [
+        1001,
+        1009,
+        2011,
+        2012,
+        2013,
+        2014,
+        2004,
+        1404,
+        9999,
+      ]) {
+        code = errorCode;
+        for (final edit in [true, false]) {
+          messages.clear();
+          final operation = edit
+              ? api.chatroomHttp.batchMutateLlmMessages(
+                  worldId: 'w/a',
+                  locationId: 'l b',
+                  conversationRoundId: 1,
+                  operations: [
+                    ChatroomLlmMessageOperation.edit(
+                      globalMessageId: 1,
+                      content: 'edit',
+                    ),
+                  ],
+                )
+              : api.chatroomHttp.batchMutateLlmMessages(
+                  worldId: 'w/a',
+                  locationId: 'l b',
+                  conversationRoundId: 1,
+                  operations: [
+                    ChatroomLlmMessageOperation.delete(globalMessageId: 1),
+                  ],
+                );
+          await expectLater(
+            operation,
+            throwsA(
+              isA<ApiException>()
+                  .having((e) => e.code, 'code', code)
+                  .having((e) => e.message, 'message', 'server message $code'),
+            ),
+          );
+          expect(messages, ['server message $code']);
+        }
+      }
+      expect(transport.requests, hasLength(18));
+      messages.clear();
+      await expectLater(
+        api.chatroomHttp.getMessages(worldId: 'w', locationId: 'l'),
+        throwsA(isA<ApiException>()),
+      );
+      expect(
+        messages,
+        isEmpty,
+        reason: 'Background history must not show a mutation toast',
+      );
+    },
+  );
+
+  test(
+    'message mutations keep session expiry and response errors separate',
+    () async {
+      Object? envelope = {'err_no': 10001, 'err_msg': 'expired', 'data': false};
+      final toasts = <String>[];
+      final expired = <String>[];
+      final api = GenesisApi(
+        transport: _FakeTransport(
+          handler: (_) => TransportResponse(
+            statusCode: 200,
+            headers: const {'content-type': 'application/json'},
+            body: jsonEncode(envelope),
+          ),
+        ),
+        useMock: false,
+        sessionStore: MemoryUserSessionStore(),
+        appHeaderProvider: () async => {},
+        onSessionExpired: (message) async {
+          expired.add(message);
+        },
+        onChatroomMessageMutationError: toasts.add,
+      );
+      for (final edit in [true, false]) {
+        await expectLater(
+          edit
+              ? api.chatroomHttp.batchMutateLlmMessages(
+                  worldId: 'w',
+                  locationId: 'l',
+                  conversationRoundId: 1,
+                  operations: [
+                    ChatroomLlmMessageOperation.edit(
+                      globalMessageId: 1,
+                      content: 'edit',
+                    ),
+                  ],
+                )
+              : api.chatroomHttp.batchMutateLlmMessages(
+                  worldId: 'w',
+                  locationId: 'l',
+                  conversationRoundId: 1,
+                  operations: [
+                    ChatroomLlmMessageOperation.delete(globalMessageId: 1),
+                  ],
+                ),
+          throwsA(isA<ApiException>().having((e) => e.code, 'code', 10001)),
+        );
+      }
+      expect(expired, hasLength(2));
+      expect(toasts, isEmpty);
+      for (final response in [
+        {'err_no': 0, 'err_msg': 'succ', 'data': false},
+        {'err_no': '2012', 'err_msg': 'malformed code', 'data': false},
+        {'err_msg': 'missing code', 'data': false},
+      ]) {
+        envelope = response;
+        await expectLater(
+          api.chatroomHttp.batchMutateLlmMessages(
+            worldId: 'w',
+            locationId: 'l',
+            conversationRoundId: 1,
+            operations: [
+              ChatroomLlmMessageOperation.delete(globalMessageId: 1),
+            ],
+          ),
+          throwsA(isA<ApiException>()),
+        );
+        expect(toasts, isEmpty);
+      }
+      envelope = {
+        'err_no': 0,
+        'err_msg': 'succ',
+        'data': {
+          'start_conversation_round_id': 1,
+          'end_conversation_round_id': 1,
+          'newest_message_id': 0,
+        },
+      };
+      expect(
+        await api.chatroomHttp.batchMutateLlmMessages(
+          worldId: 'w',
+          locationId: 'l',
+          conversationRoundId: 1,
+          operations: [ChatroomLlmMessageOperation.delete(globalMessageId: 1)],
+        ),
+        isA<ChatroomMessageMutationResult>(),
+      );
+      expect(toasts, isEmpty);
     },
   );
 

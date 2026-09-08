@@ -201,13 +201,21 @@ extension _WorldChatroomWorldProjection on WorldChatroomService {
         message.messageId <= 0) {
       return;
     }
-    await _messageStorage.upsertMessage(
-      ownerUid: ownerUid,
-      worldId: _worldId,
-      locationId: locationId,
-      message: _storageJsonFromWorldMessage(message),
-      maxMessagesPerLocation: _maxMessagesPerLocation,
-    );
+    final ticket = _historyTicket(locationId);
+    await _withLocationWrite(locationId, () async {
+      if (!_historyIsCurrent(locationId, ticket) ||
+          _deletedMessageIds[locationId]?.contains(message.globalMessageId) ==
+              true) {
+        return;
+      }
+      await _messageStorage.upsertMessage(
+        ownerUid: ownerUid,
+        worldId: ticket.world,
+        locationId: locationId,
+        message: _storageJsonFromWorldMessage(message),
+        maxMessagesPerLocation: _maxMessagesPerLocation,
+      );
+    });
     if (LocationChatDebugSlice.enabled) {
       LocationChatDebugSlice.recordEvent(
         source: 'service',

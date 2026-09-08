@@ -314,12 +314,61 @@ class LocalMockGenesisTransport implements HttpTransport {
     }
 
     if (method == 'GET' && path == 'aitown-chat/api/v2/messages') {
+      final start = int.tryParse(query['start_conversation_round_id'] ?? '0');
+      final end = int.tryParse(query['end_conversation_round_id'] ?? '0');
+      if (start == null ||
+          end == null ||
+          !((start == 0 && end == 0) || (start > 0 && end >= start))) {
+        return _v1BusinessError(1001, 'invalid conversation range');
+      }
       return _v1Ok(
         _state.chatroomV2HistoryMessages(
           worldId: query['world_id'] ?? '',
           locationId: query['location_id'] ?? '',
           since: int.tryParse(query['since'] ?? ''),
           limit: int.tryParse(query['limit'] ?? ''),
+          startConversationRoundId: start,
+          endConversationRoundId: end,
+        ),
+      );
+    }
+
+    final cards = RegExp(
+      r'^aitown-chat/api/v1/worlds/[^/]+/locations/[^/]+/llm-messages/(cards|select)$',
+    ).firstMatch(path);
+    if (cards != null && method == 'GET' && cards.group(1) == 'cards') {
+      final round = int.tryParse(query['conversation_round_id'] ?? '');
+      if (round == null || round <= 0) {
+        return _v1BusinessError(1001, 'Invalid conversation round');
+      }
+      // No regeneration runtime is simulated by the local HTTP transport.
+      return _v1Ok({
+        'original_card_id': 0,
+        'selected_card_id': 0,
+        'active_card_id': 0,
+        'confirmed': false,
+        'can_regenerate': false,
+        'can_confirm': false,
+        'list': [],
+        'total': 0,
+      });
+    }
+    if (cards != null && method == 'POST' && cards.group(1) == 'select') {
+      return _error(
+        501,
+        'Card selection is not simulated by the local transport',
+      );
+    }
+
+    final mutation = RegExp(
+      r'^aitown-chat/api/v1/worlds/([^/]+)/locations/([^/]+)/llm-messages/batch$',
+    ).firstMatch(path);
+    if (method == 'POST' && mutation != null) {
+      return _ok(
+        _state.mutateChatroomLlmMessages(
+          worldId: Uri.decodeComponent(mutation.group(1)!),
+          locationId: Uri.decodeComponent(mutation.group(2)!),
+          body: body,
         ),
       );
     }
@@ -1537,6 +1586,8 @@ class _MockState {
     required String locationId,
     int? since,
     int? limit,
+    int startConversationRoundId = 0,
+    int endConversationRoundId = 0,
   }) {
     final resolvedLocationId = locationId.trim();
     final size = limit == null || limit <= 0 ? 20 : limit.clamp(1, 100).toInt();
@@ -1554,6 +1605,12 @@ class _MockState {
     final messages =
         locationMessages
             .where((message) {
+              final round = asInt(message['conversation_round_id']);
+              if (startConversationRoundId > 0 &&
+                  (round < startConversationRoundId ||
+                      round > endConversationRoundId)) {
+                return false;
+              }
               final id = asInt(message['location_message_id']);
               return since == null || since <= 0 || id < since;
             })
@@ -1571,6 +1628,127 @@ class _MockState {
       'messages': page,
       'has_more': messages.length > page.length,
       'newest_message_id': newestId,
+    };
+  }
+
+  // Local transport fixtures model persistence only; production permission
+  // checks remain server-owned and are covered by the HTTP contract tests.
+  final Set<String> _deletedChatroomLlmMessages = <String>{};
+
+  Map<String, dynamic> mutateChatroomLlmMessages({
+    required String worldId,
+    required String locationId,
+    required Map<String, dynamic> body,
+  }) {
+    Map<String, dynamic> failure(int code) => {
+      'err_no': code,
+      'err_msg': 'Batch was not committed',
+      'data': false,
+    };
+    final round = body['conversation_round_id'];
+    final operations = body['operations'];
+    if (round is! int ||
+        round <= 0 ||
+        operations is! List ||
+        operations.isEmpty ||
+        operations.length > 100) {
+      return failure(1001);
+    }
+    _ensureChatroomMessages();
+    final ids = <int>{};
+    final targets = <Map<String, dynamic>>[];
+    for (final operation in operations) {
+      if (operation is! Map ||
+          !const {'edit', 'delete'}.contains(operation['action']) ||
+          operation['global_message_id'] is! int ||
+          operation['global_message_id'] <= 0 ||
+          !ids.add(operation['global_message_id'] as int)) {
+        return failure(1001);
+      }
+      if (operation['action'] == 'edit' &&
+          (operation['content'] is! String ||
+              (operation['content'] as String).trim().isEmpty)) {
+        return failure(1009);
+      }
+      if (operation['action'] == 'delete' && operation.containsKey('content')) {
+        return failure(1001);
+      }
+      final id = operation['global_message_id'];
+      if (_deletedChatroomLlmMessages.contains('$worldId::$locationId::$id')) {
+        return failure(2013);
+      }
+      final target = _chatroomMessages
+          .where(
+            (m) =>
+                m['world_id'] == worldId &&
+                m['location_id'] == locationId &&
+                m['global_message_id'] == id,
+          )
+          .firstOrNull;
+      if (target == null ||
+          target['conversation_round_id'] != round ||
+          !const {'character', 'narrator'}.contains(target['sender_type']) ||
+          (asString(target['stream_type']).isNotEmpty &&
+              target['stream_type'] != 'end') ||
+          asInt(target['location_message_id']) <= 0) {
+        return failure(2011);
+      }
+      targets.add(target);
+    }
+    // All validation precedes the synchronous commit: a failed batch changes nothing.
+    final deletedIds = <int>{};
+    final deletedCursors = <int>[];
+    for (var i = 0; i < operations.length; i++) {
+      final operation = operations[i] as Map;
+      final target = targets[i];
+      if (operation['action'] == 'edit') {
+        target['content'] = operation['content'];
+        target['status'] = 20;
+        if (target['v2_payload'] is Map) {
+          target['v2_payload'] = {
+            ...asJsonMap(target['v2_payload']),
+            'content': operation['content'],
+          };
+        }
+      } else {
+        deletedIds.add(target['global_message_id'] as int);
+        deletedCursors.add(target['location_message_id'] as int);
+        _deletedChatroomLlmMessages.add(
+          '$worldId::$locationId::${target['global_message_id']}',
+        );
+      }
+    }
+    _chatroomMessages.removeWhere(
+      (m) =>
+          m['world_id'] == worldId &&
+          m['location_id'] == locationId &&
+          deletedIds.contains(m['global_message_id']),
+    );
+    var start = round;
+    var end = round;
+    var newest = 0;
+    for (final message in _chatroomMessages.where(
+      (m) => m['world_id'] == worldId && m['location_id'] == locationId,
+    )) {
+      final old = asInt(message['location_message_id']);
+      final cursor = old - deletedCursors.where((id) => id < old).length;
+      if (cursor != old) {
+        message['location_message_id'] = cursor;
+        final affectedRound = asInt(message['conversation_round_id']);
+        if (affectedRound > end) end = affectedRound;
+        if (affectedRound > 0 && affectedRound < start) start = affectedRound;
+      }
+      if (cursor > newest) newest = cursor;
+    }
+    _chatroomLocationMessageSeq['$worldId::$locationId'] = newest;
+    return {
+      'err_no': 0,
+      'err_msg': 'succ',
+      'data': {
+        'start_conversation_round_id': start,
+        'end_conversation_round_id': end,
+        'newest_message_id': newest,
+      },
     };
   }
 

@@ -3,7 +3,11 @@ import 'dart:convert';
 import '../../utils/gem_amount.dart';
 import '../json_utils.dart';
 import 'chatroom_message_type.dart';
+import 'chatroom_llm_cards.dart';
 import 'chatroom_timeline_payload.dart';
+
+export 'chatroom_llm_cards.dart';
+part 'chatroom_card_events.dart';
 
 class ChatroomProtocolException implements Exception {
   const ChatroomProtocolException(this.message, {this.error});
@@ -115,8 +119,41 @@ class ChatroomV2Message {
       throw const ChatroomProtocolException('V2 message type is required');
     }
     final streamType = asString(json['stream_type']).trim().toLowerCase();
-    if (!chatroomV2StreamTypes.contains(streamType)) {
+    if (!(type == 'llm_card_stream'
+        ? const {'start', 'chunk', 'end'}.contains(streamType)
+        : chatroomV2StreamTypes.contains(streamType))) {
       throw ChatroomProtocolException('Unsupported stream_type: $streamType');
+    }
+    if (type == 'llm_card_stream' ||
+        type == 'llm_card_generation_end' ||
+        (type == 'ack' &&
+            json['payload'] is Map &&
+            ((json['payload'] as Map).containsKey('regeneration') ||
+                (json['payload'] as Map).containsKey('selection')))) {
+      llmCardInt(json['conversation_round_id']);
+    }
+    if (type == 'llm_card_stream' || type == 'llm_card_generation_end') {
+      for (final key in [
+        'global_message_id',
+        'message_id',
+        'location_message_id',
+      ]) {
+        if (json[key] != null && (json[key] is! int || json[key] != 0)) {
+          throw const FormatException(
+            'Candidate event cannot have formal message IDs',
+          );
+        }
+      }
+    }
+    if (type == 'llm_message_updated') {
+      for (final key in [
+        'global_message_id',
+        'message_id',
+        'location_message_id',
+        'conversation_round_id',
+      ]) {
+        _mutationId(json[key]);
+      }
     }
     return ChatroomV2Message(
       type: type,
@@ -768,6 +805,9 @@ class ChatroomAck extends ChatroomPayloadEvent {
     this.conversationRoundId = '',
     required this.clientMsgId,
     this.errorDetail = '',
+    this.cardConversationRoundId,
+    this.regeneration,
+    this.selection,
   });
 
   final int globalMessageId;
@@ -776,6 +816,9 @@ class ChatroomAck extends ChatroomPayloadEvent {
   final String conversationRoundId;
   final String clientMsgId;
   final String errorDetail;
+  final int? cardConversationRoundId;
+  final ChatroomCardRegeneration? regeneration;
+  final ChatroomCardSelection? selection;
 
   /// V2 ACKs are receipts only and deliberately leave these fields empty.
   bool get hasCanonicalMessageMetadata =>
@@ -809,6 +852,19 @@ class ChatroomAck extends ChatroomPayloadEvent {
   }
 
   factory ChatroomAck.fromV2Message(ChatroomV2Message message) {
+    final regeneration = message.payload['regeneration'] == null
+        ? null
+        : ChatroomCardRegeneration.fromJson(message.payload['regeneration']);
+    final selection = message.payload['selection'] == null
+        ? null
+        : ChatroomCardSelection.fromJson(message.payload['selection']);
+    if ((regeneration != null && selection != null) ||
+        (regeneration != null &&
+            regeneration.conversationRoundId != message.conversationRoundId) ||
+        (selection != null &&
+            selection.conversationRoundId != message.conversationRoundId)) {
+      throw const FormatException('Mismatched card receipt');
+    }
     return ChatroomAck(
       sessionId: message.sessionId,
       worldId: message.worldId,
@@ -819,6 +875,9 @@ class ChatroomAck extends ChatroomPayloadEvent {
       ts: asDateTime(message.ts),
       clientMsgId: message.clientMsgId,
       errorDetail: asString(message.payload['err_detail']),
+      cardConversationRoundId: message.conversationRoundId,
+      regeneration: regeneration,
+      selection: selection,
     );
   }
 }
@@ -843,6 +902,111 @@ class ChatroomBalanceLow extends ChatroomEvent {
 
 /// V2-only control event announcing that the server started a conversation
 /// round on behalf of the user.
+/// Control events: never materialized as message bubbles or stream chunks.
+class ChatroomLlmMessageUpdated extends ChatroomEvent {
+  const ChatroomLlmMessageUpdated({
+    required this.worldId,
+    required this.locationId,
+    required this.globalMessageId,
+    required this.messageId,
+    required this.locationMessageId,
+    required this.conversationRoundId,
+    required this.content,
+    this.status = 20,
+    this.errNo = 0,
+  });
+  final String worldId;
+  final String locationId;
+  final int globalMessageId;
+  final int messageId;
+  final int locationMessageId;
+  final int conversationRoundId;
+  final String content;
+  final int status;
+  final int errNo;
+
+  factory ChatroomLlmMessageUpdated.fromV2Message(ChatroomV2Message message) {
+    _validateMutationLocation(message);
+    final content = message.payload['content'];
+    if (content is! String ||
+        content.trim().isEmpty ||
+        message.payload['status'] != 20) {
+      throw const ChatroomProtocolException(
+        'Invalid llm_message_updated payload',
+      );
+    }
+    return ChatroomLlmMessageUpdated(
+      worldId: message.worldId,
+      locationId: message.locationId,
+      globalMessageId: _mutationId(message.globalMessageId),
+      messageId: _mutationId(message.messageId),
+      locationMessageId: _mutationId(message.locationMessageId),
+      conversationRoundId: _mutationId(message.conversationRoundId),
+      content: content,
+      errNo: message.errNo,
+    );
+  }
+}
+
+class ChatroomConversationRangeUpdated extends ChatroomEvent {
+  const ChatroomConversationRangeUpdated({
+    required this.worldId,
+    required this.locationId,
+    required this.startConversationRoundId,
+    required this.endConversationRoundId,
+    required this.newestMessageId,
+    this.errNo = 0,
+  });
+  final String worldId;
+  final String locationId;
+  final int startConversationRoundId;
+  final int endConversationRoundId;
+  final int newestMessageId;
+  final int errNo;
+
+  factory ChatroomConversationRangeUpdated.fromV2Message(
+    ChatroomV2Message message,
+  ) {
+    _validateMutationLocation(message);
+    final start = _mutationId(message.payload['start_conversation_round_id']);
+    final end = _mutationId(message.payload['end_conversation_round_id']);
+    final newest = _mutationId(
+      message.payload['newest_message_id'],
+      allowZero: true,
+    );
+    if (end < start) {
+      throw const ChatroomProtocolException('Reversed conversation range');
+    }
+    return ChatroomConversationRangeUpdated(
+      worldId: message.worldId,
+      locationId: message.locationId,
+      startConversationRoundId: start,
+      endConversationRoundId: end,
+      newestMessageId: newest,
+      errNo: message.errNo,
+    );
+  }
+}
+
+void _validateMutationLocation(ChatroomV2Message message) {
+  if (message.worldId.trim().isEmpty ||
+      message.locationId.trim().isEmpty ||
+      message.streamType.isNotEmpty) {
+    throw const ChatroomProtocolException(
+      'Mutation event requires world/location and empty stream_type',
+    );
+  }
+}
+
+int _mutationId(Object? value, {bool allowZero = false}) {
+  if (value is! int || value < (allowZero ? 0 : 1)) {
+    throw const ChatroomProtocolException(
+      'Mutation event requires integer IDs',
+    );
+  }
+  return value;
+}
+
 class ChatroomWaitingConversationRound extends ChatroomPayloadEvent {
   const ChatroomWaitingConversationRound({
     required super.sessionId,
@@ -1998,6 +2162,10 @@ class ChatroomMessageHandlers {
     this.onBalanceLow,
     this.onWaitingConversationRound,
     this.onEndConversationRound,
+    this.onLlmMessageUpdated,
+    this.onLlmCardStream,
+    this.onLlmCardGenerationEnd,
+    this.onConversationRangeUpdated,
     this.onWorldNotification,
     this.onStoryEventsMessage,
     this.onCharactersMovedMessage,
@@ -2010,6 +2178,12 @@ class ChatroomMessageHandlers {
     this.onAiStreamEnd,
   });
 
+  final void Function(ChatroomLlmMessageUpdated event)? onLlmMessageUpdated;
+  final void Function(ChatroomLlmCardStream event)? onLlmCardStream;
+  final void Function(ChatroomLlmCardGenerationEnd event)?
+  onLlmCardGenerationEnd;
+  final void Function(ChatroomConversationRangeUpdated event)?
+  onConversationRangeUpdated;
   final void Function(ChatroomEvent event)? onEvent;
   final void Function(ChatroomJoined event)? onJoined;
   final void Function(ChatroomDisconnected event)? onDisconnected;
@@ -2037,6 +2211,14 @@ class ChatroomMessageHandlers {
   void handle(ChatroomEvent event) {
     onEvent?.call(event);
     switch (event) {
+      case ChatroomLlmCardStream e:
+        onLlmCardStream?.call(e);
+      case ChatroomLlmCardGenerationEnd e:
+        onLlmCardGenerationEnd?.call(e);
+      case ChatroomLlmMessageUpdated e:
+        onLlmMessageUpdated?.call(e);
+      case ChatroomConversationRangeUpdated e:
+        onConversationRangeUpdated?.call(e);
       case ChatroomJoined e:
         onJoined?.call(e);
       case ChatroomDisconnected e:
@@ -2128,6 +2310,17 @@ ChatroomEvent chatroomLegacyEventFromEnvelope(ChatroomEnvelope envelope) {
 /// `type`. This prevents character/narrator stream frames from being mistaken
 /// for complete canonical messages.
 ChatroomEvent chatroomEventFromV2Message(ChatroomV2Message message) {
+  if (message.type == 'llm_card_stream') {
+    return ChatroomLlmCardStream.fromV2Message(message);
+  }
+  if (message.type == 'llm_card_generation_end') {
+    return ChatroomLlmCardGenerationEnd.fromV2Message(message);
+  }
+  if ((message.type == 'llm_message_updated' ||
+          message.type == 'conversation_range_updated') &&
+      message.streamType.isNotEmpty) {
+    throw const ChatroomProtocolException('Mutation events cannot be streamed');
+  }
   switch (message.streamType) {
     case 'llm_stream_start':
       return ChatroomAiStreamStart.fromV2Message(message);
@@ -2146,6 +2339,10 @@ ChatroomEvent chatroomEventFromV2Message(ChatroomV2Message message) {
   }
 
   switch (message.type) {
+    case 'llm_message_updated':
+      return ChatroomLlmMessageUpdated.fromV2Message(message);
+    case 'conversation_range_updated':
+      return ChatroomConversationRangeUpdated.fromV2Message(message);
     case 'ack':
       return ChatroomAck.fromV2Message(message);
     case 'user':
@@ -2194,6 +2391,14 @@ ChatroomEvent chatroomEventFromEnvelope(
 
 String chatroomEventType(ChatroomEvent event) {
   switch (event) {
+    case ChatroomLlmCardStream():
+      return 'llm_card_stream';
+    case ChatroomLlmCardGenerationEnd():
+      return 'llm_card_generation_end';
+    case ChatroomLlmMessageUpdated():
+      return 'llm_message_updated';
+    case ChatroomConversationRangeUpdated():
+      return 'conversation_range_updated';
     case ChatroomJoined():
       return 'join';
     case ChatroomDisconnected():

@@ -188,6 +188,66 @@ LLM 流的外层 `type` 仍表示发送者业务类型，状态只看 `stream_ty
 
 V2 地点聊天不跟随控制通知中的 legacy `detail_url`：`world_new_message` 或 `characters_moved` 带 `location_id` 时只调用 `/aitown-chat/api/v2/messages` 刷新该地点；缺少地点时对当前世界的叶子地点做限并发 V2 刷新。这条 runtime 链路不调用 `/aitown-chat/internal/world/messages` 或 legacy `/aitown-chat/api/messages`。
 
+### LLM 轮次卡片命令与私有事件（接口草案）
+
+2026-09-08：依据 `llm-round-cards-client-guide.md`，服务端运行时尚未启用。本次只接入协议能力，不加入重生成按钮、自动选卡、候选拼装、轮询或本地待提交记录。
+
+仅支持 V2（合法 `x-app-version > 0.3.3`），复用当前已认证连接。最新完成轮次、轮次发起人、次数上限和计费资格由服务端校验。
+
+```json
+{"type":"regenerate_llm_card","world_id":"world_001","conversation_round_id":7358,"client_msg_id":"regen-7358-1","payload":{"location_id":"loc_1"}}
+{"type":"select_llm_card","world_id":"world_001","conversation_round_id":7358,"client_msg_id":"select-7358-1","payload":{"location_id":"loc_1","card_id":9902}}
+```
+
+`ChatroomSession.regenerateLlmCard` 要求当前已加入目标地点；`selectLlmCard` 允许补报旧地点。两者要求调用方提供 1～128 字符幂等 ID，禁止重复占用在途请求 ID；不会自动重发，调用方负责用同一 ID 恢复请求。
+不携带操作者 UID，也不提供 HTTP 重生成接口。
+
+成功 ACK 保持 receipt-only，不带正式消息三层 ID。`ChatroomAck.cardConversationRoundId` 保存回显轮次，`regeneration` / `selection` 是独立类型，`hasCanonicalMessageMetadata` 不因此变为 true。
+
+- `ack.payload.regeneration`：`conversation_round_id`、`original_card_id`、`card_id`、`generation_state`、`billing`，失败已有候选还可包含 `error`。ACK 成功仅表示受理/恢复已有状态，不代表生成成功。
+- `ack.payload.selection`：与 HTTP select 的 `ChatroomCardSelection` 完全相同，含最终卡和刷新范围。接口仅返回结果，未接业务刷新或自动确认。
+- 错误 ACK 保留现有 `ChatroomFailureEvent` code/message/clientMsgId/requestType，不当作候选成功。
+
+候选流：
+
+```json
+{"type":"llm_card_stream","stream_type":"chunk","world_id":"world_001","location_id":"loc_1","conversation_round_id":7358,"user_id":"user_001","sender_type":"character","sender_id":"char_1","sender_name":"Alice","payload":{"card_id":9902,"card_message_index":1,"seq":1,"content":"Hello","current_time":"Day 1, 12:00"},"err_no":0,"err_msg":""}
+```
+
+`ChatroomLlmCardStream` 只接受 start/chunk/end；卡内序号从 1 开始，chunk 必须有正数 seq，content 是增量，end 是该条完整正文。与普通 `llm_stream_*` 路由隔离，候选没有正式消息 ID，不进入正式队列、持久化缓存或现有 AI 流拼装，也不发送客户端 ACK。当前仅分发事件，未来业务层按 `(conversation_round_id, card_id, card_message_index, seq)` 去重及拼装。
+
+整张卡终态：
+
+```json
+{"type":"llm_card_generation_end","stream_type":"","world_id":"world_001","location_id":"loc_1","conversation_round_id":7358,"user_id":"user_001","payload":{"card_id":9902,"generation_state":"succeeded","billing":{"status":"committed","price_cent":180,"pricing_version":"round_v3"}},"err_no":0,"err_msg":""}
+```
+
+`ChatroomLlmCardGenerationEnd` 只接受 succeeded/failed；失败保留 payload.error、外层错误号和信息。单条流 end 不等于整卡成功。私有事件在 session 按世界、用户隔离，可通过 events 或 ChatroomMessageHandlers 的 onLlmCardStream/onLlmCardGenerationEnd 消费。
+
+generation_state：preparing / queued / generating / succeeded / failed。
+billing.status：not_required / not_started / reserved / committed / cancelled；price_cent 为整数 cent 或 null，pricing_version 原样保存。原卡 not_required 不表示原始消息免费。ACK、终态模型不推算费用，不进行预占、结算或退款。
+
+断线不迁移/重播私有流，恢复依赖 GET /cards；后续业务需按指南实现退避查询、待确认记录及固定卡触发。目前没有自动重生成、后台轮询、自动选卡或新消息拦截。
+确认产生的 conversation_range_updated 继续使用既有正式历史范围刷新机制；候选事件自身不触发该机制。
+
+### `conversation_range_updated`（批量编辑 / 删除）
+
+2026-09-08：批量 POST 成功后，无论纯编辑、纯删除或混合操作，统一向同世界、地点的 V2 连接广播一次，包含操作人。新接口不再发送 `llm_message_updated`。客户端保留旧编辑事件解析仅作旧版本通知兼容；新批量链路不依赖它。
+
+```json
+{"type":"conversation_range_updated","stream_type":"","ts":1788854400000,"world_id":"world_001","location_id":"loc_2_2_2","payload":{"start_conversation_round_id":7358,"end_conversation_round_id":7362,"newest_message_id":84},"err_no":0,"err_msg":""}
+```
+
+此事件是控制通知，不携带正文或删除列表，不追加普通气泡、不进入流式拼装、不发送客户端 ACK；`ts` 不作为版本号。
+
+- HTTP 成功响应和 WS 通知共用范围刷新流程，重复通知合并；操作端在漏广播时仍可通过 HTTP 返回范围刷新。
+- 收到范围后废弃旧历史请求与分页状态；从 `since=0, limit=100` 开始，携带原闭区间，以已返回的最小正 `location_message_id` 前翻，直到 `has_more=false`，游标不前进视为失败。
+- 新范围到达时取消旧请求、合并未完成范围并重拉；全部页成功后在内存与 SQLite 原子替换闭区间，空结果也清除旧消息，范围外保留。失败不提交部分结果，保留待刷新范围。
+- 消息按稳定全局 ID 去重、按新地点序号排序。地点最新序号允许降低到 0，不复用世界 `lastMessageId`。SQLite 沿用版本 4 和每地点 200 条上限，写入按地点串行。
+- 初始化、补洞、缓存读取和翻页受请求代次保护；活跃流式缓存独立，完成事件与刷新协调，旧历史响应不得覆盖新内容。
+- 加入、重连或显式 `refreshLocationHistory` 从最新页重建最多 200 条缓存。网络写入结果不明时先刷新确认，不自动重发整批。
+- 编辑状态 `status=20` 由服务端保存，历史不包含该状态；客户端不新增已编辑视觉标记。
+
 ### `waiting_conversation_round`
 
 普通 `send_message` 或 `user_enter_location` 自动触发 P3 时，Chat 服务在处理本轮消息前发送以下 V2-only 控制事件：

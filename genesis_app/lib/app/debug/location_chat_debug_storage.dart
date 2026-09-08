@@ -16,6 +16,28 @@ class LocationChatDebugChatroomMessageStorage
   }
 
   @override
+  /// Atomically replaces a closed round range; omitted bounds replace the location.
+  Future<void> replaceMessages({
+    required String ownerUid,
+    required String worldId,
+    required String locationId,
+    required List<Map<String, dynamic>> messages,
+    int? startConversationRoundId,
+    int? endConversationRoundId,
+    bool Function()? isCurrent,
+    int maxMessagesPerLocation = 200,
+  }) => _delegate.replaceMessages(
+    ownerUid: ownerUid,
+    worldId: worldId,
+    locationId: locationId,
+    messages: messages,
+    startConversationRoundId: startConversationRoundId,
+    endConversationRoundId: endConversationRoundId,
+    isCurrent: isCurrent,
+    maxMessagesPerLocation: maxMessagesPerLocation,
+  );
+
+  @override
   Future<List<Map<String, dynamic>>> loadLatestMessages({
     required String ownerUid,
     required String worldId,
@@ -245,9 +267,7 @@ List<Map<String, Object?>> _storageDebugQueue(
           'senderType': asString(message['sender_type']),
           'senderId': asString(message['sender_id']),
           'clientMsgId': asString(message['client_msg_id']),
-          'conversationRoundId': asString(
-            message['conversation_round_id'],
-          ),
+          'conversationRoundId': asString(message['conversation_round_id']),
           'minAppVersion': asInt(message['min_app_version']),
           'payloadKeys': message['payload'] is Map
               ? asJsonMap(message['payload']).keys.toList(growable: false)

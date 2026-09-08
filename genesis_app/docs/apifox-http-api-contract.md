@@ -1467,6 +1467,82 @@ Query：
 }
 ```
 
+### POST `/aitown-chat/api/v1/worlds/{world_id}/locations/{location_id}/llm-messages/batch`
+
+2026-09-08：依据批量接口设计 `PLAN.md`，本接口替代旧的单条 PATCH / DELETE；客户端已移除旧请求入口。前后端需要协调切换。
+一次请求仅修改同一世界、地点、轮次内的 1～100 条已完成角色/旁白回复，整批原子提交。操作人必须是该轮发起人，普通聊天和 Go on 均适用，不限最新轮次。用户消息、Tick、隐藏 Go on 触发记录、生成中消息不可操作。复用现有 Bearer 登录凭证和 Gateway 签名。
+
+```json
+{"conversation_round_id":7358,"operations":[{"action":"edit","global_message_id":8701,"content":"修改后的完整回复"},{"action":"delete","global_message_id":8702}]}
+```
+
+- 轮次与全局消息 ID 使用正整数 int64；不经过浮点转换。
+- `operations` 为 1～100 项，ID 不得重复；操作只能为 `edit` / `delete`。
+- 编辑的 `content` 必填且不能全空白，首尾空格及换行原样发送；删除不携带 `content`。
+- 操作数组顺序不改变消息排列；任一目标校验失败时整批不生效。纯编辑不受删除开关限制。
+
+成功响应（不再返回布尔值）：
+
+```json
+{"err_no":0,"err_msg":"succ","data":{"start_conversation_round_id":7358,"end_conversation_round_id":7362,"newest_message_id":84}}
+```
+
+起止轮次是需要完整刷新的闭区间。纯编辑只刷新提交轮次；含删除时可能扩大到序号实际变化的后续轮次。`newest_message_id` 为整个地点最新序号，允许降低至 0。客户端严格校验响应范围及整数类型；HTTP 200 本身不代表成功。
+
+错误响应：`{"err_no":2013,"err_msg":"LLM reply already deleted","data":false}`。
+
+| 错误号 | 含义 |
+| --- | --- |
+| 10001 | 未登录，沿用全局登录失效流程 |
+| 1001 | 参数非法（空批次、超限、重复 ID、非法 action 等） |
+| 1009 | 编辑内容缺失或全空白 |
+| 2011 | 目标不存在、世界/地点/轮次不匹配或不可操作 |
+| 2012 | 非轮次发起人 |
+| 2013 | 批次存在已删除目标 |
+| 2014 | 含删除操作但环境未启用删除 |
+| 2004 | 存储或地点锁操作失败 |
+
+除 `10001` 外，非零业务错误通过全局 Toast 显示服务端 `err_msg`，同时抛出保留错误码的异常；调用方保留草稿、不重复弹提示。
+`ChatroomHttpApi.batchMutateLlmMessages` 返回 `ChatroomMessageMutationResult`；`WorldChatroomService` 同名入口会合并 HTTP 返回范围与 WS 待刷新范围，并阻止同轮在途重复提交。`isMutatingLlmMessages` 可用于提交状态判断。
+写成功与后续同步失败分别报告。网络超时、中断或响应格式异常时服务层安排权威快照确认结果，所有批量写入均不自动重发（包含 Gateway 返回验签错误的情况）。
+
+本次继续只接入网络和同步能力，不连接编辑页 Save、删除按钮。后端事务、地点锁和 MySQL 原子性需在服务端工程验证，本地 mock 仅用于客户端契约与整批校验回归。
+
+### LLM 轮次卡片查询与最终选择（接口草案）
+
+2026-09-08：依据 `llm-round-cards-client-guide.md`。该文档注明契约待确认、服务端接口/事件尚未接入运行时。本地仅提供协议入口，不启用业务或交互。
+
+| 方法与路径 | 客户端入口 |
+| --- | --- |
+| GET `/aitown-chat/api/v1/worlds/{world_id}/locations/{location_id}/llm-messages/cards` | `ChatroomHttpApi.getLlmCards` |
+| POST `/aitown-chat/api/v1/worlds/{world_id}/locations/{location_id}/llm-messages/select` | `ChatroomHttpApi.selectLlmCard` |
+
+不提供 HTTP `/regenerate`；重生成通过已认证 V2 WS 的 `regenerate_llm_card`。
+复用 Bearer / 现有 Gateway 签名，不发送操作者 UID。GET query 仅 `conversation_round_id`（正整数 int64），无 `pn/rn`，支持取消令牌。
+
+GET 不创建卡组。响应 data 包含 `original_card_id`、`selected_card_id`、`active_card_id`、`confirmed`、`can_regenerate`、`can_confirm`、`list`、`total`。无卡组为空列表及 0 值卡片 ID，全部卡片按 `card_index` 升序一次返回，`total=list.length`，最多 10 条（包含成功、失败和在途尝试）。
+配套 OpenAPI 未随指南提供，因此 `ChatroomLlmCardsResponse.list` 保留原始对象结构，未假设完整卡片条目及候选消息 schema；原始字段也保留在 `rawJson` 中。
+
+选卡请求：
+
+```json
+{"conversation_round_id":7358,"card_id":9902,"client_msg_id":"select-7358-1"}
+```
+
+轮次/卡片 ID 必须是正整数，`client_msg_id` 非空且最多 128 字符，重试由调用方复用同一 ID、同一卡。请求不自动重发（包括 Gateway 错误后的重发）。
+成功 `err_no=0` 的 data 与 WS `ack.payload.selection` 相同：
+
+```json
+{"conversation_round_id":7358,"selected_card_id":9902,"confirmed":true,"start_conversation_round_id":7358,"end_conversation_round_id":7359,"newest_message_id":14}
+```
+
+返回 `ChatroomCardSelection`，包含完整闭区间与整个地点最新序号，允许最新序号为 0；HTTP 层校验确认结果与请求轮次/卡片匹配。这里只返回结果，不自动确认其他卡、不修改历史或安排范围刷新，后续业务接入时复用已有范围刷新流程。
+
+已在指南中明确的业务码：2020 已固定其他卡；2021 卡组未确认时尝试批量编辑/删除；2023 重生成次数达到上限。完整错误码表在未附的 OpenAPI 中，客户端不猜测，所有非零码保留原始 code/message。
+HTTP 10001 沿用全局登录失效流程，其余非零业务错误通过现有全局 Toast 显示 err_msg。响应形状异常不能视为确认成功。
+
+本地 HTTP mock 的卡片查询返回空组；选卡返回 HTTP 501，明确未模拟生成/选卡后端，不伪造确认或计费成功。协议成功响应使用隔离 transport 测试验证。
+
 ### GET `/aitown-chat/api/v2/messages`
 
 获取指定世界、指定地点的 V2 历史消息。HTTP V2 不读取 `x-app-version`，始终返回完整 V2 DTO；`limit` 默认 20，最大 100。
@@ -1477,6 +1553,9 @@ Query：
 - `location_id*`: string，地点 ID
 - `since`: integer，严格使用 `location_message_id` 的向前分页游标；`0` 表示获取最新页
 - `limit`: integer，默认 `20`，最大 `100`
+- `start_conversation_round_id` / `end_conversation_round_id`: 配对的 int64 闭区间。省略或均为 0 表示不限范围，否则必须均为正数且结束不小于起始。
+
+范围过滤先于分页；首请求 `since=0, limit=100`，后续使用本页最小正 `location_message_id`，保留同一轮次范围，直到 `has_more=false`。`newest_message_id` 始终表示整个地点最新序号，允许降低为 0；不能把它或轮次 ID 用作分页游标。
 
 响应 `data`：
 
@@ -1484,7 +1563,7 @@ Query：
 - `has_more`: boolean，是否还有更早的地点消息
 - `newest_message_id`: integer，当前请求地点最新的 `location_message_id`，不受 `since` 当前页影响
 
-下一页 `since` 必须使用本页最后一条消息的 `location_message_id`，不得改用 world `message_id`。示例：
+下一页 `since` 必须使用本页最小正 `location_message_id`，不得改用 world `message_id`。示例：
 
 ```json
 {

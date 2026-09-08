@@ -153,8 +153,8 @@ extension _WorldChatroomConnection on WorldChatroomService {
             joinedLocationId: joinedLocationId,
           ),
         );
-        unawaited(
-          refreshLatestMessages(locationId: joinedLocationId, limit: 20),
+        _backgroundHistoryRefresh(
+          refreshLocationHistory(locationId: joinedLocationId),
         );
       }
       return joined;

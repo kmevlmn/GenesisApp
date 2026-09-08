@@ -3,6 +3,22 @@ part of 'world_chatroom_service.dart';
 extension _WorldChatroomEventProjection on WorldChatroomService {
   Future<void> _handleEvent(ChatroomEvent event) async {
     switch (event) {
+      case ChatroomLlmCardStream():
+      case ChatroomLlmCardGenerationEnd():
+        // Candidate protocol events are exposed by the session only.
+        break;
+      case ChatroomLlmMessageUpdated e:
+        await _handleLlmMessageUpdated(e);
+      case ChatroomConversationRangeUpdated e:
+        if (e.errNo == 0 && e.worldId == _worldId && e.locationId.isNotEmpty) {
+          _backgroundHistoryRefresh(
+            _requestHistoryReplacement(
+              locationId: e.locationId,
+              start: e.startConversationRoundId,
+              end: e.endConversationRoundId,
+            ),
+          );
+        }
       case ChatroomWorldNotification e:
         await _handleWorldNotification(e);
       case ChatroomNewUserJoinEvent e:
@@ -840,6 +856,8 @@ extension _WorldChatroomEventProjection on WorldChatroomService {
     final stopwatch = _chatroomHydrateMetricsEnabled
         ? (Stopwatch()..start())
         : null;
+    final historyTicket = _historyTicket(stateLocationId);
+    if (_historyRefreshes.containsKey(stateLocationId)) return;
     final beforeStateCount =
         _state.messagesByLocation[stateLocationId]?.length ?? 0;
     _logChatroomHydrateMetric(
@@ -853,7 +871,8 @@ extension _WorldChatroomEventProjection on WorldChatroomService {
         locationId: storageLocationId,
         limit: 20,
       );
-      if (cacheGeneration != _localMessageCacheGeneration) {
+      if (cacheGeneration != _localMessageCacheGeneration ||
+          !_historyIsCurrent(stateLocationId, historyTicket)) {
         _logChatroomHydrateMetric(
           'db load skipped stale generation storage=$storageLocationId '
           'state=$stateLocationId',

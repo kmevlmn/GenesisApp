@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../app/debug/location_chat_debug_slice.dart';
 import '../genesis_api.dart';
+import '../api_exception.dart';
+import '../http_transport.dart';
 import '../json_utils.dart';
 import '../models/location_tree.dart';
 import '../models/world.dart';
@@ -19,6 +21,7 @@ import 'chatroom_timeline_payload.dart';
 
 part 'world_chatroom_connection.dart';
 part 'world_chatroom_history_repository.dart';
+part 'world_chatroom_message_mutations.dart';
 part 'world_chatroom_event_projection.dart';
 part 'world_chatroom_message_reducer.dart';
 part 'world_chatroom_world_projection.dart';
@@ -207,6 +210,12 @@ class WorldChatroomService {
   _latestMessageFetchFutures = <String, Future<List<WorldChatroomMessage>>>{};
   final Map<String, Completer<WorldChatroomMessage>> _canonicalEchoCompleters =
       <String, Completer<WorldChatroomMessage>>{};
+  int _historySessionGeneration = 0;
+  final _pendingMessageMutationKeys = <String>{};
+  final _historyRefreshes = <String, _LocationHistoryRefresh>{};
+  final _locationWrites = <String, Future<void>>{};
+  final _deletedMessageIds = <String, Set<int>>{};
+
   final Map<String, _ChatroomStreamAccumulator> _streamAccumulators =
       <String, _ChatroomStreamAccumulator>{};
   int _sendClientMessageSequence = 0;
@@ -548,7 +557,10 @@ class WorldChatroomService {
   }) async {
     _throwIfDisposed();
     final nextWorldId = worldId.trim();
-    if (_worldId != nextWorldId) {
+    if (_worldId != nextWorldId ||
+        (_identity != null && _identity!.userId != identity.userId)) {
+      _cancelHistoryRefreshes();
+      _deletedMessageIds.clear();
       _publishedContentUpdateOccurrences.clear();
     }
     _worldId = nextWorldId;
@@ -673,6 +685,10 @@ class WorldChatroomService {
         : _storageOwnerUid;
     if (resolvedOwnerUid.isEmpty) return const <WorldChatroomMessage>[];
 
+    if (_historyRefreshes.containsKey(resolvedLocationId)) {
+      return const <WorldChatroomMessage>[];
+    }
+    final ticket = _historyTicket(resolvedLocationId);
     final storageLocationIds = _orderedNonEmpty([
       ...locationAliases,
       resolvedLocationId,
@@ -685,6 +701,9 @@ class WorldChatroomService {
         locationId: storageLocationId,
         limit: limit,
       );
+      if (!_historyIsCurrent(resolvedLocationId, ticket)) {
+        return const <WorldChatroomMessage>[];
+      }
       for (final json in localMessages) {
         final message = WorldChatroomMessage.fromStorageJson(json);
         messages = _trimMessageList(
@@ -720,6 +739,33 @@ class WorldChatroomService {
     return messages;
   }
 
+  /// Rebuild the bounded location cache after reconnect or a suspected missed broadcast.
+  Future<void> refreshLocationHistory({required String locationId}) {
+    _throwIfDisposed();
+    return _requestHistoryReplacement(locationId: locationId);
+  }
+
+  /// Successful writes stay successful even if the subsequent range refresh fails.
+  Future<ChatroomMessageMutationResult> batchMutateLlmMessages({
+    required String locationId,
+    required int conversationRoundId,
+    required List<ChatroomLlmMessageOperation> operations,
+  }) {
+    _throwIfDisposed();
+    return _mutateLlmReplies(
+      locationId: locationId,
+      conversationRoundId: conversationRoundId,
+      operations: List.unmodifiable(operations),
+    );
+  }
+
+  bool isMutatingLlmMessages({
+    required String locationId,
+    required int conversationRoundId,
+  }) => _pendingMessageMutationKeys.contains(
+    _messageMutationKey(locationId.trim(), conversationRoundId),
+  );
+
   Future<List<WorldChatroomMessage>> refreshLatestMessages({
     required String locationId,
     int limit = 20,
@@ -753,7 +799,9 @@ class WorldChatroomService {
     try {
       return await fetch;
     } finally {
-      _latestMessageFetchFutures.remove(fetchKey);
+      if (identical(_latestMessageFetchFutures[fetchKey], fetch)) {
+        _latestMessageFetchFutures.remove(fetchKey);
+      }
     }
   }
 
@@ -841,6 +889,7 @@ class WorldChatroomService {
   }
 
   Future<void> disconnect() async {
+    _cancelHistoryRefreshes();
     _userDisconnected = true;
     _userLocationsRefreshGeneration += 1;
     _userLocationsRefreshPending = false;
@@ -985,6 +1034,14 @@ class WorldChatroomService {
         hasMore: false,
       );
     }
+    _requireHistoryAvailable(resolvedLocationId);
+    final ticket = _historyTicket(resolvedLocationId);
+    void checkCurrent() {
+      if (!_historyIsCurrent(resolvedLocationId, ticket)) {
+        throw const ChatroomProtocolException('History cursor invalidated');
+      }
+    }
+
     final loadedMessageKeys = <String>{};
     final currentLocationMessages =
         _state.messagesByLocation[resolvedLocationId] ??
@@ -1029,6 +1086,7 @@ class WorldChatroomService {
         beforeWorldMessageId: beforeWorldMessageId,
         limit: limit,
       );
+      checkCurrent();
       final localMessages = <WorldChatroomMessage>[];
       for (final json in localMessageJson) {
         final message = WorldChatroomMessage.fromStorageJson(json);
@@ -1052,7 +1110,12 @@ class WorldChatroomService {
       since: beforeMessageId,
       limit: limit,
     );
-    await _mergeFetchedMessages(resolvedLocationId, response.messages);
+    await _mergeFetchedMessages(
+      resolvedLocationId,
+      response.messages,
+      ticket: ticket,
+    );
+    checkCurrent();
     for (final message in response.messages) {
       final key = loadedMessageKey(
         senderType: message.senderType,
@@ -1106,7 +1169,10 @@ class WorldChatroomService {
     _throwIfDisposed();
     final ownerUid = _storageOwnerUid;
     if (ownerUid.isEmpty) return;
+    _cancelHistoryRefreshes();
+    await Future.wait(_locationWrites.values.toList());
     await _messageStorage.clearCache(ownerUid);
+    _deletedMessageIds.clear();
     _localMessageCacheGeneration += 1;
     _localHydratedMessageKeys.clear();
     _localHydratingMessageFutures.clear();
