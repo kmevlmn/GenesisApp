@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
@@ -3559,6 +3560,7 @@ void main() {
 
   testWidgets('Home is default tab', (WidgetTester tester) async {
     await _pumpGenesisApp(tester);
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Popular'), findsNothing);
@@ -3567,6 +3569,7 @@ void main() {
     expect(find.byKey(const ValueKey('bottom-nav-Create')), findsOneWidget);
     expect(find.text('Inbox'), findsOneWidget);
     expect(find.text('Me'), findsOneWidget);
+    AppStartupCoordinator.resetForTesting();
   });
 
   testWidgets('signed-out cold start opens Worldo and Home opens My Worlds', (
@@ -3578,13 +3581,55 @@ void main() {
 
     expect(find.byType(AppShellPage, skipOffstage: false), findsOneWidget);
     expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 1);
+    expect(
+      Theme.of(tester.element(find.byType(BottomTabs))).brightness,
+      Brightness.light,
+    );
     expect(find.text('Worldo'), findsOneWidget);
     expect(find.text('For you'), findsOneWidget);
+    expect(tester.widget<Icon>(find.byIcon(CupertinoIcons.search)).size, 16);
 
     await tester.tap(find.text('Home'));
     await tester.pump();
 
     expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 0);
+    expect(
+      Theme.of(tester.element(find.byType(BottomTabs))).brightness,
+      Brightness.light,
+    );
+    expect(
+      _pageStatusBarStyle(tester).statusBarIconBrightness,
+      Brightness.light,
+    );
+    final navImages = tester.widgetList<SvgPicture>(
+      find.descendant(
+        of: find.byType(BottomTabs),
+        matching: find.byType(SvgPicture),
+      ),
+    );
+    expect(navImages, isNotEmpty);
+    expect(navImages.every((image) => image.colorFilter == null), isTrue);
+    final navDecoration =
+        tester
+                .widget<DecoratedBox>(
+                  find
+                      .descendant(
+                        of: find.byType(BottomTabs),
+                        matching: find.byType(DecoratedBox),
+                      )
+                      .first,
+                )
+                .decoration
+            as BoxDecoration;
+    expect(navDecoration.color, Colors.white);
+    expect(navDecoration.boxShadow, const [
+      BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, -2)),
+    ]);
+
+    expect(
+      _pageStatusBarStyle(tester).systemNavigationBarIconBrightness,
+      Brightness.dark,
+    );
     expect(find.text('Popular'), findsNothing);
 
     final emptyAction = find.byKey(
@@ -3599,7 +3644,13 @@ void main() {
     await tester.pump();
 
     expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 1);
+    expect(
+      Theme.of(tester.element(find.byType(BottomTabs))).brightness,
+      Brightness.light,
+    );
     expect(find.text('For you'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    AppStartupCoordinator.resetForTesting();
   });
 
   testWidgets('tap header search bar opens search page', (
@@ -3610,12 +3661,13 @@ void main() {
         .getTopLeft(find.byType(SearchBarPlaceholder).first)
         .dy;
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
 
     expect(find.text('Cancel'), findsOneWidget);
-    expect(find.text('Explore'), findsOneWidget);
+    expect(find.text('Worldo, Character, Tags'), findsOneWidget);
     final searchPageSearchTop = tester
         .getTopLeft(find.byType(SearchBarPlaceholder).first)
         .dy;
@@ -3633,6 +3685,20 @@ void main() {
     );
     await tester.pump();
 
+    final search = tester.widget<SearchBarPlaceholder>(
+      find.byType(SearchBarPlaceholder),
+    );
+    expect(search.backgroundColor, GenesisColors.darkFaintFill);
+    expect(search.borderColor, isNull);
+    expect(search.iconAsset, isNull);
+    expect(search.icon, CupertinoIcons.search);
+    final searchIcon = tester.widget<Icon>(find.byIcon(CupertinoIcons.search));
+    expect(searchIcon.size, 16);
+    expect(searchIcon.color, GenesisColors.darkTextSecondary);
+    expect(
+      tester.widget<Text>(find.text('Worldo, Character, Tags')).style?.color,
+      GenesisColors.darkInputPlaceholder,
+    );
     final searchRect = tester.getRect(find.byType(SearchBarPlaceholder));
     final headerRect = tester.getRect(find.byType(GenesisTopSafeArea));
     final gemEntryFinder = find.byKey(
@@ -3824,7 +3890,9 @@ void main() {
       ),
     );
 
-    final placeholder = tester.widget<Text>(find.text('Explore'));
+    final placeholder = tester.widget<Text>(
+      find.text('Worldo, Character, Tags'),
+    );
     expect(placeholder.maxLines, 1);
     expect(placeholder.overflow, TextOverflow.ellipsis);
     expect(placeholder.softWrap, isFalse);
@@ -3836,7 +3904,7 @@ void main() {
     await _pumpGenesisApp(tester);
     await tester.pump();
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'zz');
@@ -3886,7 +3954,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'reborn');
@@ -3955,7 +4023,7 @@ void main() {
     await tester.pumpWidget(GenesisApp(services: services));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'reborn');
     await tester.pump(const Duration(milliseconds: 600));
@@ -3979,7 +4047,7 @@ void main() {
   ) async {
     await _pumpGenesisApp(tester);
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), '老肖');
@@ -3995,7 +4063,7 @@ void main() {
   ) async {
     await _pumpGenesisApp(tester);
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), '老肖');
@@ -4017,7 +4085,7 @@ void main() {
   ) async {
     await _pumpGenesisApp(tester);
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'st');

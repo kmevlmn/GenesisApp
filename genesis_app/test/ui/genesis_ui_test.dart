@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -186,7 +187,9 @@ void main() {
       ),
     );
 
-    final placeholder = tester.widget<Text>(find.text('Explore'));
+    final placeholder = tester.widget<Text>(
+      find.text('Worldo, Character, Tags'),
+    );
     expect(placeholder.maxLines, 1);
     expect(placeholder.overflow, TextOverflow.ellipsis);
     expect(placeholder.softWrap, isFalse);
@@ -252,9 +255,9 @@ void main() {
     );
 
     expect(find.text('Worldo'), findsOneWidget);
-    expect(find.text('Explore'), findsOneWidget);
+    expect(find.text('Worldo, Character, Tags'), findsOneWidget);
 
-    await tester.tap(find.text('Explore'));
+    await tester.tap(find.text('Worldo, Character, Tags'));
     expect(tapped, isTrue);
   });
 
@@ -262,19 +265,18 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(body: SearchBarPlaceholder(hintText: 'Explore')),
-      ),
+      const MaterialApp(home: Scaffold(body: SearchBarPlaceholder())),
     );
 
     expect(
       tester.widget<SearchBarPlaceholder>(find.byType(SearchBarPlaceholder)),
       isA<GenesisSearchField>(),
     );
-    final image = tester.widget<Image>(find.byType(Image));
-    expect((image.image as AssetImage).assetName, searchIconAsset);
+    final icon = tester.widget<Icon>(find.byIcon(CupertinoIcons.search));
+    expect(icon.size, 16);
+    expect(find.byType(Image), findsNothing);
     expect(find.byIcon(Icons.search), findsNothing);
-    expect(find.text('Explore'), findsOneWidget);
+    expect(find.text('Worldo, Character, Tags'), findsOneWidget);
   });
 
   testWidgets('search and clear icons use symmetric horizontal insets', (
@@ -300,7 +302,7 @@ void main() {
     );
 
     final fieldRect = tester.getRect(find.byType(SearchBarPlaceholder));
-    final searchIconRect = tester.getRect(find.byType(Image));
+    final searchIconRect = tester.getRect(find.byIcon(CupertinoIcons.search));
     final clearIconRect = tester.getRect(find.byIcon(Icons.close));
     final searchInset = searchIconRect.left - fieldRect.left;
     final clearInset = fieldRect.right - clearIconRect.right;

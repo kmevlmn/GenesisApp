@@ -955,7 +955,10 @@ class _MyWorldFeedState extends State<_MyWorldFeed>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Load failed'),
+            const Text(
+              'Load failed',
+              style: TextStyle(color: GenesisColors.darkTextPrimary),
+            ),
             const SizedBox(height: 10),
             FilledButton(onPressed: _refreshItems, child: const Text('Retry')),
           ],
@@ -989,7 +992,8 @@ class _MyWorldFeedState extends State<_MyWorldFeed>
     }
 
     return RefreshIndicator(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: GenesisColors.darkRaisedBackground,
+      color: GenesisColors.darkTextSecondary,
       onRefresh: _refreshItems,
       child: _items.isEmpty
           ? emptyListView
@@ -1013,7 +1017,10 @@ class _MyWorldFeedState extends State<_MyWorldFeed>
                     child: Center(
                       child: SizedBox.square(
                         dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: GenesisColors.darkTextSecondary,
+                        ),
                       ),
                     ),
                   );

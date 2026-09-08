@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/tokens/genesis_colors.dart';
 
 import '../../network/genesis_api.dart';
 import '../../network/json_utils.dart';
@@ -240,6 +241,18 @@ class WorldItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GenesisWorldListCardLayout(
       imageUrl: item.cover,
+      placeholder: Theme.of(context).brightness == Brightness.dark
+          ? const ColoredBox(
+              color: GenesisColors.darkFaintFill,
+              child: Center(
+                child: Icon(
+                  Icons.image_outlined,
+                  color: GenesisColors.darkTextTertiary,
+                  size: 22,
+                ),
+              ),
+            )
+          : null,
       thumbnailBorderRadius: thumbnailBorderRadius,
       content: _WorldSummary(item: item),
     );
@@ -253,6 +266,7 @@ class _WorldSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final timestamp = item.cardTimestamp;
     final character = item.myCharacter;
     final characterName = character == null
@@ -270,8 +284,10 @@ class _WorldSummary extends StatelessWidget {
         Text(
           item.title,
           key: const ValueKey<String>('world-card-name'),
-          style: const TextStyle(
-            color: Color(0xFF4B6192),
+          style: TextStyle(
+            color: dark
+                ? GenesisColors.darkTextPrimary
+                : const Color(0xFF4B6192),
             fontSize: 14,
             height: 1.1,
             fontWeight: FontWeight.w600,
@@ -287,8 +303,10 @@ class _WorldSummary extends StatelessWidget {
                 key: const ValueKey<String>('world-card-tick-messages'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF666666),
+                style: TextStyle(
+                  color: dark
+                      ? GenesisColors.darkTextSecondary
+                      : const Color(0xFF666666),
                   fontSize: 12,
                   height: 1.2,
                   fontWeight: FontWeight.w400,
@@ -303,8 +321,10 @@ class _WorldSummary extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
-                style: const TextStyle(
-                  color: Color(0xFF8B8B8B),
+                style: TextStyle(
+                  color: dark
+                      ? GenesisColors.darkTextTertiary
+                      : const Color(0xFF8B8B8B),
                   fontSize: 12,
                   height: 1.1,
                   fontWeight: FontWeight.w400,
@@ -320,8 +340,10 @@ class _WorldSummary extends StatelessWidget {
             key: const ValueKey<String>('world-card-narrator'),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF666666),
+            style: TextStyle(
+              color: dark
+                  ? GenesisColors.darkTextSecondary
+                  : const Color(0xFF666666),
               fontSize: 12,
               height: 1.2,
               fontWeight: FontWeight.w400,
@@ -352,8 +374,10 @@ class _WorldSummary extends StatelessWidget {
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF111111),
+                        style: TextStyle(
+                          color: dark
+                              ? GenesisColors.darkTextPrimary
+                              : const Color(0xFF111111),
                           fontSize: 12,
                           height: 1.2,
                           fontWeight: FontWeight.w400,
@@ -366,8 +390,10 @@ class _WorldSummary extends StatelessWidget {
                         otherPlayerLabel,
                         key: const ValueKey<String>('world-card-other-players'),
                         maxLines: 1,
-                        style: const TextStyle(
-                          color: Color(0xFF666666),
+                        style: TextStyle(
+                          color: dark
+                              ? GenesisColors.darkTextSecondary
+                              : const Color(0xFF666666),
                           fontSize: 12,
                           height: 1.2,
                           fontWeight: FontWeight.w400,

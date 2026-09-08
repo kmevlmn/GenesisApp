@@ -1,5 +1,4 @@
 const String discussIconAsset = 'assets/custom-icons/png/discuss.png';
-const String searchIconAsset = 'assets/custom-icons/png/search_icon.png';
 
 const String launchIconAsset = 'assets/custom-icons/svg/launch_icon.svg';
 const String copyStatIconAsset = launchIconAsset;

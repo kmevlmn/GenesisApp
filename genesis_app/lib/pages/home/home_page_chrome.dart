@@ -72,7 +72,7 @@ class _HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GenesisTopSafeArea(
-      backgroundColor: Colors.white,
+      backgroundColor: GenesisColors.darkBackground,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: SizedBox(
@@ -89,7 +89,9 @@ class _HomeHeader extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: SearchBarPlaceholder(
-                        hintText: 'Explore',
+                        backgroundColor: GenesisColors.darkFaintFill,
+                        borderColor: null,
+                        iconColor: GenesisColors.darkTextSecondary,
                         onTap: () {
                           Navigator.of(context).pushNamed(RouteNames.search);
                         },

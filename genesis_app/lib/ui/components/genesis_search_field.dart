@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../text/genesis_text_input_formatters.dart';
@@ -7,11 +8,12 @@ import '../tokens/genesis_typography.dart';
 import '../theme/genesis_ui_theme.dart';
 
 const genesisSearchFieldHeight = 38.0;
+const genesisSearchHintText = 'Worldo, Character, Tags';
 
 class GenesisSearchField extends StatelessWidget {
   const GenesisSearchField({
     super.key,
-    this.hintText = 'Explore',
+    this.hintText = genesisSearchHintText,
     this.onTap,
     this.controller,
     this.focusNode,
@@ -26,7 +28,8 @@ class GenesisSearchField extends StatelessWidget {
     this.borderColor,
     this.borderRadius,
     this.iconColor,
-    this.iconSize = 20,
+    this.icon = CupertinoIcons.search,
+    this.iconSize = 16,
     this.iconAsset,
     this.hintStyle,
     this.textStyle,
@@ -47,6 +50,7 @@ class GenesisSearchField extends StatelessWidget {
   final Color? borderColor;
   final BorderRadius? borderRadius;
   final Color? iconColor;
+  final IconData icon;
   final double iconSize;
   final String? iconAsset;
   final TextStyle? hintStyle;
@@ -74,7 +78,7 @@ class GenesisSearchField extends StatelessWidget {
         children: [
           if (iconAsset == null)
             Icon(
-              Icons.search,
+              icon,
               color: iconColor ?? uiTheme.searchIconColor,
               size: iconSize,
             )
