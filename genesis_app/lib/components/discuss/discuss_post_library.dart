@@ -48,10 +48,10 @@ typedef DiscussImageProcessorForTesting =
 @visibleForTesting
 DiscussImageProcessorForTesting? debugDiscussImageProcessorOverride;
 
-const Color _discussComposerSurface = Color(0xFF1F1D24);
-const Color _discussComposerPrimary = Color(0xF2FFFFFF);
-const Color _discussComposerSecondary = Color(0xB8FFFFFF);
-const Color _discussComposerMuted = Color(0x73FFFFFF);
+const Color _discussComposerSurface = GenesisColors.darkFaintSurface;
+const Color _discussComposerPrimary = GenesisColors.darkTextPrimary;
+const Color _discussComposerSecondary = GenesisColors.darkTextSecondary;
+const Color _discussComposerMuted = GenesisColors.darkTextTertiary;
 const Color _discussComposerBorder = Color(0x24FFFFFF);
 
 const int discussPostMaxImages = 6;

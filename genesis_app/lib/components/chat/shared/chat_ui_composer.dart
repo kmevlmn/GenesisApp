@@ -155,6 +155,7 @@ class ChatComposer extends StatelessWidget {
                                     decoration: InputDecoration(
                                       border: InputBorder.none,
                                       hintText: hintText,
+                                      hintStyle: style.inputHintStyle,
                                       contentPadding: EdgeInsets.symmetric(
                                         horizontal:
                                             style.inputHorizontalPadding,

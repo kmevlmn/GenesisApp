@@ -105,6 +105,7 @@ class ChatUiStyleConfig {
     required this.inputBorderRadius,
     // Input field text style.
     required this.inputTextStyle,
+    this.inputHintStyle,
     // Message list padding.
     required this.messageListPadding,
     // Top space reserved when there is no top title.
@@ -487,6 +488,7 @@ class ChatUiStyleConfig {
   final double inputBorderRadius;
   // Input field text style.
   final TextStyle inputTextStyle;
+  final TextStyle? inputHintStyle;
   // Message list padding.
   final EdgeInsets messageListPadding;
   // Top space reserved when there is no top title.
@@ -632,6 +634,7 @@ class ChatUiStyleConfig {
     double? inputBackdropBlurSigma,
     double? inputBorderRadius,
     TextStyle? inputTextStyle,
+    TextStyle? inputHintStyle,
   }) {
     return ChatUiStyleConfig(
       conversationBackgroundColor:
@@ -708,6 +711,7 @@ class ChatUiStyleConfig {
           inputBackdropBlurSigma ?? this.inputBackdropBlurSigma,
       inputBorderRadius: inputBorderRadius ?? this.inputBorderRadius,
       inputTextStyle: inputTextStyle ?? this.inputTextStyle,
+      inputHintStyle: inputHintStyle ?? this.inputHintStyle,
       messageListPadding: messageListPadding ?? this.messageListPadding,
       topTitleEmptyHeight: topTitleEmptyHeight,
       topTitleBottomPadding: topTitleBottomPadding,

@@ -2130,7 +2130,8 @@ void main() {
     expect(kLocationChatStyle.inputBorderRadius, 8);
     final input = tester.widget<TextField>(find.byType(TextField));
     expect(input.cursorColor, kLocationChatStyle.inputTextStyle.color);
-    expect(input.cursorColor, Colors.white);
+    expect(input.cursorColor, const Color(0xF2FFFFFF));
+    expect(input.decoration?.hintStyle?.color, const Color(0x73FFFFFF));
     final composerBackdrops = tester
         .widgetList<BackdropFilter>(
           find.descendant(

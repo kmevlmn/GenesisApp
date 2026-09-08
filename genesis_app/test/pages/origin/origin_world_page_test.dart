@@ -1,3 +1,4 @@
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -40,10 +41,7 @@ void main() {
 
   test('origin page and detail sheet share the base background', () {
     expect(originWorldDetailSheetBackgroundColor, const Color(0xFF151517));
-    expect(
-      originWorldDetailSheetRaisedBackgroundColor,
-      const Color(0xFF1F1D24),
-    );
+    expect(GenesisColors.darkRaisedBackground, const Color(0xFF181C1F));
     expect(
       originWorldMapShellSource,
       contains('backgroundColor: originWorldDetailSheetBackgroundColor'),

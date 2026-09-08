@@ -27,6 +27,7 @@ import '../network/chatroom/chatroom_connection_controller.dart';
 import '../network/chatroom/world_chatroom_service.dart';
 import '../network/models/world.dart';
 import '../components/discuss/origin_discuss_list.dart';
+import '../components/discuss/discuss_dark_style.dart';
 import '../components/chat/shared/chat_ui.dart';
 
 sealed class RouteNames {
@@ -548,13 +549,13 @@ sealed class AppRouter {
         );
       case RouteNames.discuss:
         final args = _DiscussRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return _DiscussPageRoute(
           settings: settings,
           builder: (_) => DiscussPage(oid: args.oid, originId: args.originId),
         );
       case RouteNames.postDetail:
         final args = _PostDetailRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return _DiscussPageRoute(
           settings: settings,
           builder: (_) => PostDetailPage(item: args.item),
         );
@@ -711,6 +712,66 @@ sealed class AppRouter {
           builder: (_) => const PageNotFoundPage(),
         );
     }
+  }
+}
+
+class _DiscussPageRoute extends MaterialPageRoute<void> {
+  _DiscussPageRoute({required super.builder, required super.settings});
+
+  @override
+  DelegatedTransitionBuilder? get delegatedTransition =>
+      _darkDelegatedTransition;
+
+  static Widget? _darkDelegatedTransition(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    bool allowSnapshotting,
+    Widget? child,
+  ) {
+    if (Theme.of(context).platform == TargetPlatform.android) {
+      // The outgoing route also paints a background while fading away.
+      return const FadeForwardsPageTransitionsBuilder(
+        backgroundColor: DiscussDarkColors.background,
+      ).delegatedTransition!(
+        context,
+        animation,
+        secondaryAnimation,
+        allowSnapshotting,
+        child,
+      );
+    }
+    return Theme.of(context).pageTransitionsTheme
+        .delegatedTransition(Theme.of(context).platform)
+        ?.call(
+          context,
+          animation,
+          secondaryAnimation,
+          allowSnapshotting,
+          child,
+        );
+  }
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // Route transitions live above the page's local dark Theme. Supply the
+    // dark fallback explicitly so Android never paints the app's light surface.
+    if (Theme.of(context).platform == TargetPlatform.android) {
+      return const PredictiveBackPageTransitionsBuilder(
+        fallbackColor: DiscussDarkColors.background,
+      ).buildTransitions(this, context, animation, secondaryAnimation, child);
+    }
+    return super.buildTransitions(
+      context,
+      animation,
+      secondaryAnimation,
+      child,
+    );
   }
 }
 

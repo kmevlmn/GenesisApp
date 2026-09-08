@@ -4,13 +4,19 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+
 import '../../ui/components/genesis_static_network_image.dart';
 
 const LinearGradient originRolePortraitGradient = LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
   stops: <double>[0.30, 0.68, 1],
-  colors: <Color>[Colors.transparent, Color(0x66151517), Color(0xFF151517)],
+  colors: <Color>[
+    Colors.transparent,
+    Color(0x66151517),
+    GenesisColors.darkBackground,
+  ],
 );
 
 /// Owns the small in-memory avatar snapshots derived while Select Your Role

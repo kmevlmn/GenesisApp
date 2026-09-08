@@ -165,20 +165,65 @@ HTTP 映射层的图片规则：
 
 ## 深色界面颜色规范
 
-深色界面的黑色背景只使用以下两个标准层级：
+颜色统一定义在 `lib/ui/tokens/genesis_colors.dart` 的 `GenesisColors` 中。以下五个 token 是对应标准颜色的唯一色值来源：
 
-- 基础背景：`#151517`（Flutter：`Color(0xFF151517)`）。用于页面、World Sheet、导航栏和地图外围。
-- 抬升背景：`#1F1D24`（Flutter：`Color(0xFF1F1D24)`）。用于普通 Sheet、浮层、分组容器和部分卡片。
+| 用途 | Token | 精确值 |
+| --- | --- | --- |
+| 基础背景：页面、World Sheet、导航栏、地图外围 | `GenesisColors.darkBackground` | `#151517` / `Color(0xFF151517)` |
+| 抬升背景：普通 Sheet、浮层、分组容器、部分卡片 | `GenesisColors.darkRaisedBackground` | `#181C1F` / `Color(0xFF181C1F)` |
+| 一级文字：主标题、主要内容、高强调文字 | `GenesisColors.darkTextPrimary` | 95% 白 / `Color(0xF2FFFFFF)` |
+| 二级文字：次级文字、分组标题、未选中状态 | `GenesisColors.darkTextSecondary` | 72% 白 / `Color(0xB8FFFFFF)` |
+| 三级文字：辅助信息、元数据、弱提示 | `GenesisColors.darkTextTertiary` | 45% 白 / `Color(0x73FFFFFF)` |
 
-深色背景上的白色文字只使用以下三个标准 alpha 层级；这里的百分比均指不透明度：
+- 所有百分比均指不透明度。使用处必须引用对应 token，不得重复写上述色值或建立独立的同色常量。
+- 页面或组件已有的语义别名可以保留，但必须引用上述 token。例如 Worldo Detail 和 Discuss 的颜色别名只做映射，不再自行定义色值。
+- 现有代码的 token 迁移只替换与上述标准颜色对应的色值写法，不改变视觉颜色；其他颜色或不同透明度保持原样，不因数值接近而强行归入这五个 token。
+- `GenesisColors.darkInputPlaceholder` 是 `darkTextTertiary` 的语义别名；深色光标引用 `darkTextPrimary`。后续调整标准色时，修改公共 token 即可同步这些别名和使用处。
+- 需要透明度变体时，从对应 token 派生，例如 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.8)`；不得用变体替代规定的三级文字颜色。
+- 不创建肉眼接近的背景色或文字透明度。纯白 `#FFFFFF` 不作为深色内容区常规文字颜色，除非设计明确要求更高强调层级；输入区域和浮动操作菜单按后文专项规范执行。
 
-- 95% 白：`rgba(255, 255, 255, 0.95)`（Flutter ARGB：`Color(0xF2FFFFFF)`）。用于主标题、主要内容和高强调文字。
-- 72% 白：`rgba(255, 255, 255, 0.72)`（Flutter ARGB：`Color(0xB8FFFFFF)`）。用于次级文字、分组标题和未选中状态。
-- 45% 白：`rgba(255, 255, 255, 0.45)`（Flutter ARGB：`Color(0x73FFFFFF)`）。用于辅助信息、元数据和弱提示文字。
+## 深色输入框与 Placeholder 设计规范
 
-新增或修改深色界面时，优先复用语义 token；没有对应 token 时也必须使用上述精确值，不要创建肉眼接近的黑色底或白色文字透明度。纯白 `#FFFFFF` 不作为深色内容区的常规文字颜色，除非设计明确要求更高强调层级。
+适用于 Location Chat 的 Message 输入框、Worldo Detail / Discuss 的 Write a post 入口，以及 Post Detail 的 Write a reply 入口。新增或修改同类深色输入场景时，按以下标准实现；所有尺寸均为 Flutter 逻辑像素，百分比均指不透明度。
 
-深色输入框的光标统一使用 95% 白（Flutter：`Color(0xF2FFFFFF)`），适用于 Location Message、Discuss 发帖/回复及其他深色输入场景。不得使用纯白或品牌红作为深色输入光标；只有输入文字颜色本身为该精确值时，光标才可直接复用文字颜色。品牌红用于发送等可用操作，不用于输入光标。
+| 属性 | 标准 |
+| --- | --- |
+| 填充色 | 约 12% 白，精确值 `Color(0x1FFFFFFF)`；复用 `GenesisColors.darkFaintFill` |
+| 基础背景 | `GenesisColors.darkBackground`（`#151517`）；透明填充的最终显示色随底层内容变化 |
+| 最小高度 | 40，指单行输入区域，不包含外部安全区、工具栏或快捷操作区 |
+| 圆角 | 8 |
+| 左右内边距 | 14 |
+| 上下内边距 | 10 |
+| 字号 / 行高 | 14 / 1.4 |
+| 字重 / 字间距 | `FontWeight.w400` / 0；沿用项目字体体系 |
+| 对齐 | 左对齐；单行占位文字在输入区域内垂直居中 |
+| 输入正文 | `GenesisColors.darkTextPrimary`，95% 白 |
+| Placeholder | 三级白，45% 白 `Color(0x73FFFFFF)`；复用 `GenesisColors.darkInputPlaceholder` |
+| 光标 | `GenesisColors.darkTextPrimary`，95% 白；可复用同色的正文样式 |
+| 边框 | 输入区域本身不额外添加描边、下划线或 Material 默认边框 |
+
+实现约束：
+
+- Placeholder 必须显式使用上述三级白，不得继承全局浅色 `textDisabled`，也不得恢复为 `#9E9E9E` 或约 32% 白。真实输入框通过 `hintStyle` 设置；点击打开编辑器的入口通过占位 `Text` 的样式设置。
+- 光标不得使用纯白或品牌红。品牌红用于发送等可用操作，不用于 placeholder 或输入光标。
+- 40 是最小高度，不是固定高度；保留实际输入框随多行文字增长的行为。底部入口与打开后的发帖/回复编辑弹层是不同组件，不能把弹层的 3–6 行编辑区压缩成 40 高。
+- blur 与填充色分别管理：Location Chat 输入背景保留现有 blur 4；Worldo Detail / Discuss 入口不为追求颜色一致而新增 blur。不能用改变填充透明度来补偿 blur 差异。
+- 不改全局浅色输入主题来实现局部深色样式。优先复用共享 token 和组件；聊天 placeholder 通过 `ChatUiStyleConfig.inputHintStyle` 传递，Worldo Detail 通过 `originWorldDetailSheetFaintPlaceholderColor` 引用共享 token。
+- 参考实现：`lib/components/chat/shared/chat_ui_library.dart` 的 `kLocationChatStyle`、`chat_ui_composer.dart` 的 `ChatComposer`、`lib/components/discuss/discuss_post_facade.dart` 的 `DiscussPostInput`，以及 `lib/pages/discuss/post_detail_page.dart` 的 `_PostDetailCommentBar`。
+
+## 关联背景与浮动操作菜单规范
+
+- Discuss 缩进回复底色与输入入口复用 `GenesisColors.darkFaintFill`（约 12% 白）。
+- Discuss 发帖/回复弹层、附件删除按钮和刷新指示器需要不透明背景时，使用同一填充叠在 `#151517` 上的合成色 `GenesisColors.darkFaintSurface`（`#313133`），避免透出后方内容。
+- Report 等浮动操作菜单与 Message 长按菜单保持一致：背景固定 `#666666`，文字和图标为白色。深色页面也沿用该灰色菜单，不使用页面/Sheet 的 `#181C1F` 或输入区域底色替代。菜单触发按钮的颜色可按所在页面配置。
+
+## 加载骨架样式规范
+
+- 深色页面和 Sheet 的加载骨架统一采用 Worldo Sheet 的静态色块样式：填充色为约 12% 白，精确使用 `Color(0x1FFFFFFF)`。该透明度用于占位色块，不属于文字透明度层级。
+- 普通条形骨架默认圆角为 4 个逻辑像素；头像、封面等占位按对应内容的形状和圆角展示。宽高、行数和间距根据待加载内容布局设置。
+- 骨架保持静止、纯色填充；禁止渐变扫光、shimmer、闪烁、呼吸透明度及循环动画，不为骨架创建重复运行的 `AnimationController` 或定时器。
+- 骨架沿用所在页面或 Sheet 的背景，不额外铺设浅色底。数据到达后替换为实际内容。
+- 参考实现：`lib/pages/origin/origin_world_map_shell.dart` 的 `_OriginLoadingBone`，以及 `lib/pages/discuss/discuss_page.dart` 的 `_DiscussSkeletonBone`。
 
 ## 共享组件边界
 

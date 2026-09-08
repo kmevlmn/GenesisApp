@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
 
 abstract final class GenesisColors {
+  static const Color darkBackground = Color(0xFF151517);
+  static const Color darkTextPrimary = Color(0xF2FFFFFF);
+  static const Color darkTextSecondary = Color(0xB8FFFFFF);
+  static const Color darkTextTertiary = Color(0x73FFFFFF);
+  static const Color darkRaisedBackground = Color(0xFF181C1F);
+  static const Color darkInputPlaceholder = darkTextTertiary;
+
+  // Worldo Detail's Write a post fill, shared by discussion surfaces.
+  static const Color darkFaintFill = Color(0x1FFFFFFF);
+  // The same fill composited over #151517 for surfaces that must be opaque.
+  static const Color darkFaintSurface = Color(0xFF313133);
+
   static const Color brand = Color(0xFFFF2442);
   static const Color brandBright = brand;
   static const Color brandSoft = Color(0xFFFFB8C3);

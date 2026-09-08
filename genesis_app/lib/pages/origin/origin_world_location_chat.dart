@@ -31,7 +31,7 @@ class _OriginLocationChatEmptyState extends StatelessWidget {
                   softWrap: false,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Color(0xF2FFFFFF),
+                    color: GenesisColors.darkTextPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     height: 1.4,
@@ -47,7 +47,7 @@ class _OriginLocationChatEmptyState extends StatelessWidget {
                   softWrap: false,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Color(0xB8FFFFFF),
+                    color: GenesisColors.darkTextSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                     height: 1.4,

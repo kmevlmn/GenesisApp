@@ -88,8 +88,12 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onTitleTap,
     this.titleStyle,
     this.systemOverlayStyle,
+    this.backgroundColor = Colors.white,
+    this.foregroundColor = Colors.black,
   });
 
+  final Color backgroundColor;
+  final Color foregroundColor;
   final String pageName;
   final VoidCallback? onBack;
   final List<Widget>? actions;
@@ -105,7 +109,7 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       toolbarHeight: kGenesisTopBarHeight,
-      backgroundColor: Colors.white,
+      backgroundColor: backgroundColor,
       elevation: 0,
       scrolledUnderElevation: 0,
       systemOverlayStyle: systemOverlayStyle,
@@ -118,9 +122,9 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
           child: IconButton(
             constraints: const BoxConstraints.tightFor(width: 17, height: 17),
             padding: EdgeInsets.zero,
-            icon: const Icon(
+            icon: Icon(
               Icons.arrow_back_ios_new,
-              color: Colors.black,
+              color: foregroundColor,
               size: 17,
             ),
             onPressed: onBack ?? () => Navigator.of(context).maybePop(),

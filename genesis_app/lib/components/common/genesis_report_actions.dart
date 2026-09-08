@@ -55,6 +55,7 @@ class GenesisMoreActionMenuButton extends StatefulWidget {
     super.key,
     required this.items,
     this.iconSize = 18,
+    this.appearance = GenesisActionMenuAppearance.standard,
     this.iconColor = Colors.black,
     this.buttonSize = 38,
     this.menuRightInset,
@@ -63,6 +64,7 @@ class GenesisMoreActionMenuButton extends StatefulWidget {
   });
 
   final List<GenesisActionMenuItem> items;
+  final GenesisActionMenuAppearance appearance;
   final double iconSize;
   final Color iconColor;
   final double buttonSize;
@@ -132,7 +134,7 @@ class _GenesisMoreActionMenuButtonState
       triggerRect: topLeft & box.size,
       items: widget.items,
       placement: _GenesisActionMenuPlacement.leftOfTrigger,
-      appearance: GenesisActionMenuAppearance.standard,
+      appearance: widget.appearance,
       rightInset: widget.menuRightInset,
       verticalOffset: widget.menuVerticalOffset,
     );
@@ -295,12 +297,10 @@ class _GenesisActionMenuLayout {
           fontWeight: FontWeight.w400,
           color: _genesisActionMenuForegroundColor,
         )
-      : _genesisActionMenuTextStyle;
+      : _genesisActionMenuTextStyle.copyWith(color: foregroundColor);
 
-  ColorFilter get iconColorFilter => const ColorFilter.mode(
-    _genesisActionMenuForegroundColor,
-    BlendMode.srcIn,
-  );
+  ColorFilter get iconColorFilter =>
+      ColorFilter.mode(foregroundColor, BlendMode.srcIn);
 
   double _widthFor(List<GenesisActionMenuItem> items) {
     if (isHorizontal) {

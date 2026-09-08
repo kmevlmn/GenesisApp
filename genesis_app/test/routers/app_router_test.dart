@@ -159,6 +159,56 @@ void main() {
     expect(find.text('Page not found.'), findsOneWidget);
   });
 
+  for (final name in [RouteNames.discuss, RouteNames.postDetail]) {
+    testWidgets(
+      '$name keeps outgoing Android transition dark under a light app theme',
+      (tester) async {
+        final route =
+            AppRouter.onGenerateRoute(RouteSettings(name: name))
+                as PageRoute<void>;
+        final secondary = AnimationController(
+          vsync: tester,
+          duration: const Duration(seconds: 1),
+        );
+        addTearDown(secondary.dispose);
+        secondary.forward();
+        {
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData(
+                platform: TargetPlatform.android,
+                colorScheme: const ColorScheme.light(surface: Colors.white),
+              ),
+              home: Builder(
+                builder: (context) {
+                  const child = SizedBox.expand();
+                  return route.delegatedTransition!(
+                    context,
+                    const AlwaysStoppedAnimation(1.0),
+                    secondary,
+                    false,
+                    child,
+                  )!;
+                },
+              ),
+            ),
+          );
+          await tester.pump(const Duration(milliseconds: 50));
+          expect(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is ColoredBox &&
+                  widget.color == const Color(0xFF151517),
+            ),
+            findsOneWidget,
+          );
+        }
+        secondary.stop();
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
   testWidgets('location chat route fades during iOS transitions', (
     WidgetTester tester,
   ) async {

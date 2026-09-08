@@ -146,7 +146,7 @@ final ChatUiStyleConfig kPrivateChatStyle = ChatUiStyleConfig.standard.copyWith(
 const double _locationChatAvatarOneThird = 40 / 3;
 const double _npcChatAvatarSize = 40;
 const Color _npcChatAvatarBackgroundColor = Color(0xFF4A5F7A);
-const Color _locationChatBackgroundColor = Color(0xFF151517);
+const Color _locationChatBackgroundColor = GenesisColors.darkBackground;
 const Color _locationChatSurfaceColor = Colors.transparent;
 const double _locationChatSurfaceBlurSigma = 4;
 const double _chatHeaderTrailingWidth = 96;
@@ -177,8 +177,9 @@ ChatUiStyleConfig get kLocationChatStyle => ChatUiStyleConfig.standard.copyWith(
   inputBackgroundColor: const Color(0x1FFFFFFF),
   inputBackdropBlurSigma: 4,
   inputBorderRadius: 8,
+  inputHintStyle: const TextStyle(color: GenesisColors.darkInputPlaceholder),
   inputTextStyle: ChatUiStyleConfig.standard.inputTextStyle.copyWith(
-    color: const Color(0xF2FFFFFF),
+    color: GenesisColors.darkTextPrimary,
     fontSize: 14,
     height: 1.4,
   ),

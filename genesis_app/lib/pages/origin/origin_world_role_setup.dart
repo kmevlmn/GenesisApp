@@ -927,9 +927,9 @@ class _OriginSetupRoleCardState extends State<_OriginSetupRoleCard>
                                   'origin-setup-role-edit-done-icon-$stableId',
                                 ),
                                 size: 16,
-                                color: Colors.white.withValues(
-                                  alpha: editActionAvailable ? 0.95 : 0.35,
-                                ),
+                                color: editActionAvailable
+                                    ? GenesisColors.darkTextPrimary
+                                    : Colors.white.withValues(alpha: 0.35),
                               )
                             : Center(
                                 child: Transform.scale(
@@ -943,11 +943,11 @@ class _OriginSetupRoleCardState extends State<_OriginSetupRoleCard>
                                     width: 16,
                                     height: 16,
                                     colorFilter: ColorFilter.mode(
-                                      Colors.white.withValues(
-                                        alpha: editActionAvailable
-                                            ? 0.95
-                                            : 0.35,
-                                      ),
+                                      editActionAvailable
+                                          ? GenesisColors.darkTextPrimary
+                                          : Colors.white.withValues(
+                                              alpha: 0.35,
+                                            ),
                                       BlendMode.srcIn,
                                     ),
                                   ),

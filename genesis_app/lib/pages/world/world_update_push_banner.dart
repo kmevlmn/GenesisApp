@@ -5,6 +5,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+
 import '../../app/config/genesis_image_config.dart';
 import '../../components/chat/shared/chat_scene_plate_tokens.dart';
 import '../../network/chatroom/world_chatroom_service.dart';
@@ -365,7 +367,7 @@ class _WorldUpdatePushBanner extends StatelessWidget {
                 TextSpan(
                   text: ' · $contextLabel',
                   style: const TextStyle(
-                    color: Color(0xB8FFFFFF),
+                    color: GenesisColors.darkTextSecondary,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
@@ -378,7 +380,7 @@ class _WorldUpdatePushBanner extends StatelessWidget {
       style: const TextStyle(
         fontFamily: GenesisTypography.fontFamily,
         fontFamilyFallback: GenesisTypography.fontFamilyFallback,
-        color: Color(0xF2FFFFFF),
+        color: GenesisColors.darkTextPrimary,
         fontSize: 14,
         fontWeight: FontWeight.w600,
         height: 1.25,
@@ -454,7 +456,7 @@ class _WorldUpdatePushBanner extends StatelessWidget {
                                   fontFamily: GenesisTypography.fontFamily,
                                   fontFamilyFallback:
                                       GenesisTypography.fontFamilyFallback,
-                                  color: Color(0xB8FFFFFF),
+                                  color: GenesisColors.darkTextSecondary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
                                   height: 1.2,
@@ -471,7 +473,7 @@ class _WorldUpdatePushBanner extends StatelessWidget {
                                           'world-update-push-location-name-icon',
                                         ),
                                         size: 14,
-                                        color: Color(0xF2FFFFFF),
+                                        color: GenesisColors.darkTextPrimary,
                                       ),
                                     ),
                                     const SizedBox(width: 2),

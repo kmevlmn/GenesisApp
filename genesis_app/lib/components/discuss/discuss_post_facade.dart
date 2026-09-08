@@ -186,9 +186,9 @@ class _DiscussPostInputState extends State<DiscussPostInput> {
       behavior: HitTestBehavior.opaque,
       onTap: _openComposer,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 48),
+        constraints: const BoxConstraints(minHeight: 40),
         alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: widget.backgroundColor ?? const Color(0xFFF8F8F8),
           borderRadius: BorderRadius.circular(8),
@@ -199,7 +199,7 @@ class _DiscussPostInputState extends State<DiscussPostInput> {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 14,
-            height: 1.2,
+            height: 1.4,
             fontWeight: FontWeight.w400,
             letterSpacing: 0,
             color: widget.placeholderColor ?? const Color(0xFF888888),

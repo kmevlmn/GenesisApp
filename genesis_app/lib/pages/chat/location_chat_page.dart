@@ -42,6 +42,7 @@ import '../../ui/components/genesis_character_avatar.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/components/genesis_static_network_image.dart';
 import '../../ui/components/genesis_tab_bar.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/genesis_image_resource.dart';
 import '../../utils/genesis_ugc_text.dart';

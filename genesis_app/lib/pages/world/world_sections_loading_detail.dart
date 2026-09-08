@@ -227,7 +227,7 @@ class WorldDetailSection extends StatelessWidget {
                               fontWeight: FontWeight.w400,
                               color: canDeleteWorld
                                   ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.45),
+                                  : GenesisColors.darkTextTertiary,
                             ),
                             onSelected: () {
                               if (!canDeleteWorld) {

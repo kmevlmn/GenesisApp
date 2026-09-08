@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/components/genesis_avatar.dart';
 import '../../ui/components/genesis_edge_swipe_back.dart';
 import '../../ui/components/genesis_static_network_image.dart';
@@ -78,10 +79,10 @@ class _GenesisGenerationWaitOverlayState
   Widget build(BuildContext context) {
     final dark = widget.brightness == Brightness.dark;
     final dialogBackgroundColor = dark
-        ? const Color(0xCC1F1D24)
+        ? GenesisColors.darkRaisedBackground.withValues(alpha: 0.8)
         : const Color(0xFFFFFFFF);
-    final primaryTextColor = dark ? const Color(0xF2FFFFFF) : null;
-    final secondaryTextColor = dark ? const Color(0xB8FFFFFF) : null;
+    final primaryTextColor = dark ? GenesisColors.darkTextPrimary : null;
+    final secondaryTextColor = dark ? GenesisColors.darkTextSecondary : null;
     final hasPerspectiveText = widget.perspectiveLines != null;
     final title = widget.animateTitleDots
         ? '${widget.title}${List.filled(_dotCount, '.').join()}'
