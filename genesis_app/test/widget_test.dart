@@ -3586,6 +3586,14 @@ void main() {
       Brightness.light,
     );
     expect(find.text('Worldo'), findsOneWidget);
+    expect(
+      _pageStatusBarStyle(tester).statusBarIconBrightness,
+      Brightness.light,
+    );
+    expect(
+      _pageStatusBarStyle(tester).systemNavigationBarIconBrightness,
+      Brightness.dark,
+    );
     expect(find.text('For you'), findsOneWidget);
     expect(tester.widget<Icon>(find.byIcon(CupertinoIcons.search)).size, 16);
 
@@ -6573,13 +6581,31 @@ void main() {
 
     final searchFinder = find.byType(SearchBarPlaceholder);
     final searchRect = tester.getRect(searchFinder);
+    final search = tester.widget<SearchBarPlaceholder>(searchFinder);
+    expect(search.backgroundColor, GenesisColors.darkFaintFill);
+    expect(search.borderColor, isNull);
+    expect(Theme.of(tester.element(searchFinder)).brightness, Brightness.dark);
+    expect(
+      tester.widget<Text>(find.text('Worldo, Character, Tags')).style?.color,
+      GenesisColors.darkInputPlaceholder,
+    );
+    final tabs = tester.widget<TabBar>(find.byType(TabBar));
+    expect(tabs.labelColor, GenesisColors.darkTextPrimary);
+    expect(tabs.unselectedLabelColor, GenesisColors.darkTextSecondary);
+    expect(
+      tester
+          .widget<GenesisTopSafeArea>(find.byType(GenesisTopSafeArea))
+          .backgroundColor,
+      GenesisColors.darkBackground,
+    );
+
     final logoFinder = find.byKey(const ValueKey<String>('origin-brand-logo'));
 
     expect(
       find.byKey(const ValueKey<String>('origin-gem-wallet-entry')),
       findsNothing,
     );
-    expect(tester.getSize(logoFinder), const Size(96, 26));
+    expect(tester.getSize(logoFinder), const Size(96, 32));
     expect(searchRect.left, 122);
     expect(
       searchRect.right,
@@ -6642,7 +6668,7 @@ void main() {
       final feedScrollView = tester.widget<CustomScrollView>(feedFinder);
       expect(
         feedScrollView.scrollCacheExtent,
-        const ScrollCacheExtent.viewport(2),
+        const ScrollCacheExtent.viewport(1),
       );
       final virtualGrid = tester.widget<SliverGrid>(
         find.byKey(const ValueKey<String>('origin-feed-virtual-grid')),

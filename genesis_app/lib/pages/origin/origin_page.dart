@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -12,6 +11,7 @@ import '../../app/startup/app_startup_coordinator.dart';
 import '../../app/telemetry/firebase_performance_operation.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/common/list_loading_skeleton.dart';
+import '../../components/genesis_logo.dart';
 import '../../components/origin/origin_item_card.dart';
 import '../../components/page_header.dart';
 import '../../components/search_bar.dart';
@@ -22,6 +22,8 @@ import '../../routers/app_router.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/components/secend_tabs.dart';
 import '../../ui/tokens/genesis_origin_card_geometry.dart';
+import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 import 'origin_feed_cache_store.dart';
 
 @visibleForTesting
@@ -237,7 +239,7 @@ class _OriginPageState extends State<OriginPage> with WidgetsBindingObserver {
               Stack(
                 children: [
                   GenesisTopSafeArea(
-                    backgroundColor: Colors.white,
+                    backgroundColor: GenesisColors.darkBackground,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: SizedBox(
@@ -255,16 +257,33 @@ class _OriginPageState extends State<OriginPage> with WidgetsBindingObserver {
                                       'origin-brand-logo',
                                     ),
                                     width: 96,
-                                    height: 26,
-                                    child: SvgPicture.asset(
-                                      'assets/svg/worldo-logo.svg',
-                                      fit: BoxFit.contain,
-                                      semanticsLabel: 'Worldo',
+                                    height: 32,
+                                    child: const DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: GenesisColors.redPrimary,
+                                        borderRadius: BorderRadius.all(
+                                          Radius.circular(12),
+                                        ),
+                                      ),
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 4,
+                                        ),
+                                        child: GenesisLogo(
+                                          width: 84,
+                                          height: 24,
+                                          semanticsLabel: 'Worldo',
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: SearchBarPlaceholder(
+                                      backgroundColor:
+                                          GenesisColors.darkFaintFill,
+                                      borderColor: null,
                                       onTap: () {
                                         Navigator.of(
                                           context,
@@ -302,9 +321,12 @@ class _OriginPageState extends State<OriginPage> with WidgetsBindingObserver {
               SizedBox(
                 height: _tabsHeight,
                 child: ColoredBox(
-                  color: Colors.white,
+                  color: GenesisColors.darkBackground,
                   child: SecendTabs(
                     labels: labels,
+                    labelColor: GenesisColors.darkTextPrimary,
+                    unselectedLabelColor: GenesisColors.darkTextSecondary,
+                    indicatorColor: GenesisColors.redPrimary,
                     verticalPadding: 0,
                     physics: const BouncingScrollPhysics(),
                     onTap: (index) => _handleCategoryTap(tabContext, index),
@@ -343,10 +365,13 @@ class _OriginPageState extends State<OriginPage> with WidgetsBindingObserver {
         },
       ),
     );
-    if (defaultTargetPlatform != TargetPlatform.iOS) return page;
+    final themedPage = GenesisDarkTheme(
+      child: ColoredBox(color: GenesisColors.darkBackground, child: page),
+    );
+    if (defaultTargetPlatform != TargetPlatform.iOS) return themedPage;
     return PrimaryScrollController(
       controller: _iosPrimaryScrollController,
-      child: page,
+      child: themedPage,
     );
   }
 }
@@ -1232,7 +1257,10 @@ class _OriginFeedState extends State<_OriginFeed>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Load failed'),
+                  const Text(
+                    'Load failed',
+                    style: TextStyle(color: GenesisColors.darkTextPrimary),
+                  ),
                   const SizedBox(height: 10),
                   FilledButton(
                     onPressed: _refreshItems,
@@ -1247,7 +1275,8 @@ class _OriginFeedState extends State<_OriginFeed>
     }
 
     return RefreshIndicator(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: GenesisColors.darkRaisedBackground,
+      color: GenesisColors.darkTextSecondary,
       onRefresh: _refreshFromPull,
       child: _items.isEmpty
           ? CustomScrollView(
@@ -1258,7 +1287,12 @@ class _OriginFeedState extends State<_OriginFeed>
               slivers: const [
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(child: Text('No data')),
+                  child: Center(
+                    child: Text(
+                      'No data',
+                      style: TextStyle(color: GenesisColors.darkTextSecondary),
+                    ),
+                  ),
                 ),
               ],
             )
@@ -1364,7 +1398,10 @@ class _OriginFeedState extends State<_OriginFeed>
                           child: Center(
                             child: SizedBox.square(
                               dimension: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: GenesisColors.darkTextSecondary,
+                              ),
                             ),
                           ),
                         ),

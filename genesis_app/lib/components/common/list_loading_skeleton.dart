@@ -68,10 +68,15 @@ class GenesisOriginCardLoadingBone extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFE8EBF0), Color(0xFFF3F4F6)],
+          colors: Theme.of(context).brightness == Brightness.dark
+              ? const [
+                  GenesisColors.darkRaisedBackground,
+                  GenesisColors.darkFaintSurface,
+                ]
+              : const [Color(0xFFE8EBF0), Color(0xFFF3F4F6)],
         ),
       ),
     );
