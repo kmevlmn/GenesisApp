@@ -12,7 +12,7 @@ import 'pro_colors.dart';
 
 // Demo prices and benefits only, not store products or entitlement rules.
 enum _PreviewProPlan {
-  yearly('Yearly', '79.99', '6.67', 'year'),
+  yearly('Yearly', '99.99', '8.33', 'year'),
   monthly('Monthly', '9.99', '9.99', 'month');
 
   const _PreviewProPlan(this.label, this.total, this.perMonth, this.period);
@@ -415,7 +415,7 @@ class _ProPlanCard extends StatelessWidget {
                       ),
                       SizedBox(width: 3),
                       Text(
-                        'Save 33%',
+                        'Save 17%',
                         style: TextStyle(
                           fontSize: 11,
                           height: 1,

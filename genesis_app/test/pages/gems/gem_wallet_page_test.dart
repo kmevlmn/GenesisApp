@@ -201,7 +201,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('wallet-subscription-tab')));
       await tester.pumpAndSettle();
       expect(find.text('Pro'), findsOneWidget);
-      expect(find.text(r'Yearly: $79.99'), findsOneWidget);
+      expect(find.text(r'Yearly: $99.99'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('pro-plan-monthly')));
       await tester.pumpAndSettle();
       expect(find.text(r'Monthly: $9.99'), findsOneWidget);
