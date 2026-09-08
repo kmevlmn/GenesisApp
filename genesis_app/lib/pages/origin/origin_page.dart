@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/startup/app_startup_coordinator.dart';
 import '../../app/telemetry/firebase_performance_operation.dart';
@@ -1274,9 +1275,7 @@ class _OriginFeedState extends State<_OriginFeed>
       );
     }
 
-    return RefreshIndicator(
-      backgroundColor: GenesisColors.darkRaisedBackground,
-      color: GenesisColors.darkTextSecondary,
+    return GenesisRefreshIndicator(
       onRefresh: _refreshFromPull,
       child: _items.isEmpty
           ? CustomScrollView(

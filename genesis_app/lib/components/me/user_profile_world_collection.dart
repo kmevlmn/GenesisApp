@@ -3,6 +3,7 @@ part of 'user_profile_library.dart';
 class _WorldProfileCollectionList extends StatefulWidget {
   const _WorldProfileCollectionList({
     required this.items,
+    required this.emptyText,
     required this.isLoading,
     required this.listenable,
     required this.onRefresh,
@@ -14,6 +15,7 @@ class _WorldProfileCollectionList extends StatefulWidget {
   });
 
   final List<UserProfileWorldItem> items;
+  final String emptyText;
   final bool isLoading;
   final ValueListenable<UserProfileCollectionState<UserProfileWorldItem>>?
   listenable;
@@ -99,7 +101,7 @@ class _WorldProfileCollectionListState
             ),
           )
           .toList(growable: false),
-      emptyText: 'No Worlds you created yet.',
+      emptyText: widget.emptyText,
       isLoading: isLoading,
       loadingKey: const ValueKey('profile-world-list-loading'),
       onRefresh: widget.onRefresh,

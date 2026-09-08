@@ -149,6 +149,11 @@ HTTP 映射层的图片规则：
 - 当前头像默认 top-center crop；不要把头像裁剪规则扩散到 cover、location image、map、list thumbnail 等非头像图片。
 - `CharactersList` 和 `OriginWorldPage` 的部分角色肖像有页面级尺寸例外，修改前先确认是否应走共享头像组件。
 
+## 标准页面 Header 标题
+
+- 标准页面 Header 标题统一引用 `GenesisTypography.pageTitle`，通过 `GenesisUiTheme.pageTitleStyle` 使用：字号 20、字重 600、行高 1.4；不得在页面重复硬编码同一字号。
+- 深浅色只覆盖标题颜色，保留公共排版参数。标题左对齐、居中、可用宽度和长文本省略由 Header 布局管理，不通过缩小字号适配宽度。
+
 ## iOS 字体倾斜规则
 
 - 用户可见的斜体统一使用 `GenesisSoftItalicText`，或在富文本场景使用同一文件提供的 `genesisSoftItalicStyle` 与 `genesisSoftItalicForPlatform`；当前 iOS 和非 iOS 默认都使用内置的 Inter Italic 字形。
@@ -239,6 +244,14 @@ HTTP 映射层的图片规则：
 - Discuss 缩进回复底色与输入入口复用 `GenesisColors.darkFaintFill`（约 12% 白）。
 - Discuss 发帖/回复弹层、附件删除按钮和刷新指示器需要不透明背景时，使用同一填充叠在 `#151517` 上的合成色 `GenesisColors.darkFaintSurface`（`#313133`），避免透出后方内容。
 - Report 等浮动操作菜单与 Message 长按菜单保持一致：背景固定 `#666666`，文字和图标为白色。深色页面也沿用该灰色菜单，不使用页面/Sheet 的 `#181C1F` 或输入区域底色替代。菜单触发按钮的颜色可按所在页面配置。
+
+## 刷新与加载指示器规范
+
+- 下拉刷新统一使用 `GenesisRefreshIndicator`（`lib/ui/components/genesis_refresh_indicator.dart`），不得在页面内重复配置标准刷新颜色。
+- 深色刷新圆环使用 `GenesisColors.darkTextSecondary`，底色使用 `GenesisColors.darkRaisedBackground`；浅色沿用主题圆环颜色和页面背景。已有明确视觉例外通过 `color` / `backgroundColor` 参数传入。
+- 列表初次加载、重新加载等独立圆环使用同文件的 `GenesisLoadingIndicator`，与下拉刷新共用深浅色前景规则；尺寸和线宽按当前布局保留。
+- 组件只管理指示器表现。刷新回调、滚动控制器、嵌套滚动通知筛选和手势逻辑仍由调用方维护，不因样式封装改变刷新时机或产生重复请求。
+- 内容骨架继续遵守下方静态骨架规范，不用旋转圆环替换已约定的骨架布局。
 
 ## 加载骨架样式规范
 

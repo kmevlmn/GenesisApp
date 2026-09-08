@@ -15,16 +15,17 @@ class _FollowStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const style = TextStyle(
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final style = TextStyle(
       fontSize: 16,
       height: 1,
-      color: Color(0xFF111111),
+      color: dark ? GenesisColors.darkTextPrimary : const Color(0xFF111111),
       fontWeight: FontWeight.w600,
     );
-    const labelStyle = TextStyle(
+    final labelStyle = TextStyle(
       fontSize: 14,
       height: 1,
-      color: Color(0xFF666666),
+      color: dark ? GenesisColors.darkTextSecondary : const Color(0xFF666666),
       fontWeight: FontWeight.w400,
     );
 
@@ -100,14 +101,25 @@ class _ProfileActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final neutralBackground = dark
+        ? GenesisColors.darkFaintFill
+        : const Color(0xFFE5E5E5);
+    final neutralForeground = dark
+        ? GenesisColors.darkTextPrimary
+        : Colors.black;
     final backgroundColor = isFollowed
-        ? const Color(0xFFE5E5E5)
-        : const Color(0xFFFF2442);
-    final foregroundColor = isFollowed ? Colors.black : Colors.white;
+        ? neutralBackground
+        : GenesisColors.redPrimary;
+    final foregroundColor = isFollowed
+        ? neutralForeground
+        : (dark ? GenesisColors.darkTextPrimary : Colors.white);
     final disabledBackgroundColor = isFollowed
-        ? const Color(0xFFE5E5E5)
-        : const Color(0xFFFF2442).withValues(alpha: 0.55);
-    final disabledForegroundColor = isFollowed ? Colors.black54 : Colors.white;
+        ? neutralBackground
+        : GenesisColors.redPrimary.withValues(alpha: 0.55);
+    final disabledForegroundColor = dark
+        ? GenesisColors.darkTextTertiary
+        : (isFollowed ? Colors.black54 : Colors.white);
     const actionTextStyle = TextStyle(fontWeight: FontWeight.w600);
 
     return Row(
@@ -151,10 +163,12 @@ class _ProfileActionButtons extends StatelessWidget {
               key: const ValueKey('user-profile-message-button'),
               onPressed: onMessage,
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE5E5E5),
-                disabledBackgroundColor: const Color(0xFFE5E5E5),
-                foregroundColor: Colors.black,
-                disabledForegroundColor: Colors.black54,
+                backgroundColor: neutralBackground,
+                disabledBackgroundColor: neutralBackground,
+                foregroundColor: neutralForeground,
+                disabledForegroundColor: dark
+                    ? GenesisColors.darkTextTertiary
+                    : Colors.black54,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -278,27 +292,29 @@ class _DisplayNameText extends StatelessWidget {
   Widget build(BuildContext context) {
     final listenable = displayNameListenable;
     if (listenable == null) {
-      return _buildName(displayName);
+      return _buildName(context, displayName);
     }
     return ValueListenableBuilder<String>(
       valueListenable: listenable,
       builder: (context, name, _) {
         final resolvedName = name.trim().isEmpty ? displayName : name;
-        return _buildName(resolvedName);
+        return _buildName(context, resolvedName);
       },
     );
   }
 
-  Widget _buildName(String name) {
+  Widget _buildName(BuildContext context, String name) {
     return Text(
       name,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 20,
         height: 1,
         fontWeight: FontWeight.w600,
-        color: Colors.black,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? GenesisColors.darkTextPrimary
+            : Colors.black,
       ),
     );
   }
@@ -319,15 +335,15 @@ class _ProfileEditButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final listenable = updatingListenable;
     if (listenable == null) {
-      return _buildButton(isUpdating);
+      return _buildButton(context, isUpdating);
     }
     return ValueListenableBuilder<bool>(
       valueListenable: listenable,
-      builder: (context, updating, _) => _buildButton(updating),
+      builder: (context, updating, _) => _buildButton(context, updating),
     );
   }
 
-  Widget _buildButton(bool updating) {
+  Widget _buildButton(BuildContext context, bool updating) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: updating ? null : onTap,
@@ -343,8 +359,10 @@ class _ProfileEditButton extends StatelessWidget {
               editSquareIconAsset,
               width: 18,
               height: 18,
-              colorFilter: const ColorFilter.mode(
-                Colors.black,
+              colorFilter: ColorFilter.mode(
+                Theme.of(context).brightness == Brightness.dark
+                    ? GenesisColors.darkTextSecondary
+                    : Colors.black,
                 BlendMode.srcIn,
               ),
             ),

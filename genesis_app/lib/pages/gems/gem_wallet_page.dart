@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/debug_page_tracker.dart';
 import '../../app/gems/gem_task_analytics.dart';
@@ -214,9 +215,8 @@ class _GemWalletPageState extends State<GemWalletPage>
     if (!_hasPageData && _productsError != null && _tasksError != null) {
       return _GemWalletError(onRetry: () => unawaited(_refreshAll()));
     }
-    return RefreshIndicator(
+    return GenesisRefreshIndicator(
       color: kGemAccentColor,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       onRefresh: () => _refreshAll(silent: true),
       child: _GemWalletContent(
         products: _products,

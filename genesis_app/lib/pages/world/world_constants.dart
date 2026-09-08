@@ -24,8 +24,9 @@ const double worldStatsTopSpacerHeight =
     (worldMainTabsHeight + worldBottomTagHeight) / 2 -
     WorldDetailsPageScaffold.inlineContentTopPadding +
     worldBottomTagToStatsGap;
-const double worldInfoHeaderHeight = 49;
-const double worldLaunchedInfoHeaderHeight = 60;
+// Reserve the same footer space even when the visitor has no role avatar.
+const double worldInfoHeaderHeight = 60;
+const double worldLaunchedInfoHeaderHeight = worldInfoHeaderHeight;
 const double worldCollapsedPanelBaseHeight =
     WorldDetailsPageScaffold.inlineContentTopPadding +
     worldStatsTopSpacerHeight +

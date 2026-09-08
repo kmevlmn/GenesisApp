@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/common/genesis_center_toast.dart';
@@ -189,12 +190,7 @@ class _MemoryModelPageState extends State<MemoryModelPage> {
       backgroundColor: Colors.white,
       appBar: GenesisBackAppBar(
         pageName: 'Model',
-        titleStyle: const TextStyle(
-          color: Color(0xFF111111),
-          fontSize: 16,
-          height: 22 / 16,
-          fontWeight: FontWeight.w600,
-        ),
+        titleStyle: const TextStyle(color: Color(0xFF111111)),
         onBack: _closePage,
         actions: [
           _ModelSaveAction(
@@ -230,8 +226,7 @@ class _MemoryModelPageState extends State<MemoryModelPage> {
       return _ModelLoadError(onRetry: () => unawaited(_refresh()));
     }
     if (catalog == null || catalog.groups.isEmpty) {
-      return RefreshIndicator(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      return GenesisRefreshIndicator(
         onRefresh: () => _refresh(preserveContent: true),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -248,8 +243,7 @@ class _MemoryModelPageState extends State<MemoryModelPage> {
       );
     }
 
-    return RefreshIndicator(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return GenesisRefreshIndicator(
       onRefresh: () => _refresh(preserveContent: true),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),

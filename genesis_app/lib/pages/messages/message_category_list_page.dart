@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../components/auth/login_guard.dart';
 import '../../components/common/genesis_action_box.dart';
@@ -379,8 +380,7 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: GenesisBackAppBar(pageName: widget.title),
-      body: RefreshIndicator(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: GenesisRefreshIndicator(
         onRefresh: _loadFirstPage,
         child: _buildBody(context),
       ),

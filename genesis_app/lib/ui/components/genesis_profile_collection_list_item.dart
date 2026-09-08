@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../tokens/genesis_colors.dart';
 import '../../components/origin/stat_item.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../utils/stat_count_formatter.dart';
@@ -73,6 +74,19 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final placeholder = dark
+        ? const ColoredBox(
+            color: GenesisColors.darkFaintFill,
+            child: Center(
+              child: Icon(
+                Icons.image_outlined,
+                size: 22,
+                color: GenesisColors.darkTextTertiary,
+              ),
+            ),
+          )
+        : null;
     final worldSubtitleLines = item.subtitle
         .split('\n')
         .map((line) => line.trim())
@@ -93,11 +107,13 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
                   item.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     height: 1.1,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF4B6192),
+                    color: dark
+                        ? GenesisColors.darkTextPrimary
+                        : const Color(0xFF4B6192),
                   ),
                 ),
               ),
@@ -118,7 +134,9 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
-                color: const Color(0xFF888888),
+                color: dark
+                    ? GenesisColors.darkTextSecondary
+                    : const Color(0xFF888888),
                 height: 1.2,
               ),
             ),
@@ -128,9 +146,11 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
             item.subtitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF6F6F6F),
+              color: dark
+                  ? GenesisColors.darkTextSecondary
+                  : const Color(0xFF6F6F6F),
               height: 1.3,
             ),
           ),
@@ -141,7 +161,9 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: useSharedCardLayout
+              color: dark
+                  ? GenesisColors.darkTextSecondary
+                  : useSharedCardLayout
                   ? const Color(0xFF666666)
                   : Colors.black,
               fontSize: 12,
@@ -153,7 +175,11 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
           SizedBox(height: useSharedCardLayout ? 4 : 8),
           _StatsRow(
             stats: item.stats,
-            color: useSharedCardLayout ? const Color(0xFF666666) : Colors.black,
+            color: dark
+                ? GenesisColors.darkTextSecondary
+                : useSharedCardLayout
+                ? const Color(0xFF666666)
+                : Colors.black,
             iconSize: item.useOriginCardLayout ? 12 : 11,
             lineHeight: item.useOriginCardLayout ? 1.2 : 1,
           ),
@@ -161,14 +187,23 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
       ],
     );
     final cardContent = item.useWorldCardLayout
-        ? GenesisWorldListCardLayout(imageUrl: item.imageUrl, content: content)
+        ? GenesisWorldListCardLayout(
+            imageUrl: item.imageUrl,
+            placeholder: placeholder,
+            content: content,
+          )
         : item.useOriginCardLayout
-        ? GenesisOriginListCardLayout(imageUrl: item.imageUrl, content: content)
+        ? GenesisOriginListCardLayout(
+            imageUrl: item.imageUrl,
+            placeholder: placeholder,
+            content: content,
+          )
         : Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               GenesisListImage(
                 imageUrl: item.imageUrl,
+                placeholder: placeholder,
                 width: 52,
                 height: 52,
                 borderRadius: GenesisImageRadii.content,
@@ -179,7 +214,7 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
             ],
           );
     return Material(
-      color: Colors.white,
+      color: dark ? GenesisColors.darkBackground : Colors.white,
       shape: _shape,
       child: SizedBox(
         width: double.infinity,
@@ -225,8 +260,10 @@ class GenesisProfileCollectionListItem extends StatelessWidget {
                             editSquareIconAsset,
                             width: 16,
                             height: 16,
-                            colorFilter: const ColorFilter.mode(
-                              Color(0xFF4B6192),
+                            colorFilter: ColorFilter.mode(
+                              dark
+                                  ? GenesisColors.darkTextSecondary
+                                  : const Color(0xFF4B6192),
                               BlendMode.srcIn,
                             ),
                           ),

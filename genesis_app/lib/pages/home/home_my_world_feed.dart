@@ -991,9 +991,7 @@ class _MyWorldFeedState extends State<_MyWorldFeed>
       return emptyListView;
     }
 
-    return RefreshIndicator(
-      backgroundColor: GenesisColors.darkRaisedBackground,
-      color: GenesisColors.darkTextSecondary,
+    return GenesisRefreshIndicator(
       onRefresh: _refreshItems,
       child: _items.isEmpty
           ? emptyListView

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../components/discuss/discuss_dark_style.dart';
 import '../../components/discuss/discuss_page_comment_list.dart';
@@ -180,9 +181,8 @@ class _DiscussPageState extends State<DiscussPage> {
             return Stack(
               children: [
                 Positioned.fill(
-                  child: RefreshIndicator(
+                  child: GenesisRefreshIndicator(
                     backgroundColor: DiscussDarkColors.surface,
-                    color: DiscussDarkColors.secondary,
                     onRefresh: _refresh,
                     child: NotificationListener<ScrollNotification>(
                       onNotification: _handleScrollNotification,

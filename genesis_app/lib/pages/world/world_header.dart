@@ -115,9 +115,18 @@ class WorldMapIdentityPill extends StatelessWidget {
                     ],
                   ),
                 ),
-              if (title.isNotEmpty && timeText.isNotEmpty)
-                const SizedBox(height: 3),
-              if (timeText.isNotEmpty) _WorldMapTimeLabel(text: timeText),
+              if (title.isNotEmpty) const SizedBox(height: 3),
+              // Reserve the time row before detail loads so the title never
+              // shifts from a single-line center to the final two-line layout.
+              Visibility(
+                visible: timeText.isNotEmpty,
+                maintainSize: true,
+                maintainAnimation: true,
+                maintainState: true,
+                child: _WorldMapTimeLabel(
+                  text: timeText.isEmpty ? 'Tick 0 · 00:00' : timeText,
+                ),
+              ),
             ],
           ),
         ),

@@ -6,6 +6,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../ui/theme/genesis_dark_theme.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/debug_page_tracker.dart';
 import '../../components/common/genesis_action_box.dart';
@@ -26,6 +28,7 @@ import '../../utils/display_name_formatter.dart';
 import '../../utils/entity_deleted.dart';
 import '../../utils/image_format_guards.dart';
 import '../../ui/components/genesis_safe_area.dart';
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../ui/text/genesis_text_input_formatters.dart';
 import 'settings_page.dart';
 
@@ -165,105 +168,131 @@ class _MePageState extends State<MePage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_MePageContent>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Load failed'),
-                const SizedBox(height: 8),
-                FilledButton(onPressed: _refresh, child: const Text('Retry')),
-              ],
-            ),
-          );
-        }
-
-        final content = snapshot.data;
-        if (content == null) {
-          return const SizedBox.shrink();
-        }
-        if (!content.isSignedIn) {
-          return SignedOutMeView(
-            loggingInProvider: _loggingInProvider,
-            onLogin: _login,
-            reselectionListenable: widget.reselectionListenable,
-          );
-        }
-        final data = content.data!;
-        final gemWalletState = AppServicesScope.of(context).gemWallet.state;
-
-        return GenesisTopSafeArea(
-          backgroundColor: Colors.white,
-          child: Column(
-            children: [
-              SizedBox(
-                height: 50,
-                child: Stack(
-                  alignment: Alignment.center,
+    return GenesisDarkTheme(
+      child: ColoredBox(
+        color: GenesisColors.darkBackground,
+        child: FutureBuilder<_MePageContent>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: GenesisLoadingIndicator(strokeWidth: 4),
+              );
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    AnimatedOpacity(
-                      opacity: _profileCollapsed ? 1 : 0,
-                      duration: const Duration(milliseconds: 120),
-                      child: const PageTitleText(pageName: 'Me'),
+                    const Text(
+                      'Load failed',
+                      style: TextStyle(color: GenesisColors.darkTextSecondary),
                     ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            onPressed: _openDiscord,
-                            icon: SvgPicture.asset(
-                              'assets/custom-icons/svg/discord-svgrepo-com.svg',
-                              width: 30,
-                              height: 30,
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: _openSettings,
-                            icon: const Icon(Icons.settings, size: 24),
-                            color: Colors.black,
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 8),
+                    FilledButton(
+                      onPressed: _refresh,
+                      child: const Text('Retry'),
                     ),
                   ],
                 ),
+              );
+            }
+
+            final content = snapshot.data;
+            if (content == null) {
+              return const SizedBox.shrink();
+            }
+            if (!content.isSignedIn) {
+              return SignedOutMeView(
+                loggingInProvider: _loggingInProvider,
+                onLogin: _login,
+                reselectionListenable: widget.reselectionListenable,
+              );
+            }
+            final data = content.data!;
+            final gemWalletState = AppServicesScope.of(context).gemWallet.state;
+
+            return GenesisTopSafeArea(
+              backgroundColor: GenesisColors.darkBackground,
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 50,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AnimatedOpacity(
+                          opacity: _profileCollapsed ? 1 : 0,
+                          duration: const Duration(milliseconds: 120),
+                          child: const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: EdgeInsets.only(left: 16, right: 112),
+                              child: PageTitleText(pageName: 'Me'),
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                onPressed: _openDiscord,
+                                icon: SizedBox.square(
+                                  dimension: 24,
+                                  child: Center(
+                                    // Clyde fills its viewBox; the settings glyph
+                                    // has inset space inside its 24px icon box.
+                                    child: SvgPicture.asset(
+                                      'assets/custom-icons/svg/discord-clyde-white.svg',
+                                      width: 22,
+                                      height: 16.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: _openSettings,
+                                icon: const Icon(Icons.settings, size: 24),
+                                color: GenesisColors.darkTextPrimary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: UserProfileContent(
+                      data: data,
+                      originsListenable: _originsState,
+                      worldsListenable: _worldsState,
+                      avatarUrlListenable: _avatarUrl,
+                      displayNameListenable: _displayName,
+                      isUpdatingProfileListenable: _isUpdatingProfile,
+                      gemWalletStateListenable: gemWalletState,
+                      reselectionListenable: widget.reselectionListenable,
+                      onEditAvatar: _editAvatar,
+                      onEditDisplayName: _editNickName,
+                      onRefresh: _refreshCurrentCollection,
+                      onRefreshOrigins: _refreshOrigins,
+                      onRefreshWorlds: _refreshWorlds,
+                      onWorldDeleted: _handleWorldDeleted,
+                      onCollectionTabChanged: _handleCollectionTabChanged,
+                      onCollapsedChanged: _handleProfileCollapsedChanged,
+                      originTabLabel: 'Worldo',
+                      worldTabLabel: 'Playing',
+                      showCollectionCounts: true,
+                      tabLabelFontSize: 14,
+                    ),
+                  ),
+                ],
               ),
-              Expanded(
-                child: UserProfileContent(
-                  data: data,
-                  originsListenable: _originsState,
-                  worldsListenable: _worldsState,
-                  avatarUrlListenable: _avatarUrl,
-                  displayNameListenable: _displayName,
-                  isUpdatingProfileListenable: _isUpdatingProfile,
-                  gemWalletStateListenable: gemWalletState,
-                  reselectionListenable: widget.reselectionListenable,
-                  onEditAvatar: _editAvatar,
-                  onEditDisplayName: _editNickName,
-                  onRefresh: _refreshCurrentCollection,
-                  onRefreshOrigins: _refreshOrigins,
-                  onRefreshWorlds: _refreshWorlds,
-                  onWorldDeleted: _handleWorldDeleted,
-                  onCollectionTabChanged: _handleCollectionTabChanged,
-                  onCollapsedChanged: _handleProfileCollapsedChanged,
-                  originTabLabel: 'Worldo',
-                  worldTabLabel: 'Playing',
-                  showCollectionCounts: true,
-                  tabLabelFontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 

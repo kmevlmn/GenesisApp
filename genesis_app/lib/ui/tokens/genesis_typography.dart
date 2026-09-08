@@ -19,7 +19,7 @@ abstract final class GenesisTypography {
     color: GenesisColors.textPrimary,
     fontFamily: fontFamily,
     fontFamilyFallback: fontFamilyFallback,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: FontWeight.w600,
     height: 1.4,
   );

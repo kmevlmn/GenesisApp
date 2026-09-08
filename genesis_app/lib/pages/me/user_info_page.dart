@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
+import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/system/genesis_system_ui.dart';
 
 import '../../app/blocked_user_review_return.dart';
 import '../../app/bootstrap/app_services_scope.dart';
@@ -490,94 +493,108 @@ class _UserInfoPageState extends State<UserInfoPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: !BlockedUserReviewReturn.hasPendingHomeRefresh,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        if (!BlockedUserReviewReturn.consumePendingHomeRefresh()) {
-          Navigator.of(context).maybePop();
-          return;
-        }
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil(RouteNames.home, (route) => false);
-      },
-      child: Scaffold(
-        appBar: GenesisBackAppBar(
-          pageName: _profileCollapsed ? _profileTitle : '',
-          onBack: _handleBack,
-          actions: [
-            if (!_profileIsSelf)
-              GenesisMoreActionMenuButton(
-                visualRightInset: 16,
-                items: [
-                  genesisReportMenuItem(
-                    context: context,
-                    targetType: 'user',
-                    targetId: _profileUid.trim().isEmpty
-                        ? widget.uid.trim()
-                        : _profileUid.trim(),
-                  ),
-                  GenesisActionMenuItem(
-                    label: _profileBlocked ? 'Unblock' : 'Block',
-                    iconData: Icons.block,
-                    onSelected: _profileBlocked
-                        ? _handleUnblockUser
-                        : _handleBlockUser,
-                  ),
-                ],
-              ),
-          ],
-        ),
-        body: SafeArea(
-          bottom: false,
-          child: FutureBuilder<UserProfileData>(
-            future: _future,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const _UserInfoLoadingSkeleton();
-              }
-              if (snapshot.hasError) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Load failed'),
-                      const SizedBox(height: 8),
-                      FilledButton(
-                        onPressed: _refresh,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              final data = snapshot.data;
-              if (data == null) return const SizedBox.shrink();
-              return UserProfileContent(
-                key: ValueKey<String>(
-                  'user-info-session-$_sessionListGeneration',
+    return GenesisDarkTheme(
+      child: PopScope(
+        canPop: !BlockedUserReviewReturn.hasPendingHomeRefresh,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          if (!BlockedUserReviewReturn.consumePendingHomeRefresh()) {
+            Navigator.of(context).maybePop();
+            return;
+          }
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil(RouteNames.home, (route) => false);
+        },
+        child: Scaffold(
+          backgroundColor: GenesisColors.darkBackground,
+          appBar: GenesisBackAppBar(
+            centerTitle: false,
+            titleSpacing: 12,
+            backgroundColor: GenesisColors.darkBackground,
+            foregroundColor: GenesisColors.darkTextSecondary,
+            systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+            pageName: _profileCollapsed ? _profileTitle : '',
+            onBack: _handleBack,
+            actions: [
+              if (!_profileIsSelf)
+                GenesisMoreActionMenuButton(
+                  visualRightInset: 16,
+                  iconColor: GenesisColors.darkTextSecondary,
+                  items: [
+                    genesisReportMenuItem(
+                      context: context,
+                      targetType: 'user',
+                      targetId: _profileUid.trim().isEmpty
+                          ? widget.uid.trim()
+                          : _profileUid.trim(),
+                    ),
+                    GenesisActionMenuItem(
+                      label: _profileBlocked ? 'Unblock' : 'Block',
+                      iconData: Icons.block,
+                      onSelected: _profileBlocked
+                          ? _handleUnblockUser
+                          : _handleBlockUser,
+                    ),
+                  ],
                 ),
-                data: data,
-                originsListenable: _originsState,
-                worldsListenable: _worldsState,
-                gemWalletStateListenable: data.isSelf
-                    ? AppServicesScope.of(context).gemWallet.state
-                    : null,
-                onRefresh: _refreshCurrentCollection,
-                onCollectionTabChanged: (index) {
-                  _selectedCollectionTabIndex = index;
-                },
-                onCollapsedChanged: _handleProfileCollapsedChanged,
-                originTabLabel: 'Worldo',
-                worldTabLabel: 'Playing',
-                showCollectionCounts: true,
-                tabLabelFontSize: 14,
-                isBlocking: _isBlockingUser,
-                isBlocked: _profileBlocked,
-              );
-            },
+            ],
+          ),
+          body: SafeArea(
+            bottom: false,
+            child: FutureBuilder<UserProfileData>(
+              future: _future,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const _UserInfoLoadingSkeleton();
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Load failed',
+                          style: TextStyle(
+                            color: GenesisColors.darkTextSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        FilledButton(
+                          onPressed: _refresh,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final data = snapshot.data;
+                if (data == null) return const SizedBox.shrink();
+                return UserProfileContent(
+                  key: ValueKey<String>(
+                    'user-info-session-$_sessionListGeneration',
+                  ),
+                  data: data,
+                  originsListenable: _originsState,
+                  worldsListenable: _worldsState,
+                  gemWalletStateListenable: data.isSelf
+                      ? AppServicesScope.of(context).gemWallet.state
+                      : null,
+                  onRefresh: _refreshCurrentCollection,
+                  onCollectionTabChanged: (index) {
+                    _selectedCollectionTabIndex = index;
+                  },
+                  onCollapsedChanged: _handleProfileCollapsedChanged,
+                  originTabLabel: 'Worldo',
+                  worldTabLabel: 'Playing',
+                  showCollectionCounts: true,
+                  tabLabelFontSize: 14,
+                  isBlocking: _isBlockingUser,
+                  isBlocked: _profileBlocked,
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -590,93 +607,91 @@ class _UserInfoLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _UserInfoSkeletonShimmer(
-      child: Column(
-        key: ValueKey<String>('user-info-loading-skeleton'),
-        children: [
-          SizedBox(height: 10),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _UserInfoSkeletonBone(
-                  width: 80,
-                  height: 80,
-                  borderRadius: GenesisAvatarRadii.user,
-                ),
-                SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: 2),
-                      _UserInfoSkeletonBone(
-                        widthFactor: 0.58,
-                        height: 20,
-                        borderRadius: 4,
-                      ),
-                      SizedBox(height: 10),
-                      _UserInfoSkeletonBone(
-                        width: 128,
-                        height: 16,
-                        borderRadius: 4,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 20),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _UserInfoSkeletonBone(width: 84, height: 20, borderRadius: 4),
-                SizedBox(width: 16),
-                _UserInfoSkeletonBone(width: 86, height: 20, borderRadius: 4),
-              ],
-            ),
-          ),
-          SizedBox(height: 20),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _UserInfoSkeletonBone(height: 38, borderRadius: 8),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: _UserInfoSkeletonBone(height: 38, borderRadius: 8),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 18),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: EdgeInsets.only(left: 16),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _UserInfoSkeletonBone(width: 54, height: 20, borderRadius: 4),
-                  SizedBox(width: 20),
-                  _UserInfoSkeletonBone(width: 48, height: 20, borderRadius: 4),
-                ],
+    return const Column(
+      key: ValueKey<String>('user-info-loading-skeleton'),
+      children: [
+        SizedBox(height: 10),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _UserInfoSkeletonBone(
+                width: 80,
+                height: 80,
+                borderRadius: GenesisAvatarRadii.user,
               ),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 2),
+                    _UserInfoSkeletonBone(
+                      widthFactor: 0.58,
+                      height: 20,
+                      borderRadius: 4,
+                    ),
+                    SizedBox(height: 10),
+                    _UserInfoSkeletonBone(
+                      width: 128,
+                      height: 16,
+                      borderRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 20),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              _UserInfoSkeletonBone(width: 84, height: 20, borderRadius: 4),
+              SizedBox(width: 16),
+              _UserInfoSkeletonBone(width: 86, height: 20, borderRadius: 4),
+            ],
+          ),
+        ),
+        SizedBox(height: 20),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: _UserInfoSkeletonBone(height: 38, borderRadius: 8),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: _UserInfoSkeletonBone(height: 38, borderRadius: 8),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 18),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: EdgeInsets.only(left: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _UserInfoSkeletonBone(width: 54, height: 20, borderRadius: 4),
+                SizedBox(width: 20),
+                _UserInfoSkeletonBone(width: 48, height: 20, borderRadius: 4),
+              ],
             ),
           ),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: _UserInfoCollectionSkeletonList(),
-            ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: _UserInfoCollectionSkeletonList(),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -749,58 +764,6 @@ class _UserInfoCollectionSkeletonItem extends StatelessWidget {
   }
 }
 
-class _UserInfoSkeletonShimmer extends StatefulWidget {
-  const _UserInfoSkeletonShimmer({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_UserInfoSkeletonShimmer> createState() =>
-      _UserInfoSkeletonShimmerState();
-}
-
-class _UserInfoSkeletonShimmerState extends State<_UserInfoSkeletonShimmer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _UserInfoSkeletonAnimation(
-      animation: _controller,
-      child: widget.child,
-    );
-  }
-}
-
-class _UserInfoSkeletonAnimation extends InheritedWidget {
-  const _UserInfoSkeletonAnimation({
-    required this.animation,
-    required super.child,
-  });
-
-  final Animation<double> animation;
-
-  static Animation<double>? maybeOf(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<_UserInfoSkeletonAnimation>()
-        ?.animation;
-  }
-
-  @override
-  bool updateShouldNotify(covariant _UserInfoSkeletonAnimation oldWidget) {
-    return animation != oldWidget.animation;
-  }
-}
-
 class _UserInfoSkeletonBone extends StatelessWidget {
   const _UserInfoSkeletonBone({
     this.width,
@@ -816,17 +779,15 @@ class _UserInfoSkeletonBone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final animation = _UserInfoSkeletonAnimation.maybeOf(context);
-    final disableAnimations = MediaQuery.disableAnimationsOf(context);
     Widget child = SizedBox(
       width: width,
       height: height,
-      child: animation == null || disableAnimations
-          ? _decoratedBox(0)
-          : AnimatedBuilder(
-              animation: animation,
-              builder: (context, child) => _decoratedBox(animation.value),
-            ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: GenesisColors.darkFaintFill,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+      ),
     );
 
     if (widthFactor case final factor?) {
@@ -837,25 +798,6 @@ class _UserInfoSkeletonBone extends StatelessWidget {
       );
     }
     return child;
-  }
-
-  Widget _decoratedBox(double animationValue) {
-    final offset = -1.4 + (animationValue * 2.8);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
-        gradient: LinearGradient(
-          begin: Alignment(offset - 0.8, 0),
-          end: Alignment(offset + 0.8, 0),
-          colors: const [
-            Color(0xFFE8EBF0),
-            Color(0xFFF6F7F9),
-            Color(0xFFE8EBF0),
-          ],
-          stops: const [0.25, 0.5, 0.75],
-        ),
-      ),
-    );
   }
 }
 

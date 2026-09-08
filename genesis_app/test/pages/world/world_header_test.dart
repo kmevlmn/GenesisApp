@@ -8,6 +8,33 @@ import 'package:genesis_flutter_android/pages/world/world_sections.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_character_avatar.dart';
 
 void main() {
+  testWidgets('world name stays in place while tick and time load', (
+    tester,
+  ) async {
+    for (final scale in [1.0, 1.1]) {
+      Widget header(String timeText) => MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+          child: Scaffold(
+            body: WorldMapIdentityPill(
+              title: 'My World',
+              timeText: timeText,
+              maxWidth: 300,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(header(''));
+      final titleFinder = find.byKey(const ValueKey<String>('world-top-name'));
+      final initialTitleRect = tester.getRect(titleFinder);
+      for (final timeText in ['Tick 7', 'Tick 7 · Day 45, 19:30']) {
+        await tester.pumpWidget(header(timeText));
+        expect(tester.getRect(titleFinder), initialTitleRect);
+        expect(tester.takeException(), isNull);
+      }
+    }
+  });
+
   test('world map time label includes the current sub-tick number', () {
     expect(
       worldTimeLabel(tickIndex: 7, subTickNo: 3, worldTime: 'Day 45, 19:30'),
@@ -224,7 +251,7 @@ void main() {
             find.byKey(const ValueKey<String>('world-info-header-content')),
           )
           .height,
-      worldInfoHeaderHeight,
+      worldLaunchedInfoHeaderHeight,
     );
     expect(
       find.byKey(const ValueKey<String>('world-launched-character-summary')),

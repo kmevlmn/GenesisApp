@@ -166,8 +166,7 @@ class _UserProfileContentState extends State<UserProfileContent>
       onNotification: _handleProfilePullNotification,
       child: KeyedSubtree(
         key: const ValueKey<String>('profile-page-refresh'),
-        child: RefreshIndicator(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        child: GenesisRefreshIndicator(
           notificationPredicate: _pageRefreshNotificationPredicate,
           onRefresh: refresh,
           child: scrollView,
@@ -181,6 +180,15 @@ class _UserProfileContentState extends State<UserProfileContent>
       final labels = [widget.originTabLabel, widget.worldTabLabel];
       return GenesisTabBar(
         controller: _tabController,
+        labelColor: Theme.of(context).brightness == Brightness.dark
+            ? GenesisColors.darkTextPrimary
+            : null,
+        unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
+            ? GenesisColors.darkTextSecondary
+            : null,
+        indicatorColor: Theme.of(context).brightness == Brightness.dark
+            ? GenesisColors.redPrimary
+            : null,
         labels: labels,
         labelWidgets: widget.showCollectionCounts
             ? [
@@ -246,17 +254,19 @@ class _UserProfileContentState extends State<UserProfileContent>
         child: SizedBox(
           width: 24,
           height: 24,
-          child: CircularProgressIndicator(strokeWidth: 2.4),
+          child: GenesisLoadingIndicator(),
         ),
       );
     }
     if (widget.isBlocked) {
-      return const Center(
+      return Center(
         child: Text(
           'User blocked',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Color(0xFF888888),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? GenesisColors.darkTextSecondary
+                : const Color(0xFF888888),
             fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
@@ -277,6 +287,9 @@ class _UserProfileContentState extends State<UserProfileContent>
               pageKey: const ValueKey<String>('profile-origin-collection-page'),
               child: _OriginProfileCollectionList(
                 items: data.origins,
+                emptyText: data.isSelf
+                    ? 'No Worldo you created yet.'
+                    : 'No Worldo yet.',
                 isLoading: widget.originsLoading,
                 listenable: widget.originsListenable,
                 onRefresh: widget.onRefresh == null
@@ -293,6 +306,9 @@ class _UserProfileContentState extends State<UserProfileContent>
               pageKey: const ValueKey<String>('profile-world-collection-page'),
               child: _WorldProfileCollectionList(
                 items: data.worlds,
+                emptyText: data.isSelf
+                    ? 'No Worlds you created yet.'
+                    : 'No Worlds yet.',
                 isLoading: widget.worldsLoading,
                 listenable: widget.worldsListenable,
                 onRefresh: widget.onRefresh == null
@@ -388,6 +404,16 @@ class _UserProfileContentState extends State<UserProfileContent>
                         SizedBox(height: widget.nameUidGap),
                       CopyableIdLabel(
                         label: 'UID',
+                        customTextStyle:
+                            Theme.of(context).brightness == Brightness.dark
+                            ? CopyableIdLabel.textStyle.copyWith(
+                                color: GenesisColors.darkTextTertiary,
+                              )
+                            : null,
+                        customIconColor:
+                            Theme.of(context).brightness == Brightness.dark
+                            ? GenesisColors.darkTextTertiary
+                            : null,
                         value: data.uid,
                         displayValue: data.deleted
                             ? deletedEntityDisplayText
@@ -836,7 +862,9 @@ class _ProfileTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
     return _ProfilePullOffsetTransition(
       offsetListenable: pullOffsetListenable,
       child: ColoredBox(
-        color: Colors.white,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? GenesisColors.darkBackground
+            : Colors.white,
         child: Column(
           children: [
             const SizedBox(height: 5),

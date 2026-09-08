@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../components/common/genesis_center_toast.dart';
 import '../../components/gems/gem_colors.dart';
@@ -211,9 +212,8 @@ class _GemRecordsPageState extends State<GemRecordsPage>
       );
     }
     if (state.records.isEmpty) {
-      return RefreshIndicator(
+      return GenesisRefreshIndicator(
         color: kGemAccentColor,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         onRefresh: () => _loadFirstPage(index: index, refreshing: true),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -221,9 +221,8 @@ class _GemRecordsPageState extends State<GemRecordsPage>
         ),
       );
     }
-    return RefreshIndicator(
+    return GenesisRefreshIndicator(
       color: kGemAccentColor,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       onRefresh: () => _loadFirstPage(index: index, refreshing: true),
       child: ListView.separated(
         controller: state.scrollController,

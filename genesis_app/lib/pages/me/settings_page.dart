@@ -437,8 +437,7 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
 
             final items = snapshot.data ?? const <_BlockedUserItem>[];
             if (items.isEmpty) {
-              return RefreshIndicator(
-                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              return GenesisRefreshIndicator(
                 onRefresh: _refresh,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -459,8 +458,7 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
               );
             }
 
-            return RefreshIndicator(
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            return GenesisRefreshIndicator(
               onRefresh: _refresh,
               child: ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),

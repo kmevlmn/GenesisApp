@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/bootstrap/polling_scheduler.dart';
 import '../../components/common/genesis_timestamp_text.dart';
@@ -217,8 +218,7 @@ class _MessagesPageState extends State<MessagesPage> {
             child: ValueListenableBuilder<List<String>>(
               valueListenable: _conversationStore.orderedConversationIds,
               builder: (context, conversationIds, _) {
-                return RefreshIndicator(
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                return GenesisRefreshIndicator(
                   onRefresh: _refreshMessagesData,
                   child: CustomScrollView(
                     controller: _scrollController,

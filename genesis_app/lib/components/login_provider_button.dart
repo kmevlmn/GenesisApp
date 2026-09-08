@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../ui/tokens/genesis_colors.dart';
 import '../app/config/app_flavor_config.dart';
 import '../platform/auth/auth_session.dart';
 import '../pages/legal/legal_document_page.dart';
@@ -97,15 +98,17 @@ class _LoginLegalTextState extends State<LoginLegalText> {
 
   @override
   Widget build(BuildContext context) {
-    const baseStyle = TextStyle(
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final baseStyle = TextStyle(
       fontSize: 12,
       height: 1.35,
-      color: Color(0xFF8A8A8A),
+      color: dark ? GenesisColors.darkTextTertiary : const Color(0xFF8A8A8A),
     );
-    const linkStyle = TextStyle(
+    final linkStyle = TextStyle(
       fontSize: 12,
       height: 1.35,
-      color: Color(0xFF3E5B8A),
+      color: dark ? GenesisColors.darkTextSecondary : const Color(0xFF3E5B8A),
+      decoration: dark ? TextDecoration.underline : null,
     );
     return Text.rich(
       TextSpan(
@@ -145,8 +148,8 @@ class LoginProviderButton extends StatelessWidget {
     this.isLoading = false,
     this.height = 56,
     this.borderRadius = 16,
-    this.backgroundColor = const Color(0xFFF0F0F0),
-    this.foregroundColor = Colors.black,
+    this.backgroundColor,
+    this.foregroundColor,
   });
 
   final IdentityProvider provider;
@@ -155,11 +158,18 @@ class LoginProviderButton extends StatelessWidget {
   final bool isLoading;
   final double height;
   final double borderRadius;
-  final Color backgroundColor;
-  final Color foregroundColor;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor =
+        this.backgroundColor ??
+        (dark ? GenesisColors.darkFaintFill : const Color(0xFFF0F0F0));
+    final foregroundColor =
+        this.foregroundColor ??
+        (dark ? GenesisColors.darkTextPrimary : Colors.black);
     return SizedBox(
       width: double.infinity,
       height: height,
@@ -169,7 +179,9 @@ class LoginProviderButton extends StatelessWidget {
           backgroundColor: backgroundColor,
           disabledBackgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
-          disabledForegroundColor: foregroundColor.withValues(alpha: 0.55),
+          disabledForegroundColor: dark
+              ? GenesisColors.darkTextTertiary
+              : foregroundColor.withValues(alpha: 0.55),
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 22),
           shape: RoundedRectangleBorder(
@@ -191,7 +203,9 @@ class LoginProviderButton extends StatelessWidget {
                             dimension: _loginProviderSpinnerSize,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.4,
-                              color: foregroundColor.withValues(alpha: 0.75),
+                              color: dark
+                                  ? GenesisColors.darkTextSecondary
+                                  : foregroundColor.withValues(alpha: 0.75),
                             ),
                           )
                         : LoginProviderIcon(provider: provider),
@@ -234,6 +248,12 @@ class LoginProviderIcon extends StatelessWidget {
       ),
       IdentityProvider.apple => SvgPicture.asset(
         _appleOauthIconAsset,
+        colorFilter: Theme.of(context).brightness == Brightness.dark
+            ? const ColorFilter.mode(
+                GenesisColors.darkTextPrimary,
+                BlendMode.srcIn,
+              )
+            : null,
         width: _appleProviderIconSize,
         height: _appleProviderIconSize,
         fit: BoxFit.contain,

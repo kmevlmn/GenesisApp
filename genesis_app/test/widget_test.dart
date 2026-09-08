@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:flutter/rendering.dart' show ScrollCacheExtent, RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -6527,6 +6527,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(nestedScrollState.outerController.position.pixels, greaterThan(0));
 
+    final headerTitle = find.descendant(
+      of: find.byType(MePage),
+      matching: find.text('Me'),
+    );
+    expect(tester.getTopLeft(headerTitle).dx, 16);
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(of: headerTitle, matching: find.byType(RichText)),
+    );
+    expect(paragraph.text.style!.fontSize, 20);
+    expect(paragraph.textScaler.scale(20), 20);
+    final transform = paragraph.getTransformTo(null);
+    expect(transform.entry(0, 0), 1);
+    expect(transform.entry(1, 1), 1);
+
+    expect(
+      tester.widget<Text>(headerTitle).style?.color,
+      GenesisColors.darkTextPrimary,
+    );
+    final visibility = tester.widget<AnimatedOpacity>(
+      find
+          .ancestor(of: headerTitle, matching: find.byType(AnimatedOpacity))
+          .first,
+    );
+    expect(visibility.opacity, 1);
     await tester.tap(
       find.descendant(of: find.byType(BottomTabs), matching: find.text('Me')),
     );
@@ -16397,7 +16421,9 @@ void main() {
   testWidgets('tap Me shows signed-out Me view when not logged in', (
     WidgetTester tester,
   ) async {
-    await _pumpGenesisApp(tester);
+    await tester.pumpWidget(
+      GenesisApp(services: await _testServices(initialUid: null)),
+    );
 
     await tester.tap(find.text('Me'));
     await tester.pumpAndSettle();
@@ -16413,6 +16439,17 @@ void main() {
     expect(find.text('Sign up and get 250 Gems!'), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Continue with Apple'), findsOneWidget);
+    expect(
+      Theme.of(tester.element(find.byType(SignedOutMeView))).brightness,
+      Brightness.dark,
+    );
+    expect(
+      Theme.of(tester.element(find.byType(BottomTabs))).brightness,
+      Brightness.light,
+    );
+    await tester.pump(const Duration(seconds: 1));
+    AppStartupCoordinator.resetForTesting();
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('tap EULA opens EULA legal document', (
@@ -17610,6 +17647,7 @@ void main() {
       GenesisApp(
         services: await _testServices(
           sessionStoreOverride: sessionStore,
+          initialUid: null,
           identityAuth: const _FakeIdentityAuthService(
             signInSession: AuthSession(
               provider: IdentityProvider.google,
@@ -17632,6 +17670,9 @@ void main() {
     expect(backendAuth.loginCount, 1);
     expect(backendAuth.lastLoginProvider, IdentityProvider.google);
     expect(find.text('Continue with Google'), findsNothing);
+    await tester.pump(const Duration(seconds: 1));
+    AppStartupCoordinator.resetForTesting();
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('Messages login refreshes cached Me session state', (
@@ -26090,8 +26131,20 @@ void main() {
     expect(find.text('Following'), findsOneWidget);
     expect(find.text('17'), findsOneWidget);
     expect(find.text('Followers'), findsOneWidget);
-    expect(find.text('Worldo 30'), findsOneWidget);
-    expect(find.text('Playing 30'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('profile-tab-count-origin')),
+        matching: find.text('30'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('profile-tab-count-world')),
+        matching: find.text('30'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('#Worldo'), findsNothing);
     expect(tester.widget<Text>(find.text('Following')).style?.fontSize, 14);
     expect(tester.widget<Text>(find.text('Followers')).style?.fontSize, 14);
@@ -26117,7 +26170,7 @@ void main() {
       false,
     );
 
-    await tester.tap(find.text('Playing 30'));
+    await tester.tap(find.byKey(const ValueKey('profile-tab-world')));
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.chevron_right), findsNothing);
@@ -26180,6 +26233,25 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);
+    final skeleton = find.byKey(
+      const ValueKey<String>('user-info-loading-skeleton'),
+    );
+    final bones = tester.widgetList<DecoratedBox>(
+      find.descendant(of: skeleton, matching: find.byType(DecoratedBox)),
+    );
+    expect(bones, isNotEmpty);
+    for (final bone in bones) {
+      final decoration = bone.decoration as BoxDecoration;
+      expect(decoration.color, GenesisColors.darkFaintFill);
+      expect(decoration.gradient, isNull);
+    }
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+      GenesisColors.darkBackground,
+    );
+    expect(tester.widget<AppBar>(find.byType(AppBar)).centerTitle, isFalse);
 
     userInfoCompleter.complete(
       transport._jsonResponse({

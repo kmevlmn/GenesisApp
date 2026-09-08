@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../components/auth/login_guard.dart';
 import '../../components/common/genesis_center_toast.dart';
@@ -350,8 +351,7 @@ class _FollowUsersPane extends StatelessWidget {
           );
         }
         if (items.isEmpty) {
-          return RefreshIndicator(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          return GenesisRefreshIndicator(
             onRefresh: onRefresh,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -373,8 +373,7 @@ class _FollowUsersPane extends StatelessWidget {
             ),
           );
         }
-        return RefreshIndicator(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        return GenesisRefreshIndicator(
           onRefresh: onRefresh,
           child: ListView.builder(
             // ignore: deprecated_member_use

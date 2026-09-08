@@ -106,6 +106,7 @@ flutter:
   assets:
     - assets/svg/worldo-logo.svg
     - assets/svg/worldo-logo-dark.svg
+    - assets/images/app_icon.png
     - assets/images/default_list_image.png
     - assets/images/map_default/
     - assets/custom-icons/png/
