@@ -182,6 +182,29 @@ HTTP 映射层的图片规则：
 - 需要透明度变体时，从对应 token 派生，例如 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.8)`；不得用变体替代规定的三级文字颜色。
 - 不创建肉眼接近的背景色或文字透明度。纯白 `#FFFFFF` 不作为深色内容区常规文字颜色，除非设计明确要求更高强调层级；输入区域和浮动操作菜单按后文专项规范执行。
 
+## 红色层级规范
+
+红色按用途划分为三个等级，唯一色值定义在 `GenesisColors`；这些是不同色值，不是透明度变体。
+
+| 等级 | Token | 色值 | 用途 |
+| --- | --- | --- | --- |
+| 一级：品牌红 | `GenesisColors.redPrimary` | `#FF2442` | 主要操作、可用发送按钮、选中态、红点及角色边框等强强调 |
+| 二级：正文粉红 | `GenesisColors.redSecondary` | `#FF8A9A` | 深色页面 Personality / 性格描述、事件线索等需要持续阅读的强调正文；取自 Worldo Detail 的 Personality |
+| 三级：浅粉色 | `GenesisColors.redTertiary` | `#FFB8C3` | 浅粉填充、既有禁用按钮填充、轻量装饰；不替代正文或白字层级 |
+
+- 深色页面的红色强调正文必须使用 `redSecondary`，不得使用品牌红 `redPrimary`，避免长段文字过于刺眼。错误提示、危险操作等语义状态单独按其用途处理。
+- `brand` / `brandBright` / `create` / `danger` 保留为一级红的语义别名，`brandSoft` 保留为三级红的别名；不再分别定义同色值。
+- Worldo Detail Personality、World Detail Cast 的 Personality、Location Chat 的同色强调和 Tick Event 线索统一引用 `redSecondary`。页面级颜色别名可以保留，但必须映射公共 token。
+- 新增及修改红色样式时必须调用对应 token，不复制色值；其他红色、不同透明度和特殊状态不因颜色接近而强行替换。
+
+## 深色 Sheet Handle 设计规范
+
+- 顶部横向分页 Handle 的颜色以 Worldo Sheet 为基准：选中段使用 `GenesisColors.darkHandleActive`（`darkTextPrimary`，95% 白），未选中段使用 `GenesisColors.darkHandleInactive`（`darkTextTertiary`，45% 白）。不得用输入填充的 12% 白代替未选中颜色。
+- 两个 Handle token 是公共文字颜色的语义别名，不另定义色值；所有同类深色分页 Handle 统一引用这两个 token。
+- 滑动过程中，根据页面进度对选中／未选中颜色和段宽连续插值，保持圆角；不增加闪烁、呼吸或循环动画。
+- 颜色标准与分页数量、尺寸分开管理；段宽和间距按分页数量设计，统一颜色时不改变手势、触摸区域或页面布局。
+- 单一、无选中态的深色 Sheet 拖动条默认使用 `darkHandleInactive`；需要表达当前分页选中态时才使用 `darkHandleActive`。
+
 ## 深色输入框与 Placeholder 设计规范
 
 适用于 Location Chat 的 Message 输入框、Worldo Detail / Discuss 的 Write a post 入口，以及 Post Detail 的 Write a reply 入口。新增或修改同类深色输入场景时，按以下标准实现；所有尺寸均为 Flutter 逻辑像素，百分比均指不透明度。

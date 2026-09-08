@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/components/world_location_list.dart';
 import 'package:genesis_flutter_android/components/world_new_badge.dart';
@@ -8,6 +9,46 @@ import 'package:genesis_flutter_android/components/world_point.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_static_network_image.dart';
 
 void main() {
+  for (final brightness in Brightness.values) {
+    testWidgets('location rows honor $brightness without changing layout', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(brightness: brightness),
+          home: const Scaffold(
+            body: WorldLocationList(
+              enableOuterScrollHandoff: false,
+              points: [
+                WorldPoint(
+                  id: 'dark-location',
+                  name: 'Harbor',
+                  type: WorldPointType.castle,
+                  position: Offset.zero,
+                  users: [],
+                  locationDescription: 'A quiet harbor',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      expect(
+        tester.widget<Text>(find.text('Harbor')).style?.color,
+        brightness == Brightness.dark
+            ? GenesisColors.darkTextPrimary
+            : Colors.black,
+      );
+      expect(
+        tester.widget<Text>(find.text('A quiet harbor')).style?.color,
+        brightness == Brightness.dark
+            ? GenesisColors.darkTextSecondary
+            : Colors.black,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   const networkPoint = WorldPoint(
     id: 'location-1',
     name: 'Location',

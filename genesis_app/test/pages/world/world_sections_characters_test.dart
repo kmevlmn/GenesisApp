@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/app/debug/world_new_content_debug_settings.dart';
 import 'package:genesis_flutter_android/components/world_new_badge.dart';
@@ -101,8 +102,8 @@ void main() {
     final brief = tester.widget<Text>(
       find.text('Travels between unfinished worlds'),
     );
-    expect(identity.style?.color, const Color(0xFF111111));
-    expect(brief.style?.color, const Color(0xFFFF2442));
+    expect(identity.style?.color, GenesisColors.darkTextPrimary);
+    expect(brief.style?.color, GenesisColors.redSecondary);
     expect(find.text('Goal: Player goals remain hidden'), findsNothing);
     expect(find.text('No character details yet.'), findsNothing);
   });

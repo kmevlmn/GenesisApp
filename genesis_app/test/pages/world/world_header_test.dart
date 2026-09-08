@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/network/models/world.dart';
 import 'package:genesis_flutter_android/pages/world/world_constants.dart';
@@ -131,6 +132,7 @@ void main() {
         find.byKey(const ValueKey<String>('world-current-character-name')),
       );
       expect(characterName.style?.fontSize, 14);
+      expect(characterName.style?.color, GenesisColors.darkTextPrimary);
       expect(characterName.style?.fontWeight, FontWeight.w600);
 
       final avatar = tester.widget<GenesisCharacterAvatar>(
@@ -143,7 +145,7 @@ void main() {
       );
       final avatarPlaceholderDecoration =
           avatarPlaceholder.decoration as BoxDecoration;
-      expect(avatarPlaceholderDecoration.color, const Color(0xFFE9EDF2));
+      expect(avatarPlaceholderDecoration.color, GenesisColors.darkFaintFill);
       expect(
         avatarPlaceholderDecoration.borderRadius,
         BorderRadius.circular(12),
@@ -215,7 +217,7 @@ void main() {
     );
 
     final summary = tester.widget<Text>(find.text('Tick 0-1 · 4 Messages'));
-    expect(summary.style?.color, const Color(0xFF111111));
+    expect(summary.style?.color, GenesisColors.darkTextSecondary);
     expect(
       tester
           .getSize(

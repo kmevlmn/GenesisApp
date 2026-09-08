@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+
 import '../../components/world_details_shell.dart';
 
 const String worldSectionEventsIconAsset = 'assets/custom-icons/svg/events.svg';
@@ -39,7 +41,7 @@ const double worldMapContentTopOffset =
 const double worldCharacterAvatarLogicalSize = 48;
 const int worldMainPageCount = 1;
 
-const Color worldHeaderMetaColor = Color(0xFF666666);
+const Color worldHeaderMetaColor = GenesisColors.darkTextSecondary;
 const TextStyle worldHeaderMetaTextStyle = TextStyle(
   fontSize: 12,
   height: 1.1,
@@ -50,5 +52,5 @@ const TextStyle worldDetailBodyTextStyle = TextStyle(
   fontSize: 13,
   height: 1.4,
   fontWeight: FontWeight.w400,
-  color: Color(0xFF111111),
+  color: GenesisColors.darkTextPrimary,
 );

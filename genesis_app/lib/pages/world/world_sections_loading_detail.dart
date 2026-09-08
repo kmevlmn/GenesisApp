@@ -127,7 +127,7 @@ class WorldLoadingBone extends StatelessWidget {
   Widget build(BuildContext context) {
     final child = DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFE9EDF2),
+        color: GenesisColors.darkFaintFill,
         borderRadius: BorderRadius.circular(radius),
       ),
       child: SizedBox(width: width, height: height),
@@ -177,7 +177,10 @@ class WorldDetailSection extends StatelessWidget {
     final brief = world.brief.trim().isEmpty ? '-' : world.brief.trim();
     final cover = worldResolveAssetUrl(world.cover).trim();
     final canDeleteWorld = worldCanDeleteLaunchedOnlyBySelf(world, currentUid);
-    final metaStyle = CopyableIdLabel.textStyle.copyWith(height: 1.2);
+    final metaStyle = CopyableIdLabel.textStyle.copyWith(
+      height: 1.2,
+      color: GenesisColors.darkTextSecondary,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,13 +208,14 @@ class WorldDetailSection extends StatelessWidget {
                             fontSize: 16,
                             height: 1.25,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF4B6192),
+                            color: GenesisColors.darkTextPrimary,
                             decoration: TextDecoration.none,
                           ),
                         ),
                       ),
                       GenesisMoreActionMenuButton(
                         buttonSize: 18 * 1.25,
+                        iconColor: GenesisColors.darkTextPrimary,
                         items: [
                           genesisReportMenuItem(
                             context: context,
@@ -404,7 +408,7 @@ class WorldDetailSectionListView extends StatelessWidget {
             character: character,
             currentUid: currentUid,
             subtitle: worldCharacterDescriptionText(character),
-            subtitleColor: const Color(0xFF666666),
+            subtitleColor: GenesisColors.darkTextSecondary,
             showCharacterDetails: true,
           ),
         );
@@ -477,13 +481,13 @@ class _WorldNewUserJoinNoticeText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const baseStyle = TextStyle(
-      color: Color(0xFF666666),
+      color: GenesisColors.darkTextSecondary,
       fontSize: 12,
       height: 1.2,
       fontWeight: FontWeight.w400,
     );
     const emphasisStyle = TextStyle(
-      color: Color(0xFF111111),
+      color: GenesisColors.darkTextPrimary,
       fontWeight: FontWeight.w600,
     );
     return LayoutBuilder(
@@ -536,7 +540,7 @@ class WorldDetailSectionTitle extends StatelessWidget {
         fontSize: 14,
         height: 1.2,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF111111),
+        color: GenesisColors.darkTextPrimary,
       ),
     );
   }
@@ -554,9 +558,12 @@ class WorldDetailCoverImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final viewerUrl = url.trim();
     final fallback = Container(
-      color: const Color(0xFFEFF1F4),
+      color: GenesisColors.darkRaisedBackground,
       alignment: Alignment.center,
-      child: const Icon(Icons.image_outlined, color: Color(0xFF9A9A9A)),
+      child: const Icon(
+        Icons.image_outlined,
+        color: GenesisColors.darkTextTertiary,
+      ),
     );
 
     final imageUrl = selectGenesisImageUrl(

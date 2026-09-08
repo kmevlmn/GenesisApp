@@ -1031,8 +1031,8 @@ class _LocationChatRoster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const accent = Color(0xFFFF2442);
-    const accentSoft = Color(0xFFFF8A9A);
+    const accent = GenesisColors.redPrimary;
+    const accentSoft = GenesisColors.redSecondary;
     const softWhite = Color(0xFFF4F3F6);
     const white = Colors.white;
     final radius = BorderRadius.circular(14);

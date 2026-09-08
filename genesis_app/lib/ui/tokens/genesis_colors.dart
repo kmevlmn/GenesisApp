@@ -7,16 +7,24 @@ abstract final class GenesisColors {
   static const Color darkTextTertiary = Color(0x73FFFFFF);
   static const Color darkRaisedBackground = Color(0xFF181C1F);
   static const Color darkInputPlaceholder = darkTextTertiary;
+  static const Color darkHandleActive = darkTextPrimary;
+  static const Color darkHandleInactive = darkTextTertiary;
 
   // Worldo Detail's Write a post fill, shared by discussion surfaces.
   static const Color darkFaintFill = Color(0x1FFFFFFF);
   // The same fill composited over #151517 for surfaces that must be opaque.
   static const Color darkFaintSurface = Color(0xFF313133);
 
-  static const Color brand = Color(0xFFFF2442);
+  // Red hierarchy: actions, readable accent text, pale/disabled fills.
+  static const Color redPrimary = Color(0xFFFF2442);
+  static const Color redSecondary = Color(0xFFFF8A9A);
+  static const Color redTertiary = Color(0xFFFFB8C3);
+
+  // Existing semantic names remain aliases of the shared red hierarchy.
+  static const Color brand = redPrimary;
   static const Color brandBright = brand;
-  static const Color brandSoft = Color(0xFFFFB8C3);
-  static const Color create = Color(0xFFFF2442);
+  static const Color brandSoft = redTertiary;
+  static const Color create = redPrimary;
   static const Color createAdd = Color(0xFFC41F2E);
 
   static const Color surface = Colors.white;
@@ -33,5 +41,5 @@ abstract final class GenesisColors {
 
   static const Color border = Color(0xFFE6E6E8);
   static const Color borderStrong = Color(0xFFDCDCDC);
-  static const Color danger = Color(0xFFFF2442);
+  static const Color danger = redPrimary;
 }

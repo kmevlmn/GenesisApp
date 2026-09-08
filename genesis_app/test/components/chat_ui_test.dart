@@ -3838,7 +3838,10 @@ void main() {
             .decoration,
         const BoxDecoration(color: Color(0xFFFF2442), shape: BoxShape.circle),
       );
-      expect(tester.widget<Text>(header).style?.color, const Color(0xFFF4F3F6));
+      expect(
+        tester.widget<Text>(header).style?.color,
+        GenesisColors.darkTextPrimary,
+      );
       expect(
         find.descendant(
           of: globalSection,
@@ -3860,7 +3863,7 @@ void main() {
       );
       expect(
         tester.widget<Text>(globalText).textSpan?.style?.color,
-        Colors.white.withValues(alpha: 0.73),
+        GenesisColors.darkTextSecondary,
       );
       expect(
         find.descendant(of: globalSection, matching: find.byType(Transform)),

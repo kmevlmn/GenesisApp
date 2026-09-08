@@ -103,7 +103,7 @@ class _OriginCharacterRow extends StatelessWidget {
                 Text(
                   tagline,
                   style: _bodyTextStyle.copyWith(
-                    color: originWorldDetailSheetAccentSoftColor,
+                    color: GenesisColors.redSecondary,
                   ),
                 ),
               ],

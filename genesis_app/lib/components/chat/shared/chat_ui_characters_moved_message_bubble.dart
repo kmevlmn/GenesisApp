@@ -227,7 +227,7 @@ class _ChatTickSceneCharacterMovementRow extends StatelessWidget {
                         locationName,
                         style: TextStyle(
                           color: canOpenLocation
-                              ? _tickMessageClueColor
+                              ? GenesisColors.redSecondary
                               : _tickMessageHeaderColor,
                           fontSize: 13,
                           height: 1.3,
@@ -235,14 +235,15 @@ class _ChatTickSceneCharacterMovementRow extends StatelessWidget {
                           decoration: canOpenLocation
                               ? TextDecoration.underline
                               : TextDecoration.none,
-                          decorationColor: _tickMessageClueColor.withValues(
-                            alpha: 0.45,
-                          ),
+                          decorationColor: GenesisColors.redSecondary
+                              .withValues(alpha: 0.45),
                         ),
                       ),
                       if (canOpenLocation) ...[
                         const SizedBox(width: 3),
-                        const _ChatLocationCaret(color: _tickMessageClueColor),
+                        const _ChatLocationCaret(
+                          color: GenesisColors.redSecondary,
+                        ),
                       ],
                     ],
                   ),

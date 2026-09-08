@@ -36,6 +36,7 @@ extension _WorldPageLayout on _WorldPageState {
       children: [
         WorldDetailsPageScaffold(
           backgroundColor: _tilemapLoadingBackgroundColor,
+          panelBackgroundColor: GenesisColors.darkBackground,
           panelTopGap: 50,
           panelCollapsedHeightOffset: 120,
           scrollPhysics: const NeverScrollableScrollPhysics(),

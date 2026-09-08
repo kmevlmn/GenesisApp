@@ -1,8 +1,7 @@
 part of 'chat_ui_library.dart';
 
 const Color _tickMessageBackgroundColor = Color(0x99151517);
-const Color _tickMessageAccentColor = Color(0xFFFF2442);
-const Color _tickMessageClueColor = Color(0xFFFF8A9A);
+const Color _tickMessageAccentColor = GenesisColors.redPrimary;
 const Color _tickMessageHeaderColor = Color(0xFFF4F3F6);
 const Color _tickMessageBorderColor = Color(0x33FFFFFF);
 const Color _tickMessageDividerColor = Color(0x29FFFFFF);
@@ -228,10 +227,14 @@ class _ChatCompositeTickMessageContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ChatTickHeader(message: message, style: style),
+        ChatTickHeader(
+          label: _tickLabel(message),
+          headerKey: ValueKey<String>('chat-tick-header-${message.localId}'),
+          style: style,
+        ),
         if (payload.hasGlobal) ...[
           _ChatTickSectionDivider(style: style),
-          _ChatTickGlobalSection(text: payload.globalText, style: style),
+          ChatTickGlobalSection(text: payload.globalText, style: style),
         ],
         if (storyEvents != null && storyEvents.paragraphs.isNotEmpty) ...[
           SizedBox(height: usesScenePlate ? 12 : 20),
@@ -367,18 +370,23 @@ class _ChatTickProgressTitleState extends State<_ChatTickProgressTitle> {
   }
 }
 
-class _ChatTickHeader extends StatelessWidget {
-  const _ChatTickHeader({required this.message, required this.style});
+class ChatTickHeader extends StatelessWidget {
+  const ChatTickHeader({
+    super.key,
+    required this.label,
+    required this.style,
+    this.headerKey,
+  });
 
-  final ChatMessageVm message;
+  final String label;
+  final Key? headerKey;
   final ChatUiStyleConfig style;
 
   @override
   Widget build(BuildContext context) {
-    final label = _tickLabel(message);
     if (!style.useScenePlateBubbleGeometry) {
       return Text(
-        key: ValueKey<String>('chat-tick-header-${message.localId}'),
+        key: headerKey,
         label,
         style: style.systemMessageTextStyle.copyWith(
           color: _tickMessageHeaderColor,
@@ -387,7 +395,7 @@ class _ChatTickHeader extends StatelessWidget {
       );
     }
     return Container(
-      key: ValueKey<String>('chat-tick-header-${message.localId}'),
+      key: headerKey,
       padding: const EdgeInsets.only(bottom: 10),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: _tickMessageDividerColor)),
@@ -408,7 +416,7 @@ class _ChatTickHeader extends StatelessWidget {
             child: Text(
               label,
               style: style.systemMessageTextStyle.copyWith(
-                color: _tickMessageHeaderColor,
+                color: GenesisColors.darkTextPrimary,
                 fontSize: 13,
                 height: 1,
                 fontWeight: FontWeight.w600,
@@ -421,8 +429,12 @@ class _ChatTickHeader extends StatelessWidget {
   }
 }
 
-class _ChatTickGlobalSection extends StatelessWidget {
-  const _ChatTickGlobalSection({required this.text, required this.style});
+class ChatTickGlobalSection extends StatelessWidget {
+  const ChatTickGlobalSection({
+    super.key,
+    required this.text,
+    required this.style,
+  });
 
   final String text;
   final ChatUiStyleConfig style;
@@ -437,7 +449,7 @@ class _ChatTickGlobalSection extends StatelessWidget {
         textAlign: TextAlign.left,
         style: style.systemMessageTextStyle.copyWith(
           color: style.useScenePlateBubbleGeometry
-              ? Colors.white.withValues(alpha: 0.73)
+              ? GenesisColors.darkTextSecondary
               : textColor.withValues(alpha: 0.72),
           fontSize: style.useScenePlateBubbleGeometry ? 13 : null,
           height: style.useScenePlateBubbleGeometry ? 1.3 : null,

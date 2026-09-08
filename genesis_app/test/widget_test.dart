@@ -27953,6 +27953,22 @@ void main() {
       of: find.byKey(const ValueKey<String>('world-bottom-tags-overlay')),
       matching: find.text('Detail'),
     );
+    final tagFills = tester
+        .widgetList<Container>(
+          find.descendant(
+            of: find.byKey(const ValueKey<String>('world-bottom-tags-overlay')),
+            matching: find.byType(Container),
+          ),
+        )
+        .where((widget) => widget.decoration is BoxDecoration)
+        .toList();
+    expect(tagFills, hasLength(4));
+    for (final tag in tagFills) {
+      expect(
+        (tag.decoration as BoxDecoration).color,
+        GenesisColors.darkFaintFill,
+      );
+    }
     await tester.tap(detailTag);
     await tester.pumpAndSettle();
     expect(currentTilemap().animationsPaused, isTrue);
@@ -27960,6 +27976,16 @@ void main() {
       const ValueKey<String>('world-single-section-bottom-sheet'),
     );
     final openedSheetContext = tester.element(openedSheet);
+    expect(
+      (tester.widget<DecoratedBox>(openedSheet).decoration as BoxDecoration)
+          .color,
+      GenesisColors.darkBackground,
+    );
+    expect(Theme.of(openedSheetContext).brightness, Brightness.dark);
+    final worldScaffold = tester.widget<WorldDetailsPageScaffold>(
+      find.byType(WorldDetailsPageScaffold).first,
+    );
+    expect(worldScaffold.panelBackgroundColor, GenesisColors.darkBackground);
     expect(
       tester.getTopLeft(openedSheet).dy,
       closeTo(
@@ -28001,7 +28027,9 @@ void main() {
       expect(tester.getSize(segment).width, index == 0 ? 26 : 4);
       expect(
         (tester.widget<Container>(segment).decoration as BoxDecoration).color,
-        index == 0 ? const Color(0xFF666666) : const Color(0xFFB7B7B7),
+        index == 0
+            ? GenesisColors.darkHandleActive
+            : GenesisColors.darkHandleInactive,
       );
     }
 

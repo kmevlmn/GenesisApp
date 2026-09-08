@@ -439,6 +439,7 @@ class WorldEventsSectionState extends State<WorldEventsSection> {
               itemBuilder: (context, itemIndex) {
                 if (showsAiDisclaimer && itemIndex == 0) {
                   return const AiContentDisclaimer(
+                    textColor: GenesisColors.darkTextTertiary,
                     padding: EdgeInsets.fromLTRB(10, 0, 10, 18),
                     textAlign: TextAlign.left,
                   );
@@ -450,6 +451,7 @@ class WorldEventsSectionState extends State<WorldEventsSection> {
                     'world-event-tick-item-${worldEventTickIdentity(tick)}',
                   ),
                   tick: tick,
+                  useChatEventStyle: true,
                   tickNumber: tickNumber,
                   subTickNumber: worldEventSubTickNumber(tick),
                   fallbackBody: fallbackBody,

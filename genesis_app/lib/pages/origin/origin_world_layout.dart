@@ -12,7 +12,6 @@ const Color originWorldDetailSheetSecondaryTextColor =
 const Color originWorldDetailSheetTertiaryTextColor =
     GenesisColors.darkTextTertiary;
 const Color originWorldDetailSheetSoftWhiteColor = Color(0xFFF4F3F6);
-const Color originWorldDetailSheetAccentSoftColor = Color(0xFFFF8A9A);
 const Color originWorldDetailSheetInactiveIndicatorColor = Color(0x40FFFFFF);
 const Color originWorldDetailSheetSubtleSurfaceColor = Color(0x14FFFFFF);
 const Color originWorldDetailSheetFaintSurfaceColor =

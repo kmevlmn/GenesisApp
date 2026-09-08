@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../icons/custom_icon_assets.dart';
+import '../ui/tokens/genesis_colors.dart';
+import '../utils/genesis_image_resource.dart';
+import 'chat/shared/chat_ui.dart';
 import '../ui/components/genesis_soft_italic_text.dart';
 import '../utils/genesis_timestamp_formatter.dart';
 
@@ -23,6 +26,7 @@ class WorldTickEventItem extends StatelessWidget {
     this.contentTimestampStyle,
     this.metricUnit = '',
     this.showParagraphClue = false,
+    this.useChatEventStyle = false,
   });
 
   final Map<String, dynamic> tick;
@@ -41,6 +45,9 @@ class WorldTickEventItem extends StatelessWidget {
   final String metricUnit;
   final bool showParagraphClue;
 
+  /// Share Location Chat Tick event rendering in the dark World Events sheet.
+  final bool useChatEventStyle;
+
   @override
   Widget build(BuildContext context) {
     final tickResult = _tickResult(tick);
@@ -57,20 +64,33 @@ class WorldTickEventItem extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _TickHeader(
-            tickNumber: tickNumber,
-            subTickNumber: subTickNumber,
-            date: date,
-            timeAgo: timeAgo,
-          ),
-          const SizedBox(height: 6),
-          _GlobalEventCard(
-            body: body,
-            stacked: stackedContent,
-            labelStyle: contentLabelStyle,
-            bodyStyle: contentTextStyle,
-          ),
-          const SizedBox(height: 6),
+          if (useChatEventStyle) ...[
+            ChatTickHeader(
+              label:
+                  'Tick $tickNumber${subTickNumber > 0 ? '-$subTickNumber' : ''}',
+              style: kLocationChatStyle,
+            ),
+            if (body.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ChatTickGlobalSection(text: body, style: kLocationChatStyle),
+            ],
+            const SizedBox(height: 12),
+          ] else ...[
+            _TickHeader(
+              tickNumber: tickNumber,
+              subTickNumber: subTickNumber,
+              date: date,
+              timeAgo: timeAgo,
+            ),
+            const SizedBox(height: 6),
+            _GlobalEventCard(
+              body: body,
+              stacked: stackedContent,
+              labelStyle: contentLabelStyle,
+              bodyStyle: contentTextStyle,
+            ),
+            const SizedBox(height: 6),
+          ],
           for (final paragraph in paragraphs) ...[
             _TickParagraphRow(
               paragraph: paragraph,
@@ -82,6 +102,7 @@ class WorldTickEventItem extends StatelessWidget {
               timestampStyle: contentTimestampStyle,
               metricUnit: metricUnit,
               showClue: showParagraphClue,
+              useChatEventStyle: useChatEventStyle,
             ),
             const SizedBox(height: 6),
           ],
@@ -123,11 +144,11 @@ class _TickHeader extends StatelessWidget {
             child: Text(
               'Tick $tickNumber${subTickNumber > 0 ? '-$subTickNumber' : ''}'
               '${date.isEmpty ? '' : ' · $date'}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 height: 1.2,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF111111),
+                color: const Color(0xFF111111),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -137,11 +158,11 @@ class _TickHeader extends StatelessWidget {
             const SizedBox(width: 12),
             Text(
               timeAgo,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 height: 1.2,
                 fontWeight: FontWeight.w400,
-                color: Color(0xFF8F8F8F),
+                color: const Color(0xFF8F8F8F),
               ),
             ),
           ],
@@ -203,6 +224,7 @@ class _TickParagraphRow extends StatelessWidget {
     this.timestampStyle,
     this.metricUnit = '',
     this.showClue = false,
+    this.useChatEventStyle = false,
   });
 
   final Map<String, dynamic> paragraph;
@@ -214,6 +236,7 @@ class _TickParagraphRow extends StatelessWidget {
   final TextStyle? timestampStyle;
   final String metricUnit;
   final bool showClue;
+  final bool useChatEventStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +259,73 @@ class _TickParagraphRow extends StatelessWidget {
       metricUnit: metricUnit,
     );
     final visibleRoles = _visibleRoles(paragraph, charactersById);
+
+    if (useChatEventStyle) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.place_outlined,
+                  size: 12,
+                  color: GenesisColors.darkTextSecondary,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    name.isEmpty ? 'Location' : name,
+                    style: labelStyle,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ChatTickStoryEventParagraph(
+              messageLocalId: 'world-event',
+              index: 0,
+              addTopSpacing: false,
+              paragraph: ChatStoryEventParagraphVm(
+                timestamp: timestamp,
+                text: body,
+                clue: clue,
+                visibilityLabel: visibleRoles
+                    .map((role) => role.name)
+                    .join(', '),
+                visibleRoles: [
+                  for (final role in visibleRoles)
+                    ChatStoryEventVisibleRoleVm(
+                      roleId: role.id,
+                      name: role.name,
+                      isAi: role.isAi,
+                      avatarUrl: role.avatarUrl,
+                    ),
+                ],
+              ),
+            ),
+            if (characterDetails.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 22),
+                child: _CharacterDetailsText(
+                  details: characterDetails,
+                  style:
+                      bodyStyle ??
+                      const TextStyle(
+                        color: GenesisColors.darkTextSecondary,
+                        fontSize: 13,
+                        height: 1.3,
+                      ),
+                  nameColor: GenesisColors.darkTextPrimary,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     final label = _LocationLabel(
       text: name.isEmpty ? 'Location' : name,
@@ -368,7 +458,13 @@ const _positiveDeltaColor = Color(0xFF338960);
 const _negativeDeltaColor = Color(0xFFFF2442);
 
 class _CharacterDetailsText extends StatelessWidget {
-  const _CharacterDetailsText({required this.details, required this.style});
+  const _CharacterDetailsText({
+    required this.details,
+    required this.style,
+    this.nameColor = _characterDetailNameColor,
+  });
+
+  final Color nameColor;
 
   final List<_CharacterDetailLine> details;
   final TextStyle style;
@@ -376,7 +472,7 @@ class _CharacterDetailsText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nameStyle = style.copyWith(
-      color: _characterDetailNameColor,
+      color: nameColor,
       fontWeight: FontWeight.w600,
     );
     return Text.rich(
@@ -563,7 +659,15 @@ String _locationName(
 }
 
 class _VisibleRole {
-  const _VisibleRole({required this.name, required this.isAi});
+  const _VisibleRole({
+    required this.id,
+    required this.name,
+    required this.isAi,
+    required this.avatarUrl,
+  });
+
+  final String id;
+  final String avatarUrl;
 
   final String name;
   final bool isAi;
@@ -588,6 +692,10 @@ List<_VisibleRole> _visibleRoles(
     if (name.isEmpty || !seenNames.add(name)) continue;
     roles.add(
       _VisibleRole(
+        id: roleId,
+        avatarUrl: GenesisImageResource.fromJson(
+          character['avatar'],
+        ).displayUrl,
         name: name,
         isAi: _mapString(character, const ['player_uid']).isEmpty,
       ),

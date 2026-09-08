@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/gems/daily_check_in_coordinator.dart';
 import '../../app/bootstrap/service_registry.dart';
@@ -526,11 +528,15 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
       }
       if (_initialLoadError != null) {
         return Scaffold(
+          backgroundColor: GenesisColors.darkBackground,
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Load failed'),
+                const Text(
+                  'Load failed',
+                  style: TextStyle(color: GenesisColors.darkTextSecondary),
+                ),
                 const SizedBox(height: 10),
                 FilledButton(
                   onPressed: () => _fetchWorld(isInitial: true),
@@ -739,6 +745,7 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
           children: [
             WorldDetailsPageScaffold(
               backgroundColor: _tilemapLoadingBackgroundColor,
+              panelBackgroundColor: GenesisColors.darkBackground,
               panelTopGap: 50,
               panelCollapsedHeightOffset: 120,
               scrollPhysics: const NeverScrollableScrollPhysics(),
@@ -763,7 +770,7 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
                 top: 0,
                 right: 0,
                 height: topPadding,
-                child: const ColoredBox(color: Colors.white),
+                child: const ColoredBox(color: GenesisColors.darkBackground),
               ),
             if (_worldMainTabIndex != 0)
               Positioned(

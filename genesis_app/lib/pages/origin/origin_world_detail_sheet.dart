@@ -1737,8 +1737,8 @@ class _OriginCollapsedOpeningRoleAction extends StatelessWidget {
 class _OriginSheetPageIndicator extends StatelessWidget {
   const _OriginSheetPageIndicator({required this.page});
 
-  static const Color _activeColor = originWorldDetailSheetPrimaryTextColor;
-  static const Color _inactiveColor = originWorldDetailSheetTertiaryTextColor;
+  static const Color _activeColor = GenesisColors.darkHandleActive;
+  static const Color _inactiveColor = GenesisColors.darkHandleInactive;
 
   final double page;
 

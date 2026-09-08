@@ -6,6 +6,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+
+import '../../ui/tokens/genesis_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../app/bootstrap/service_registry.dart';
@@ -37,11 +39,11 @@ class WorldBottomTags extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: worldMainTabsHeight,
-      color: const Color(0xFFFFFFFF),
+      color: GenesisColors.darkBackground,
       alignment: Alignment.centerLeft,
       child: DefaultTextStyle(
         style: const TextStyle(
-          color: Color(0xFF111111),
+          color: GenesisColors.darkTextPrimary,
           fontSize: 12,
           height: 1,
           fontWeight: FontWeight.w600,
@@ -101,7 +103,7 @@ class WorldBottomTagContent extends StatelessWidget {
             height: worldBottomTagHeight,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFEBEFF2),
+              color: GenesisColors.darkFaintFill,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -113,19 +115,23 @@ class WorldBottomTagContent extends StatelessWidget {
                     width: 17,
                     height: 17,
                     colorFilter: const ColorFilter.mode(
-                      Color(0xFF666666),
+                      GenesisColors.darkTextSecondary,
                       BlendMode.srcIn,
                     ),
                   )
                 else
-                  Icon(item.icon, size: 17, color: const Color(0xFF666666)),
+                  Icon(
+                    item.icon,
+                    size: 17,
+                    color: GenesisColors.darkTextSecondary,
+                  ),
                 const SizedBox(width: 5),
                 Text(
                   item.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFF111111),
+                    color: GenesisColors.darkTextPrimary,
                     fontSize: 12,
                     height: 1,
                     fontWeight: FontWeight.w600,
@@ -498,7 +504,7 @@ class WorldSingleSectionBottomSheetState
       emptyText: 'No character status yet.',
       subtitleBuilder: (character) =>
           worldMetricStatusText(world.metric, character),
-      subtitleColor: const Color(0xFF666666),
+      subtitleColor: GenesisColors.darkTextSecondary,
       showCharacterDetails: false,
       controller: scrollController,
     );
@@ -512,7 +518,7 @@ class WorldSingleSectionBottomSheetState
       currentUid: widget.currentUid,
       emptyText: 'No characters yet.',
       subtitleBuilder: worldCharacterDescriptionText,
-      subtitleColor: const Color(0xFF666666),
+      subtitleColor: GenesisColors.darkTextSecondary,
       showCharacterDetails: true,
       controller: scrollController,
     );
@@ -792,31 +798,42 @@ class WorldSingleSectionBottomSheetState
               snap: false,
               shouldCloseOnMinExtent: false,
               builder: (context, scrollController) {
-                return DecoratedBox(
-                  key: const ValueKey<String>(
-                    'world-single-section-bottom-sheet',
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    brightness: Brightness.dark,
+                    colorScheme: Theme.of(context).colorScheme.copyWith(
+                      brightness: Brightness.dark,
+                      surface: GenesisColors.darkBackground,
+                      onSurface: GenesisColors.darkTextPrimary,
+                    ),
+                    dividerColor: GenesisColors.darkFaintFill,
                   ),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: GenesisRadii.sheet,
-                  ),
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        key: const ValueKey<String>(
-                          'world-sheet-header-drag-area',
+                  child: DecoratedBox(
+                    key: const ValueKey<String>(
+                      'world-single-section-bottom-sheet',
+                    ),
+                    decoration: const BoxDecoration(
+                      color: GenesisColors.darkBackground,
+                      borderRadius: GenesisRadii.sheet,
+                    ),
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          key: const ValueKey<String>(
+                            'world-sheet-header-drag-area',
+                          ),
+                          behavior: HitTestBehavior.opaque,
+                          onVerticalDragUpdate: _handleHeaderDragUpdate,
+                          child: WorldSingleSectionSheetHeader(
+                            item: _headerItem,
+                            pageController: _pageController,
+                            pageCount: worldBottomTagItems.length,
+                            onClose: _collapseSheet,
+                          ),
                         ),
-                        behavior: HitTestBehavior.opaque,
-                        onVerticalDragUpdate: _handleHeaderDragUpdate,
-                        child: WorldSingleSectionSheetHeader(
-                          item: _headerItem,
-                          pageController: _pageController,
-                          pageCount: worldBottomTagItems.length,
-                          onClose: _collapseSheet,
-                        ),
-                      ),
-                      Expanded(child: _buildSheetContent(scrollController)),
-                    ],
+                        Expanded(child: _buildSheetContent(scrollController)),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -875,7 +892,7 @@ class WorldSingleSectionSheetHeader extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Color(0xFF111111),
+                        color: GenesisColors.darkTextPrimary,
                         fontSize: 16,
                         height: 1,
                         fontWeight: FontWeight.w600,
@@ -893,8 +910,8 @@ class WorldSingleSectionSheetHeader extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         minimumSize: const Size(28, 28),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        backgroundColor: const Color(0xFFF3F3F5),
-                        foregroundColor: const Color(0xFF111111),
+                        backgroundColor: GenesisColors.darkFaintFill,
+                        foregroundColor: GenesisColors.darkTextPrimary,
                         shape: const CircleBorder(),
                       ),
                       child: const Icon(Icons.close_rounded, size: 17),
@@ -920,8 +937,8 @@ class WorldSheetPageIndicator extends StatelessWidget {
   static const double _inactiveWidth = 4;
   static const double _segmentGap = 5;
   static const double _height = 4;
-  static const Color _activeColor = Color(0xFF666666);
-  static const Color _inactiveColor = Color(0xFFB7B7B7);
+  static const Color _activeColor = GenesisColors.darkHandleActive;
+  static const Color _inactiveColor = GenesisColors.darkHandleInactive;
 
   final PageController pageController;
   final int pageCount;
@@ -1002,10 +1019,13 @@ class WorldSheetHeaderIcon extends StatelessWidget {
         asset,
         width: 20,
         height: 20,
-        colorFilter: const ColorFilter.mode(Color(0xFF111111), BlendMode.srcIn),
+        colorFilter: const ColorFilter.mode(
+          GenesisColors.darkTextSecondary,
+          BlendMode.srcIn,
+        ),
       );
     }
-    return Icon(item.icon, size: 20, color: const Color(0xFF111111));
+    return Icon(item.icon, size: 20, color: GenesisColors.darkTextSecondary);
   }
 }
 
