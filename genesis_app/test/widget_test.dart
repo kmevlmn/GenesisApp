@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:genesis_flutter_android/ui/components/genesis_profile_collection_list_item.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent, RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6500,76 +6501,174 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('reselecting Me returns the profile page to top', (
-    WidgetTester tester,
-  ) async {
-    AppStartupCoordinator.resetForTesting();
-    addTearDown(AppStartupCoordinator.resetForTesting);
-    final transport = _RecordingV1ListTransport();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AppServicesScope(
-          services: await _testServices(
-            transport: transport,
-            useMock: false,
-            initialAuthToken: 'backend-token',
-            initialUserInfo: {
-              'uid': 'u_mock',
-              'name': 'Me Scroll User',
-              'avatar': '',
-              'following_cnt': 1,
-              'follower_cnt': 2,
-            },
+  testWidgets(
+    'Me bottom navigation resets scroll while collection returns preserve it',
+    (WidgetTester tester) async {
+      AppStartupCoordinator.resetForTesting();
+      addTearDown(AppStartupCoordinator.resetForTesting);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        GenesisMethodChannels.device,
+        (call) async => call.method == GenesisMethodChannels.getAppVersion
+            ? {
+                'versionName': '0.4.6',
+                'versionCode': 51,
+                'packageName': 'com.worldo.ai',
+              }
+            : null,
+      );
+      addTearDown(() {
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          GenesisMethodChannels.device,
+          null,
+        );
+      });
+      final transport = _RecordingV1ListTransport();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorObservers: [genesisPageRouteObserver],
+          onGenerateRoute: (settings) => MaterialPageRoute<WorldPageResult>(
+            settings: settings,
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Back to Me collection'),
+              ),
+            ),
           ),
-          child: const AppShellPage(initialIndex: 4),
+          home: AppServicesScope(
+            services: await _testServices(
+              transport: transport,
+              useMock: false,
+              initialAuthToken: 'backend-token',
+              initialUserInfo: {
+                'uid': 'u_mock',
+                'name': 'Me Scroll User',
+                'avatar': '',
+                'following_cnt': 1,
+                'follower_cnt': 2,
+              },
+            ),
+            child: const AppShellPage(initialIndex: 4),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final nestedScrollViewFinder = find.byType(NestedScrollView);
-    expect(nestedScrollViewFinder, findsOneWidget);
-    final nestedScrollState = tester.state<NestedScrollViewState>(
-      nestedScrollViewFinder,
-    );
-    await tester.drag(nestedScrollViewFinder, const Offset(0, -500));
-    await tester.pumpAndSettle();
-    expect(nestedScrollState.outerController.position.pixels, greaterThan(0));
+      final nestedScrollViewFinder = find.byType(NestedScrollView);
+      expect(nestedScrollViewFinder, findsOneWidget);
+      final nestedScrollState = tester.state<NestedScrollViewState>(
+        nestedScrollViewFinder,
+      );
+      await tester.drag(nestedScrollViewFinder, const Offset(0, -500));
+      await tester.pumpAndSettle();
+      expect(nestedScrollState.outerController.position.pixels, greaterThan(0));
 
-    final headerTitle = find.descendant(
-      of: find.byType(MePage),
-      matching: find.text('Me'),
-    );
-    expect(tester.getTopLeft(headerTitle).dx, 16);
-    final paragraph = tester.renderObject<RenderParagraph>(
-      find.descendant(of: headerTitle, matching: find.byType(RichText)),
-    );
-    expect(paragraph.text.style!.fontSize, 20);
-    expect(paragraph.textScaler.scale(20), 20);
-    final transform = paragraph.getTransformTo(null);
-    expect(transform.entry(0, 0), 1);
-    expect(transform.entry(1, 1), 1);
+      final headerTitle = find.descendant(
+        of: find.byType(MePage),
+        matching: find.text('Me'),
+      );
+      expect(tester.getTopLeft(headerTitle).dx, 16);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: headerTitle, matching: find.byType(RichText)),
+      );
+      expect(paragraph.text.style!.fontSize, 20);
+      expect(paragraph.textScaler.scale(20), 20);
+      final transform = paragraph.getTransformTo(null);
+      expect(transform.entry(0, 0), 1);
+      expect(transform.entry(1, 1), 1);
 
-    expect(
-      tester.widget<Text>(headerTitle).style?.color,
-      GenesisColors.darkTextPrimary,
-    );
-    final visibility = tester.widget<AnimatedOpacity>(
-      find
-          .ancestor(of: headerTitle, matching: find.byType(AnimatedOpacity))
-          .first,
-    );
-    expect(visibility.opacity, 1);
-    await tester.tap(
-      find.descendant(of: find.byType(BottomTabs), matching: find.text('Me')),
-    );
-    await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(headerTitle).style?.color,
+        GenesisColors.darkTextPrimary,
+      );
+      final visibility = tester.widget<AnimatedOpacity>(
+        find
+            .ancestor(of: headerTitle, matching: find.byType(AnimatedOpacity))
+            .first,
+      );
+      expect(visibility.opacity, 1);
+      await tester.tap(
+        find.descendant(of: find.byType(BottomTabs), matching: find.text('Me')),
+      );
+      await tester.pumpAndSettle();
 
-    expect(nestedScrollState.outerController.position.pixels, 0);
-    await tester.pump(const Duration(seconds: 1));
-    AppStartupCoordinator.resetForTesting();
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+      expect(nestedScrollState.outerController.position.pixels, 0);
+
+      for (final collection in ['Worldo', 'Playing']) {
+        await tester.tap(
+          find.descendant(
+            of: find.byType(MePage),
+            matching: find.text(collection),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.drag(nestedScrollViewFinder, const Offset(0, -700));
+        await tester.pumpAndSettle();
+        final outerBefore = nestedScrollState.outerController.position.pixels;
+        final innerBefore = nestedScrollState.innerController.position.pixels;
+        expect(outerBefore, greaterThan(0));
+        expect(innerBefore, greaterThan(0));
+
+        await tester.tap(
+          find.byType(GenesisProfileCollectionListItem).hitTestable().first,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          ModalRoute.of(
+            tester.element(find.text('Back to Me collection')),
+          )?.settings.name,
+          collection == 'Worldo' ? RouteNames.originWorld : RouteNames.world,
+        );
+        await tester.tap(find.text('Back to Me collection'));
+        await tester.pumpAndSettle();
+        expect(nestedScrollState.outerController.position.pixels, outerBefore);
+        expect(nestedScrollState.innerController.position.pixels, innerBefore);
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(BottomTabs),
+            matching: find.text('Home'),
+          ),
+        );
+        // Departure must reset immediately, before returning or waiting for
+        // a scroll animation to finish.
+        expect(nestedScrollState.outerController.position.pixels, 0);
+        expect(nestedScrollState.innerController.position.pixels, 0);
+        expect(
+          nestedScrollState.outerController.position.isScrollingNotifier.value,
+          isFalse,
+        );
+        expect(
+          nestedScrollState.innerController.position.isScrollingNotifier.value,
+          isFalse,
+        );
+        await tester.pump();
+        await tester.tap(
+          find.descendant(
+            of: find.byType(BottomTabs),
+            matching: find.text('Me'),
+          ),
+        );
+        await tester.pump();
+        expect(nestedScrollState.outerController.position.pixels, 0);
+        expect(nestedScrollState.innerController.position.pixels, 0);
+        expect(
+          nestedScrollState.outerController.position.isScrollingNotifier.value,
+          isFalse,
+        );
+        expect(
+          nestedScrollState.innerController.position.isScrollingNotifier.value,
+          isFalse,
+        );
+        await tester.pumpAndSettle();
+        expect(nestedScrollState.outerController.position.pixels, 0);
+        expect(nestedScrollState.innerController.position.pixels, 0);
+      }
+      await tester.pump(const Duration(seconds: 1));
+      AppStartupCoordinator.resetForTesting();
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('Origin tab requests cursor feed then tag list', (
     WidgetTester tester,
@@ -8145,7 +8244,7 @@ void main() {
     final topBar = find.byKey(const ValueKey<String>('origin-top-overlay-bar'));
     final viewportWidth =
         tester.view.physicalSize.width / tester.view.devicePixelRatio;
-    expect(tester.getTopLeft(topBar).dx, moreOrLessEquals(12));
+    expect(tester.getTopLeft(topBar).dx, moreOrLessEquals(5));
     expect(tester.getTopRight(topBar).dx, moreOrLessEquals(viewportWidth - 12));
     expect(tester.getSize(topBar).height, genesisSearchFieldHeight);
     expect(
@@ -28584,7 +28683,7 @@ void main() {
       );
       final viewportWidth =
           tester.view.physicalSize.width / tester.view.devicePixelRatio;
-      expect(tester.getTopLeft(worldTopBar).dx, moreOrLessEquals(12));
+      expect(tester.getTopLeft(worldTopBar).dx, moreOrLessEquals(5));
       expect(
         tester.getTopRight(worldTopBar).dx,
         moreOrLessEquals(viewportWidth - 12),

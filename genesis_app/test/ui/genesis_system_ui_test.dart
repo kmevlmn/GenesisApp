@@ -48,7 +48,7 @@ void main() {
   });
 
   testWidgets(
-    'startup enables edge-to-edge before applying the default style',
+    'startup enables edge-to-edge before applying the dark launch style',
     (tester) async {
       final calls = <MethodCall>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -77,7 +77,7 @@ void main() {
       );
       final style = styleCall.arguments as Map<dynamic, dynamic>;
       expect(style['statusBarColor'], Colors.transparent.toARGB32());
-      expect(style['statusBarIconBrightness'], Brightness.dark.toString());
+      expect(style['statusBarIconBrightness'], Brightness.light.toString());
       expect(style['systemStatusBarContrastEnforced'], isFalse);
     },
   );

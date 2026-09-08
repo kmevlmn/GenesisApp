@@ -16,6 +16,7 @@ class UserProfileContent extends StatefulWidget {
     this.isUpdatingProfileListenable,
     this.gemWalletStateListenable,
     this.reselectionListenable,
+    this.isActiveListenable,
     this.onEditAvatar,
     this.onEditDisplayName,
     this.onRefresh,
@@ -46,6 +47,7 @@ class UserProfileContent extends StatefulWidget {
   final ValueListenable<bool>? isUpdatingProfileListenable;
   final ValueListenable<GemWalletState>? gemWalletStateListenable;
   final ValueListenable<int>? reselectionListenable;
+  final ValueListenable<bool>? isActiveListenable;
   final VoidCallback? onEditAvatar;
   final VoidCallback? onEditDisplayName;
   final Future<void> Function()? onRefresh;
@@ -89,6 +91,7 @@ class _UserProfileContentState extends State<UserProfileContent>
     _scrollController = ScrollController();
     _scrollController.addListener(_updateCollapsedState);
     widget.reselectionListenable?.addListener(_handleMainNavReselected);
+    widget.isActiveListenable?.addListener(_handleTabActivityChanged);
   }
 
   @override
@@ -103,6 +106,10 @@ class _UserProfileContentState extends State<UserProfileContent>
       _followerCountOverride = null;
       _followLoading = false;
     }
+    if (oldWidget.isActiveListenable != widget.isActiveListenable) {
+      oldWidget.isActiveListenable?.removeListener(_handleTabActivityChanged);
+      widget.isActiveListenable?.addListener(_handleTabActivityChanged);
+    }
   }
 
   @override
@@ -110,6 +117,7 @@ class _UserProfileContentState extends State<UserProfileContent>
     _tabController.removeListener(_handleTabControllerChanged);
     _scrollController.removeListener(_updateCollapsedState);
     widget.reselectionListenable?.removeListener(_handleMainNavReselected);
+    widget.isActiveListenable?.removeListener(_handleTabActivityChanged);
     _profilePullOffset.dispose();
     _scrollController.dispose();
     _tabController.dispose();
@@ -507,6 +515,16 @@ class _UserProfileContentState extends State<UserProfileContent>
       _profilePullOffset.value = offset;
     }
     return false;
+  }
+
+  void _handleTabActivityChanged() {
+    if (widget.isActiveListenable?.value != false ||
+        !_scrollController.hasClients) {
+      return;
+    }
+    // Bottom-tab departure resets both nested scroll regions synchronously.
+    // Detail routes do not change tab activity, so their return keeps position.
+    _scrollController.jumpTo(_scrollController.position.minScrollExtent);
   }
 
   void _handleMainNavReselected() {

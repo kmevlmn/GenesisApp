@@ -686,8 +686,9 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
           eventLocationIds: eventMapLocationIds,
           animationsPaused: _worldBottomSheetOpen || mapPausedForLocationChat,
           reloadRevision: _tilemapReloadRevision,
-          visualModeToggleTop: topPadding + 8 + worldMapTabsHeight + 8,
-          visualModeToggleRight: worldMapBackButtonLeft,
+          visualModeToggleTop:
+              topPadding + worldMapBackButtonTop + worldMapTabsHeight + 8,
+          visualModeToggleRight: worldMapTopBarRightInset,
           restorationController: _tilemapRestorationController,
           onMapTap: _recordWorldTilemapClick,
           onDisplayReadinessChanged: _handleTilemapDisplayReadinessChanged,
@@ -774,8 +775,8 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
               ),
             if (_worldMainTabIndex != 0)
               Positioned(
-                left: 9.5,
-                top: topPadding + 6,
+                left: worldMapBackButtonLeft,
+                top: topPadding + worldMapBackButtonTop,
                 child: WorldMapBackButton(
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),

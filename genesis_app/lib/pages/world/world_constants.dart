@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/components/genesis_map_top_glass_bar.dart';
 
 import '../../components/world_details_shell.dart';
 
@@ -11,8 +12,10 @@ const String worldSectionCastIconAsset =
     'assets/custom-icons/svg/world_tab_cast.svg';
 const String worldDetailIconAsset =
     'assets/custom-icons/svg/worlddetail-icon.svg';
-const double worldMapTabsHeight = 38;
-const double worldMapBackButtonLeft = 12;
+const double worldMapTabsHeight = genesisMapBackButtonDimension;
+const double worldMapBackButtonLeft = genesisMapBackButtonLeft;
+const double worldMapBackButtonTop = genesisMapBackButtonTop;
+const double worldMapTopBarRightInset = genesisMapTopBarRightInset;
 const double worldMapIdentityHorizontalGap = 10;
 const double worldMainTabsHeight = 49;
 const double worldBottomTagHeight = 34;

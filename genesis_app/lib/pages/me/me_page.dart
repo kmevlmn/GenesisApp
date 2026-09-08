@@ -207,6 +207,7 @@ class _MePageState extends State<MePage> with RouteAware {
                 loggingInProvider: _loggingInProvider,
                 onLogin: _login,
                 reselectionListenable: widget.reselectionListenable,
+                isActiveListenable: widget.isActiveListenable,
               );
             }
             final data = content.data!;
@@ -282,6 +283,7 @@ class _MePageState extends State<MePage> with RouteAware {
                       isUpdatingProfileListenable: _isUpdatingProfile,
                       gemWalletStateListenable: gemWalletState,
                       reselectionListenable: widget.reselectionListenable,
+                      isActiveListenable: widget.isActiveListenable,
                       onEditAvatar: _editAvatar,
                       onEditDisplayName: _editNickName,
                       onRefresh: _refreshCurrentCollection,

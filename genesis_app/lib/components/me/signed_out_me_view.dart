@@ -14,11 +14,13 @@ class SignedOutMeView extends StatefulWidget {
     required this.loggingInProvider,
     required this.onLogin,
     this.reselectionListenable,
+    this.isActiveListenable,
   });
 
   final IdentityProvider? loggingInProvider;
   final ValueChanged<IdentityProvider> onLogin;
   final ValueListenable<int>? reselectionListenable;
+  final ValueListenable<bool>? isActiveListenable;
 
   @override
   State<SignedOutMeView> createState() => _SignedOutMeViewState();
@@ -34,23 +36,36 @@ class _SignedOutMeViewState extends State<SignedOutMeView> {
   void initState() {
     super.initState();
     widget.reselectionListenable?.addListener(_handleMainNavReselected);
+    widget.isActiveListenable?.addListener(_handleTabActivityChanged);
   }
 
   @override
   void didUpdateWidget(covariant SignedOutMeView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.reselectionListenable == widget.reselectionListenable) {
-      return;
+    if (oldWidget.reselectionListenable != widget.reselectionListenable) {
+      oldWidget.reselectionListenable?.removeListener(_handleMainNavReselected);
+      widget.reselectionListenable?.addListener(_handleMainNavReselected);
     }
-    oldWidget.reselectionListenable?.removeListener(_handleMainNavReselected);
-    widget.reselectionListenable?.addListener(_handleMainNavReselected);
+    if (oldWidget.isActiveListenable != widget.isActiveListenable) {
+      oldWidget.isActiveListenable?.removeListener(_handleTabActivityChanged);
+      widget.isActiveListenable?.addListener(_handleTabActivityChanged);
+    }
   }
 
   @override
   void dispose() {
     widget.reselectionListenable?.removeListener(_handleMainNavReselected);
+    widget.isActiveListenable?.removeListener(_handleTabActivityChanged);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleTabActivityChanged() {
+    if (widget.isActiveListenable?.value != false ||
+        !_scrollController.hasClients) {
+      return;
+    }
+    _scrollController.jumpTo(_scrollController.position.minScrollExtent);
   }
 
   void _handleMainNavReselected() {

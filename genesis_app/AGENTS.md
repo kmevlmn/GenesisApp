@@ -200,6 +200,12 @@ HTTP 映射层的图片规则：
 - 需要透明度变体时，从对应 token 派生，例如 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.8)`；不得用变体替代规定的三级文字颜色。
 - 不创建肉眼接近的背景色或文字透明度。纯白 `#FFFFFF` 不作为深色内容区常规文字颜色，除非设计明确要求更高强调层级；输入区域和浮动操作菜单按后文专项规范执行。
 
+## 原生启动页
+
+- 启动页固定深色，不随系统深浅色切换。原生启动窗口与 Flutter 首帧之前的背景均对应 `GenesisColors.darkBackground`，状态栏使用浅色图标。
+- 启动图使用 `assets/images/app_icon.png`，居中显示为 96×96、圆角 12；通过 `dart run tool/generate_launch_assets.dart` 生成 iOS / Android 资源，并从公共背景 token 同步原生色值。修改源图或 token 后须重新生成。
+- Android 仅按启动机制保留 Android 12 的版本资源，不复制日间 / 夜间样式。原生启动资源修改后需重新 build / install，热重载不会更新。
+
 ## 红色层级规范
 
 红色按用途划分为三个等级，唯一色值定义在 `GenesisColors`；这些是不同色值，不是透明度变体。

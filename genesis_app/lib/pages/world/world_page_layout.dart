@@ -144,7 +144,7 @@ extension _WorldPageLayout on _WorldPageState {
           final maxIdentityWidth =
               (constraints.maxWidth -
                       sideReservedWidth -
-                      worldMapBackButtonLeft)
+                      worldMapTopBarRightInset)
                   .clamp(worldTimePillMinWidth, constraints.maxWidth)
                   .toDouble();
           return Stack(
@@ -152,8 +152,8 @@ extension _WorldPageLayout on _WorldPageState {
               if (_worldMainTabIndex == 0)
                 Positioned(
                   left: worldMapBackButtonLeft,
-                  right: worldMapBackButtonLeft,
-                  top: top + 8,
+                  right: worldMapTopBarRightInset,
+                  top: top + worldMapBackButtonTop,
                   child: AnimatedBuilder(
                     animation:
                         _mainTabController.animation ?? _mainTabController,

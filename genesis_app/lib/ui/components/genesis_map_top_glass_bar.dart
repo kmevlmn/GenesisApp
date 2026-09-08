@@ -6,6 +6,15 @@ const Color genesisMapTopGlassBarColor = Color(0x80151517);
 const double genesisMapTopGlassBarBlurSigma = 10;
 const double genesisMapTopGlassBarRadius = 12;
 
+// Match Location Chat's unchanged 48px back-button slot in its 50px header.
+// The 38px glass plate centers its 17px arrow at (24, safeTop + 25).
+const double genesisMapBackButtonDimension = 38;
+const double genesisMapBackButtonLeft =
+    (48 - genesisMapBackButtonDimension) / 2;
+const double genesisMapBackButtonTop = (50 - genesisMapBackButtonDimension) / 2;
+const double genesisMapBackIconSize = 17;
+const double genesisMapTopBarRightInset = 12;
+
 class GenesisMapGlassBackButton extends StatelessWidget {
   const GenesisMapGlassBackButton({
     super.key,
@@ -37,7 +46,7 @@ class GenesisMapGlassBackButton extends StatelessWidget {
             key: surfaceKey,
             color: genesisMapTopGlassBarColor,
             child: IconButton(
-              iconSize: 18,
+              iconSize: genesisMapBackIconSize,
               onPressed: onPressed,
               icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
               padding: EdgeInsets.zero,

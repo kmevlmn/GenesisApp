@@ -37,6 +37,7 @@ const SystemUiOverlayStyle kGenesisLightSystemUiOverlayStyle =
 abstract final class GenesisSystemUi {
   static Future<void> initialize() async {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setSystemUIOverlayStyle(kGenesisDefaultSystemUiOverlayStyle);
+    // Match the native dark launch screen until the first page takes over.
+    SystemChrome.setSystemUIOverlayStyle(kGenesisLightSystemUiOverlayStyle);
   }
 }

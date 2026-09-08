@@ -2527,7 +2527,7 @@ void main() {
       find.byKey(const ValueKey('memory-model-entry')),
     );
     final headerRect = tester.getRect(find.byType(ChatHeader));
-    expect(titleIconRect.left, closeTo(48, 1));
+    expect(titleIconRect.left, closeTo(44.5, 0.01));
     expect(titleIcon.color, Colors.white.withValues(alpha: 0.45));
     expect(subtitleIconRect.left, closeTo(titleIconRect.left, 1));
     expect(modelRect.right, closeTo(headerRect.right, 1));
@@ -2575,7 +2575,7 @@ void main() {
 
     expect(modelRect.width, kMemoryModelEntryMinWidth);
     expect(titleRect.right, closeTo(modelRect.left, 0.01));
-    expect(titleRect.width, closeTo(393 - 48 - 16 - 4 - 82, 0.01));
+    expect(titleRect.width, closeTo(393 - 44.5 - 16 - 4 - 82, 0.01));
   });
 
   testWidgets(
