@@ -6,6 +6,8 @@ import 'package:genesis_flutter_android/components/common/genesis_bottom_sheet_p
 import 'package:genesis_flutter_android/components/common/genesis_modal_routes.dart';
 import 'package:genesis_flutter_android/components/login_sheet.dart';
 import 'package:genesis_flutter_android/components/login_provider_button.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
+import 'package:genesis_flutter_android/ui/components/genesis_dark_close_button.dart';
 
 void main() {
   testWidgets('provider buttons follow the current flavor capability', (
@@ -55,7 +57,36 @@ void main() {
     );
 
     final title = tester.widget<Text>(find.text('Sign up to continue'));
-    expect(title.style, GenesisBottomSheetPanel.titleStyle);
+    expect(
+      title.style,
+      GenesisBottomSheetPanel.titleStyle.copyWith(
+        color: GenesisColors.darkTextPrimary,
+      ),
+    );
+    expect(find.byType(GenesisDarkCloseButton), findsOneWidget);
+    final panel = tester.widget<Material>(
+      find
+          .descendant(
+            of: find.byType(GenesisBottomSheetPanel),
+            matching: find.byType(Material),
+          )
+          .first,
+    );
+    expect(panel.color, GenesisColors.darkRaisedBackground);
+    final legal = tester.widget<Text>(
+      find.descendant(
+        of: find.byType(LoginLegalText),
+        matching: find.byType(Text),
+      ),
+    );
+    final links = (legal.textSpan! as TextSpan).children!
+        .whereType<TextSpan>()
+        .where((span) => span.recognizer != null);
+    expect(links, hasLength(3));
+    for (final link in links) {
+      expect(link.style?.color, GenesisColors.darkTextSecondary);
+      expect(link.style?.decoration, TextDecoration.none);
+    }
   });
 
   testWidgets('login sheet centers the branded Gems signup promo', (
@@ -71,7 +102,7 @@ void main() {
     final promo = tester.widget<Text>(promoFinder);
     expect(promo.style?.fontSize, 14);
     expect(promo.style?.fontWeight, FontWeight.w600);
-    expect(promo.style?.color, const Color(0xFFFF2442));
+    expect(promo.style?.color, GenesisColors.redSecondary);
     expect(promo.textAlign, TextAlign.center);
     expect(
       tester.getCenter(promoFinder).dx,

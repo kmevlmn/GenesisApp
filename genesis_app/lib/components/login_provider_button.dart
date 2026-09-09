@@ -108,7 +108,7 @@ class _LoginLegalTextState extends State<LoginLegalText> {
       fontSize: 12,
       height: 1.35,
       color: dark ? GenesisColors.darkTextSecondary : const Color(0xFF3E5B8A),
-      decoration: dark ? TextDecoration.underline : null,
+      decoration: TextDecoration.none,
     );
     return Text.rich(
       TextSpan(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'common/genesis_bottom_sheet_panel.dart';
 import 'common/genesis_center_toast.dart';
@@ -8,6 +9,9 @@ import '../app/telemetry/genesis_telemetry.dart';
 import '../platform/auth/auth_cancelled_exception.dart';
 import '../platform/auth/auth_session.dart';
 import '../ui/tokens/genesis_colors.dart';
+import '../ui/components/genesis_dark_close_button.dart';
+import '../ui/components/genesis_safe_area.dart';
+import '../ui/theme/genesis_dark_theme.dart';
 
 class LoginSheet extends StatefulWidget {
   const LoginSheet({super.key, required this.onLogin});
@@ -62,51 +66,63 @@ class _LoginSheetState extends State<LoginSheet> {
     final maxHeight = media.size.height - media.padding.top - 18;
     final targetHeight = maxHeight < 342 ? maxHeight : 342.0;
 
-    return GenesisBottomSheetPanel(
-      title: 'Sign up to continue',
-      height: targetHeight,
-      trailing: GenesisBottomSheetCloseButton(
-        onPressed: _submittingProvider != null
-            ? null
-            : () {
-                GenesisTelemetry.event(
-                  'login_cancel',
-                  category: 'auth',
-                  data: const <String, Object?>{'source': 'close_button'},
-                );
-                Navigator.of(context).pop(false);
-              },
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(
-            width: double.infinity,
-            child: Text(
-              'Sign up and get 250 Gems!',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: GenesisColors.brand,
-                height: 1.35,
-              ),
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkRaisedBackground,
+        ),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            systemNavigationBarIconBrightness: Brightness.light,
+          ),
+          child: GenesisBottomSheetPanel(
+            title: 'Sign up to continue',
+            height: targetHeight,
+            trailing: GenesisDarkCloseButton(
+              onPressed: _submittingProvider != null
+                  ? null
+                  : () {
+                      GenesisTelemetry.event(
+                        'login_cancel',
+                        category: 'auth',
+                        data: const <String, Object?>{'source': 'close_button'},
+                      );
+                      Navigator.of(context).pop(false);
+                    },
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    'Sign up and get 250 Gems!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: GenesisColors.redSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                LoginProviderButtons(
+                  loggingInProvider: _submittingProvider,
+                  onLogin: _submit,
+                  spacing: 12,
+                ),
+                const SizedBox(height: 14),
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 22),
+                    child: LoginLegalText(),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          LoginProviderButtons(
-            loggingInProvider: _submittingProvider,
-            onLogin: _submit,
-            spacing: 12,
-          ),
-          const SizedBox(height: 14),
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 22),
-              child: LoginLegalText(),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

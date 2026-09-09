@@ -1,3 +1,4 @@
+import '../../ui/components/genesis_dark_close_button.dart';
 // ignore_for_file: use_key_in_widget_constructors
 
 import 'dart:async';
@@ -901,22 +902,7 @@ class WorldSingleSectionSheetHeader extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: TextButton(
-                      onPressed: onClose,
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(28, 28),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        backgroundColor: GenesisColors.darkFaintFill,
-                        foregroundColor: GenesisColors.darkTextPrimary,
-                        shape: const CircleBorder(),
-                      ),
-                      child: const Icon(Icons.close_rounded, size: 17),
-                    ),
-                  ),
+                  GenesisDarkCloseButton(onPressed: onClose),
                 ],
               ),
             ),

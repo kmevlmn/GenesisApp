@@ -221,6 +221,14 @@ HTTP 映射层的图片规则：
 - Worldo Detail Personality、World Detail Cast 的 Personality、Location Chat 的同色强调和 Tick Event 线索统一引用 `redSecondary`。页面级颜色别名可以保留，但必须映射公共 token。
 - 新增及修改红色样式时必须调用对应 token，不复制色值；其他红色、不同透明度和特殊状态不因颜色接近而强行替换。
 
+## 深色面板关闭按钮规范
+
+- 普通深色 Sheet、弹层和面板的关闭按钮统一使用 `GenesisDarkCloseButton`（`lib/ui/components/genesis_dark_close_button.dart`），调用方只传 `onPressed` 和可选 `key`，不得重复拼装圆底与关闭图标。
+- 按钮为 28×28 的圆形，填充使用 `GenesisColors.darkFaintFill`（约 12% 白）；内部 `Icons.close_rounded` 图标为 17px，使用 `GenesisColors.darkTextPrimary`。禁用时保留圆底，图标使用 `darkTextTertiary`，不响应点击；公共组件提供 `Close` 提示。
+- 尺寸和状态样式由组件集中管理。外部定位、Header 边距及关闭回调仍由调用方负责，不因复用而改变页面关闭行为。
+- `GenesisBottomSheetCloseButton` 在深色主题下转用此组件；`GenesisBottomSheetPanel` 的深色面板与安全区使用 `darkRaisedBackground`，默认标题使用 `darkTextPrimary`。浅色调用沿用原样式。
+- 图片查看器、裁剪工具的专用工具栏关闭操作，以及搜索清空、附件删除，不属于普通面板关闭按钮，保留各自的布局和交互规格。
+
 ## 深色 Sheet Handle 设计规范
 
 - 顶部横向分页 Handle 的颜色以 Worldo Sheet 为基准：选中段使用 `GenesisColors.darkHandleActive`（`darkTextPrimary`，95% 白），未选中段使用 `GenesisColors.darkHandleInactive`（`darkTextTertiary`，45% 白）。不得用输入填充的 12% 白代替未选中颜色。
