@@ -39,6 +39,7 @@ void main() {
           body: SizedBox(
             width: 320,
             child: ProfileMembershipCard(
+              isActive: true,
               membershipExpiresAt: DateTime(year, 10, 7),
               blueBalanceCent: 30000,
               blueGemsExpiresAt: DateTime(year, 9, 30),

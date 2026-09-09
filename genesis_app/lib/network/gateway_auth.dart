@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../app/telemetry/genesis_telemetry.dart';
 import '../platform/channels/genesis_method_channels.dart';
 import '../platform/device/device_id_service.dart';
+import '../utils/server_clock.dart';
 import 'api_client.dart';
 import 'api_exception.dart';
 import 'app_request_headers.dart';
@@ -411,6 +412,7 @@ class GatewayAuthCoordinator {
   final HttpTransport _transport;
   late final ApiClient _client;
   int? _serverTimeOffsetMs;
+  final ServerClock serverClock = ServerClock();
   Future<void>? _prepareFuture;
   Future<void>? _registrationRecoveryFuture;
 
@@ -570,6 +572,9 @@ class GatewayAuthCoordinator {
       );
       final offset = serverTimeMs - DateTime.now().millisecondsSinceEpoch;
       _serverTimeOffsetMs = offset;
+      serverClock.synchronize(
+        DateTime.fromMillisecondsSinceEpoch(serverTimeMs, isUtc: true),
+      );
       stopwatch.stop();
       _gatewayTelemetry(
         'gateway.time_sync',

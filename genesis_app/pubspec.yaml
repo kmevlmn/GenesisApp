@@ -47,6 +47,7 @@ dependencies:
   http_profile: ^0.1.0
   google_sign_in: ^7.2.0
   shared_preferences: ^2.5.3
+  flutter_secure_storage: ^10.0.0
   sign_in_with_apple: ^8.0.0
   crypto: ^3.0.7
   uuid: ^4.5.3
@@ -74,6 +75,8 @@ dependency_overrides:
     path: third_party/firebase_performance
   in_app_purchase_android:
     path: third_party/in_app_purchase_android
+  in_app_purchase_storekit:
+    path: third_party/in_app_purchase_storekit
   sign_in_with_apple:
     path: third_party/sign_in_with_apple
   path_provider_foundation: 2.4.2

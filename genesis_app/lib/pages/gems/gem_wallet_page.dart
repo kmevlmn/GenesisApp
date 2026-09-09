@@ -47,6 +47,7 @@ class GemWalletPage extends StatefulWidget {
   const GemWalletPage({
     super.key,
     this.showSubscriptionInitially = false,
+    this.showBuyGems = true,
     this.productsLoader,
     this.membershipProductsLoader,
     this.tasksLoader,
@@ -60,6 +61,7 @@ class GemWalletPage extends StatefulWidget {
   final GemProductsLoader? productsLoader;
   final MembershipCatalogLoader? membershipProductsLoader;
   final bool showSubscriptionInitially;
+  final bool showBuyGems;
   final GemTasksLoader? tasksLoader;
   final GemWalletStore? walletStore;
   final BillingService? billingService;
@@ -129,11 +131,12 @@ class _GemWalletPageState extends State<GemWalletPage>
   @override
   void initState() {
     super.initState();
-    _subscriptionVisited = widget.showSubscriptionInitially;
-    _gemsVisited = !widget.showSubscriptionInitially;
+    _subscriptionVisited =
+        !widget.showBuyGems || widget.showSubscriptionInitially;
+    _gemsVisited = !_subscriptionVisited;
     _purchaseTabs = TabController(
-      length: 2,
-      initialIndex: widget.showSubscriptionInitially ? 0 : 1,
+      length: widget.showBuyGems ? 2 : 1,
+      initialIndex: _subscriptionVisited ? 0 : 1,
       vsync: this,
     );
     _purchaseTabs.addListener(_visitCurrentTab);
@@ -224,20 +227,24 @@ class _GemWalletPageState extends State<GemWalletPage>
           titleSideInset: 56,
           systemOverlayStyle: kGenesisDefaultSystemUiOverlayStyle,
           actions: [
-            IconButton(
-              key: const ValueKey('wallet-records-button'),
-              tooltip: 'Records',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(width: 56, height: 50),
-              onPressed: () =>
-                  Navigator.of(context).pushNamed(RouteNames.gemRecords),
-              icon: SvgPicture.asset(
-                recordsIconAsset,
-                key: const ValueKey('wallet-records-icon'),
-                width: 20,
-                height: 20,
+            if (widget.showBuyGems)
+              IconButton(
+                key: const ValueKey('wallet-records-button'),
+                tooltip: 'Records',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 56,
+                  height: 50,
+                ),
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(RouteNames.gemRecords),
+                icon: SvgPicture.asset(
+                  recordsIconAsset,
+                  key: const ValueKey('wallet-records-icon'),
+                  width: 20,
+                  height: 20,
+                ),
               ),
-            ),
           ],
         ),
         body: SafeArea(
@@ -252,11 +259,12 @@ class _GemWalletPageState extends State<GemWalletPage>
                       )
                     : const SizedBox.expand(),
               ),
-              _WalletTabPage(
-                child: _gemsVisited
-                    ? _buildBody(_walletStateListenable)
-                    : const SizedBox.expand(),
-              ),
+              if (widget.showBuyGems)
+                _WalletTabPage(
+                  child: _gemsVisited
+                      ? _buildBody(_walletStateListenable)
+                      : const SizedBox.expand(),
+                ),
             ],
           ),
         ),

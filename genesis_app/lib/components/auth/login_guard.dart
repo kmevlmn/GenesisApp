@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/gems/daily_check_in_coordinator.dart';
@@ -13,13 +14,18 @@ import '../login_sheet.dart';
 Future<bool> ensureGenesisLogin(
   BuildContext context, {
   bool continueAfterLogin = false,
+  bool isDismissible = true,
+  ValueListenable<bool>? forceLoginRequired,
 }) async {
   if (await hasGenesisLoginSession(context)) return true;
+  if (forceLoginRequired?.value == false) return false;
   if (!context.mounted) return false;
   final loginContext = context;
 
   final loggedIn = await showLoginSheet(
     context: loginContext,
+    isDismissible: isDismissible,
+    forceLoginRequired: forceLoginRequired,
     onLogin: (provider) {
       return _loginWithProvider(loginContext, provider);
     },

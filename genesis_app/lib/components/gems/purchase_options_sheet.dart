@@ -15,11 +15,13 @@ class PurchaseOptionsSheet extends StatefulWidget {
     super.key,
     required this.gemsBuilder,
     this.initialTab = PurchaseSheetTab.buyGems,
+    this.showBuyGems = true,
     this.membershipProductsLoader,
   });
 
   final WidgetBuilder gemsBuilder;
   final PurchaseSheetTab initialTab;
+  final bool showBuyGems;
   final MembershipCatalogLoader? membershipProductsLoader;
 
   @override
@@ -35,11 +37,14 @@ class _PurchaseOptionsSheetState extends State<PurchaseOptionsSheet>
   @override
   void initState() {
     super.initState();
-    _gemsVisited = widget.initialTab == PurchaseSheetTab.buyGems;
-    _subscriptionVisited = widget.initialTab == PurchaseSheetTab.subscription;
+    final initialTab = widget.showBuyGems
+        ? widget.initialTab
+        : PurchaseSheetTab.subscription;
+    _gemsVisited = initialTab == PurchaseSheetTab.buyGems;
+    _subscriptionVisited = initialTab == PurchaseSheetTab.subscription;
     _tabs = TabController(
-      length: 2,
-      initialIndex: widget.initialTab.index,
+      length: widget.showBuyGems ? 2 : 1,
+      initialIndex: initialTab.index,
       vsync: this,
     );
     _tabs.addListener(_visitCurrentTab);
@@ -97,17 +102,19 @@ class _PurchaseOptionsSheetState extends State<PurchaseOptionsSheet>
               child: _subscriptionVisited
                   ? ProSubscriptionContent(
                       productsLoader: widget.membershipProductsLoader,
+                      closeOnPurchaseSuccess: true,
                     )
                   : const SizedBox.expand(),
             ),
-            _PurchaseSheetPage(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _gemsVisited
-                    ? Builder(builder: widget.gemsBuilder)
-                    : const SizedBox.expand(),
+            if (widget.showBuyGems)
+              _PurchaseSheetPage(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _gemsVisited
+                      ? Builder(builder: widget.gemsBuilder)
+                      : const SizedBox.expand(),
+                ),
               ),
-            ),
           ],
         ),
       ),

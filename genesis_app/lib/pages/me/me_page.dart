@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/debug_page_tracker.dart';
+import '../../app/gems/gem_wallet_store.dart';
 import '../../components/common/genesis_action_box.dart';
 import '../../components/common/genesis_center_toast.dart';
 import '../../components/common/genesis_modal_routes.dart';
@@ -238,37 +239,42 @@ class _MePageState extends State<MePage> with RouteAware {
                 ),
               ),
               Expanded(
-                child: UserProfileContent(
-                  data: data,
-                  originsListenable: _originsState,
-                  worldsListenable: _worldsState,
-                  avatarUrlListenable: _avatarUrl,
-                  displayNameListenable: _displayName,
-                  displayNameTrailing: SizedBox(
-                    width: 50,
-                    // Match the name's line height without moving the edit action.
-                    height: MediaQuery.textScalerOf(context).scale(20),
-                    child: const Center(
-                      child: ProMembershipBadge(
-                        key: ValueKey('me-profile-crown-icon'),
-                      ),
-                    ),
+                child: ValueListenableBuilder<GemWalletState>(
+                  valueListenable: gemWalletState,
+                  builder: (context, wallet, _) => UserProfileContent(
+                    data: data,
+                    originsListenable: _originsState,
+                    worldsListenable: _worldsState,
+                    avatarUrlListenable: _avatarUrl,
+                    displayNameListenable: _displayName,
+                    displayNameTrailing: wallet.membership?.isActive == true
+                        ? SizedBox(
+                            width: 50,
+                            // Match the name's line height without moving the edit action.
+                            height: MediaQuery.textScalerOf(context).scale(20),
+                            child: const Center(
+                              child: ProMembershipBadge(
+                                key: ValueKey('me-profile-crown-icon'),
+                              ),
+                            ),
+                          )
+                        : null,
+                    isUpdatingProfileListenable: _isUpdatingProfile,
+                    gemWalletStateListenable: gemWalletState,
+                    reselectionListenable: widget.reselectionListenable,
+                    onEditAvatar: _editAvatar,
+                    onEditDisplayName: _editNickName,
+                    onRefresh: _refreshCurrentCollection,
+                    onRefreshOrigins: _refreshOrigins,
+                    onRefreshWorlds: _refreshWorlds,
+                    onWorldDeleted: _handleWorldDeleted,
+                    onCollectionTabChanged: _handleCollectionTabChanged,
+                    onCollapsedChanged: _handleProfileCollapsedChanged,
+                    originTabLabel: 'Worldo',
+                    worldTabLabel: 'Playing',
+                    showCollectionCounts: true,
+                    tabLabelFontSize: 14,
                   ),
-                  isUpdatingProfileListenable: _isUpdatingProfile,
-                  gemWalletStateListenable: gemWalletState,
-                  reselectionListenable: widget.reselectionListenable,
-                  onEditAvatar: _editAvatar,
-                  onEditDisplayName: _editNickName,
-                  onRefresh: _refreshCurrentCollection,
-                  onRefreshOrigins: _refreshOrigins,
-                  onRefreshWorlds: _refreshWorlds,
-                  onWorldDeleted: _handleWorldDeleted,
-                  onCollectionTabChanged: _handleCollectionTabChanged,
-                  onCollapsedChanged: _handleProfileCollapsedChanged,
-                  originTabLabel: 'Worldo',
-                  worldTabLabel: 'Playing',
-                  showCollectionCounts: true,
-                  tabLabelFontSize: 14,
                 ),
               ),
             ],

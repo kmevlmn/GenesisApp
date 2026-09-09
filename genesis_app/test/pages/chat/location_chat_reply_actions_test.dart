@@ -411,7 +411,7 @@ void main() {
   });
 
   testWidgets(
-    'Get more opens Subscription and tabs switch without eager gems loading',
+    'guest Get more opens only Subscription and cannot swipe to Gems',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -431,14 +431,15 @@ void main() {
       await tester.tap(getMore);
       await tester.pumpAndSettle();
       expect(find.text('Subscription'), findsOneWidget);
-      expect(find.text('Buy Gems'), findsOneWidget);
+      expect(find.text('Buy Gems'), findsNothing);
       expect(find.byKey(const ValueKey('pro-tier-title')), findsOneWidget);
-      await tester.tap(find.text('Buy Gems'));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('pro-tier-title')), findsNothing);
-      await tester.tap(find.text('Subscription'));
+      await tester.drag(
+        find.byKey(const ValueKey('purchase-sheet-pages')),
+        const Offset(-500, 0),
+      );
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('pro-tier-title')), findsOneWidget);
+      expect(find.text('Buy Gems'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('gem-purchase-sheet-close')));
       await tester.pumpAndSettle();
       expect(find.byType(PurchaseOptionsSheet), findsNothing);

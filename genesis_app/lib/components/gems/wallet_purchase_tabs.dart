@@ -51,7 +51,7 @@ class WalletPurchaseTabs extends StatelessWidget {
             builder: (context, _) => SecendTabs(
               controller: controller,
               indicatorColor: GenesisColors.brand,
-              labels: const ['Subscription', 'Buy Gems'],
+              labels: ['Subscription', if (controller.length > 1) 'Buy Gems'],
               horizontalPadding: 0,
               labelPadding: const EdgeInsets.symmetric(horizontal: 4),
               verticalPadding: 0,
@@ -62,7 +62,7 @@ class WalletPurchaseTabs extends StatelessWidget {
               labelColor: GenesisColors.textPrimary,
               unselectedLabelColor: GenesisColors.tabUnselected,
               labelWidgets: [
-                for (var index = 0; index < 2; index++)
+                for (var index = 0; index < controller.length; index++)
                   SizedBox(
                     key: ValueKey(
                       index == 0

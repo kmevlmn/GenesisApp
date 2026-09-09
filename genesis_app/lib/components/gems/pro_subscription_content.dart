@@ -7,12 +7,18 @@ import 'package:intl/intl.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/bootstrap/service_registry.dart';
 import '../../app/membership/membership_catalog.dart';
+import '../../app/membership/membership_purchase_service.dart';
+import '../../app/membership/membership_purchase_eligibility.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../routers/app_router.dart';
 import '../../ui/components/genesis_primary_button.dart';
 import '../../ui/components/genesis_soft_italic_text.dart';
 import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_typography.dart';
+import '../../network/models/membership_product.dart';
+import '../../network/models/membership_benefit.dart';
+import 'gem_colors.dart';
+import 'membership_purchase_presentation.dart';
 import '../common/genesis_center_toast.dart';
 import 'pro_colors.dart';
 
@@ -26,12 +32,19 @@ enum _ProPlan {
   final String period;
 }
 
-enum _PreviewBenefitStatus { upgraded, unchanged, locked }
-
 class ProSubscriptionContent extends StatefulWidget {
-  const ProSubscriptionContent({super.key, this.productsLoader});
+  const ProSubscriptionContent({
+    super.key,
+    this.productsLoader,
+    this.purchaseHandler,
+    this.purchaseService,
+    this.closeOnPurchaseSuccess = false,
+  });
 
   final MembershipCatalogLoader? productsLoader;
+  final Future<void> Function(MembershipProduct)? purchaseHandler;
+  final MembershipPurchaseService? purchaseService;
+  final bool closeOnPurchaseSuccess;
 
   @override
   State<ProSubscriptionContent> createState() => _ProSubscriptionContentState();
@@ -44,6 +57,9 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
   bool _loading = false;
   bool _started = false;
   int _requestGeneration = 0;
+  MembershipPurchasePresentation? _purchasePresentation;
+  MembershipPurchaseService? _presentationService;
+  MembershipPurchaseService? _catalogService;
 
   MembershipOffer? _offerFor(_ProPlan plan) {
     for (final offer in _offers) {
@@ -59,6 +75,10 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
     if (!_started || !identical(services, _services)) {
       _services?.sessionRevision.removeListener(_sessionChanged);
       _services = services;
+      _bindPurchaseUpdates();
+      _purchasePresentation?.dispose();
+      _purchasePresentation = null;
+      _presentationService = null;
       services?.sessionRevision.addListener(_sessionChanged);
       _started = true;
       unawaited(_load());
@@ -69,6 +89,20 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
   void didUpdateWidget(ProSubscriptionContent oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.productsLoader != widget.productsLoader) unawaited(_load());
+    _bindPurchaseUpdates();
+  }
+
+  void _bindPurchaseUpdates() {
+    final service = widget.purchaseService ?? _services?.membershipPurchases;
+    if (identical(service, _catalogService)) return;
+    _catalogService?.catalogRevision.removeListener(_purchaseChanged);
+    _catalogService = service;
+    service?.catalogRevision.addListener(_purchaseChanged);
+  }
+
+  void _purchaseChanged() {
+    // A catalog refresh caused by restore must not start another restore.
+    unawaited(_load(silent: true, restorePurchases: false));
   }
 
   void _sessionChanged() {
@@ -78,26 +112,44 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
 
   @override
   void dispose() {
+    _purchasePresentation?.dispose();
     _requestGeneration++;
     _services?.sessionRevision.removeListener(_sessionChanged);
+    _catalogService?.catalogRevision.removeListener(_purchaseChanged);
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({
+    bool silent = false,
+    bool restorePurchases = true,
+  }) async {
     final request = ++_requestGeneration;
     setState(() {
-      _loading = true;
-      _offers = [];
+      if (!silent) {
+        _loading = true;
+        _offers = [];
+      }
     });
     try {
       final loader = widget.productsLoader ?? _services?.membershipCatalog.load;
       if (loader == null) throw MembershipPlatformUnavailable();
-      final offers = await loader();
+      final catalog = await loader();
       if (!mounted || request != _requestGeneration) return;
       setState(() {
-        _offers = offers;
+        _offers = catalog.offers;
+        if (_offerFor(_plan) == null && _offers.isNotEmpty) {
+          _plan = _ProPlan.values.firstWhere((plan) => _offerFor(plan) != null);
+        }
         _loading = false;
       });
+      if (restorePurchases) {
+        unawaited(
+          (widget.purchaseService ?? _services?.membershipPurchases)
+              ?.restorePurchases(
+                products: catalog.offers.map((offer) => offer.product).toList(),
+              ),
+        );
+      }
     } catch (error) {
       if (!mounted || request != _requestGeneration) return;
       debugPrint('[Membership] catalog load failed: ${error.runtimeType}');
@@ -105,20 +157,62 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
     }
   }
 
-  void _onSubscribePressed() {
+  Future<void> _onSubscribePressed() async {
     if (_loading) return;
     final offer = _offerFor(_plan);
     if (offer == null || offer.price == null) {
       unawaited(_load());
       return;
     }
-    // Sale availability is a business guard, not a presentation state.
-    if (!offer.product.saleEnabled) return;
-    showGenesisToast(context, 'Pro subscriptions are coming soon.');
+    final blocked = membershipPurchaseBlockReason(offer.product);
+    if (blocked != null) {
+      showGenesisToast(context, membershipPurchaseFailureMessage(blocked));
+      unawaited(_load(silent: true, restorePurchases: false));
+      return;
+    }
+    final handler = widget.purchaseHandler;
+    if (handler != null) {
+      await handler(offer.product);
+      return;
+    }
+    final service = widget.purchaseService ?? _services?.membershipPurchases;
+    if (service == null) {
+      showGenesisToast(context, 'VIP purchase is unavailable.');
+      return;
+    }
+    if (!identical(service, _presentationService)) {
+      _purchasePresentation?.dispose();
+      _presentationService = service;
+      _purchasePresentation = MembershipPurchasePresentation(
+        context: context,
+        service: service,
+      );
+    }
+    final confirmed = await _purchasePresentation!.purchase(offer.product);
+    if (confirmed &&
+        mounted &&
+        widget.closeOnPurchaseSuccess &&
+        ModalRoute.of(context)?.isCurrent == true) {
+      await Navigator.of(context).maybePop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final selectedProduct = _offerFor(_plan)?.product;
+    if (_loading) {
+      // Match Buy Gems' initial loading indicator in the same tab content area.
+      return const Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: kGemAccentColor,
+          ),
+        ),
+      );
+    }
     return Column(
       children: [
         const SizedBox(height: 10),
@@ -134,23 +228,23 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 20, 20, 0),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       GenesisSoftItalicText(
-                        'Pro',
-                        key: ValueKey('pro-tier-title'),
-                        style: TextStyle(
+                        selectedProduct?.title ?? '',
+                        key: const ValueKey('pro-tier-title'),
+                        style: const TextStyle(
                           fontSize: 28,
                           height: 34 / 28,
                           fontWeight: FontWeight.w700,
                           color: GenesisColors.textPrimary,
                         ),
                       ),
-                      SizedBox(height: 10),
-                      Divider(height: 1, color: Color(0xFFEBEBEB)),
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, color: Color(0xFFEBEBEB)),
                     ],
                   ),
                 ),
@@ -158,57 +252,17 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
                   child: ListView(
                     key: const PageStorageKey('pro-benefits-scroll'),
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                    children: const [
-                      _ProBenefit(
-                        label: 'Monthly bonus Gems',
-                        icon: Icons.diamond_outlined,
-                        status: _PreviewBenefitStatus.upgraded,
-                      ),
-                      _ProBenefit(
-                        label: 'More character slots',
-                        asset: characterStatIconAsset,
-                        status: _PreviewBenefitStatus.upgraded,
-                      ),
-                      _ProBenefit(
-                        label: 'Unlimited inspirations',
-                        asset: inspirationIconAsset,
-                        status: _PreviewBenefitStatus.upgraded,
-                      ),
-                      _ProBenefit(
-                        label: 'Edit AI replies',
-                        asset: editSquareIconAsset,
-                        status: _PreviewBenefitStatus.upgraded,
-                      ),
-                      _ProBenefit(
-                        label: 'Longer conversation memory',
-                        icon: Icons.memory_outlined,
-                        status: _PreviewBenefitStatus.upgraded,
-                      ),
-                      _ProBenefit(
-                        label: 'Save your conversations',
-                        icon: Icons.download_outlined,
-                        status: _PreviewBenefitStatus.locked,
-                      ),
-                      _ProBenefit(
-                        label: 'Custom chat backgrounds',
-                        icon: Icons.wallpaper_outlined,
-                        status: _PreviewBenefitStatus.upgraded,
-                      ),
-                      _ProBenefit(
-                        label: 'Download without watermark',
-                        icon: Icons.hide_image_outlined,
-                        status: _PreviewBenefitStatus.locked,
-                      ),
-                      _ProBenefit(
-                        label: 'Create custom characters',
-                        asset: createOriginCharactersIconAsset,
-                        status: _PreviewBenefitStatus.unchanged,
-                      ),
-                      _ProBenefit(
-                        label: 'Explore community worlds',
-                        icon: Icons.public_outlined,
-                        status: _PreviewBenefitStatus.unchanged,
-                      ),
+                    children: [
+                      for (final benefit
+                          in selectedProduct?.benefits ??
+                              const <MembershipBenefit>[])
+                        _ProBenefit(
+                          key: ValueKey('pro-benefit-${benefit.code}'),
+                          label: benefit.title,
+                          status: benefit.displayType,
+                          asset: _benefitIcon(benefit.iconKey).$1,
+                          icon: _benefitIcon(benefit.iconKey).$2,
+                        ),
                     ],
                   ),
                 ),
@@ -262,7 +316,11 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
                   foregroundColor: proPurchaseInk,
                   side: const BorderSide(color: Color(0xFFC69A45)),
                   label:
-                      '${_plan.label}: ${_offerFor(_plan)?.price?.formattedPrice ?? ''}',
+                      selectedProduct?.canPurchase == false &&
+                          selectedProduct?.purchaseBlockReason ==
+                              'already_subscribed'
+                      ? 'Subscripting'
+                      : '${_plan.label}: ${_offerFor(_plan)?.price?.formattedPrice ?? ''}',
                   height: 44,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -307,8 +365,25 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
   }
 }
 
+// The API supplies icon identifiers, never asset paths or executable content.
+// Keep the existing local artwork; unknown identifiers use a generic benefit icon.
+(String?, IconData?) _benefitIcon(String key) => switch (key) {
+  'blue_gem' => (null, Icons.diamond_outlined),
+  'character_slots' => (characterStatIconAsset, null),
+  'inspiration' => (inspirationIconAsset, null),
+  'edit_reply' => (editSquareIconAsset, null),
+  'memory' => (null, Icons.memory_outlined),
+  'save_conversation' => (null, Icons.download_outlined),
+  'chat_background' => (null, Icons.wallpaper_outlined),
+  'no_watermark' => (null, Icons.hide_image_outlined),
+  'custom_character' => (createOriginCharactersIconAsset, null),
+  'community_world' => (null, Icons.public_outlined),
+  _ => (null, Icons.stars_outlined),
+};
+
 class _ProBenefit extends StatelessWidget {
   const _ProBenefit({
+    super.key,
     required this.label,
     required this.status,
     this.asset,
@@ -316,26 +391,26 @@ class _ProBenefit extends StatelessWidget {
   });
 
   final String label;
-  final _PreviewBenefitStatus status;
+  final MembershipBenefitDisplay status;
   final String? asset;
   final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    final locked = status == _PreviewBenefitStatus.locked;
+    final locked = status == MembershipBenefitDisplay.locked;
     final color = locked ? const Color(0xFF999999) : GenesisColors.textPrimary;
     final (statusIcon, statusColor, statusLabel) = switch (status) {
-      _PreviewBenefitStatus.upgraded => (
+      MembershipBenefitDisplay.enhanced => (
         null,
         proCopperAccent,
         'Improved with Pro',
       ),
-      _PreviewBenefitStatus.unchanged => (
+      MembershipBenefitDisplay.included => (
         Icons.check_rounded,
         GenesisColors.textPrimary,
         'Same as free',
       ),
-      _PreviewBenefitStatus.locked => (
+      MembershipBenefitDisplay.locked => (
         Icons.lock_outline_rounded,
         const Color(0xFF999999),
         'Higher tier required',
@@ -370,7 +445,7 @@ class _ProBenefit extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          if (status == _PreviewBenefitStatus.upgraded)
+          if (status == MembershipBenefitDisplay.enhanced)
             SvgPicture.asset(
               upgradeIconAsset,
               key: ValueKey('pro-benefit-status-$label'),
@@ -417,7 +492,8 @@ class _ProPlanCard extends StatelessWidget {
         ? NumberFormat.simpleCurrency(
             locale: Localizations.localeOf(context).toString(),
             name: price.currencyCode,
-          ).format(price.amountMicros / 1000000 / offer!.product.billingMonths)
+            decimalDigits: 2,
+          ).format(price.amountCent / 100 / offer!.product.billingMonths)
         : price.formattedPrice;
     return Semantics(
       button: true,

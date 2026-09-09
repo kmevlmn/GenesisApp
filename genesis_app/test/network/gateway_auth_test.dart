@@ -188,6 +188,36 @@ void main() {
     expect(keyStore.lastCanonical, contains('\n\nhashed-app-id\n'));
   });
 
+  test(
+    'time sync exposes server UTC time for membership expiry checks',
+    () async {
+      final expectedTime = DateTime.utc(2040, 1, 1);
+      final transport = _FakeTransport(
+        handler: (_) => _json({
+          'err_no': 0,
+          'data': {'server_time_ms': expectedTime.millisecondsSinceEpoch},
+        }),
+      );
+      final coordinator = GatewayAuthCoordinator(
+        gatewayBaseUrl: 'https://gateway.test/apix/',
+        appHeaderProvider: _testAppHeaders,
+        deviceIdService: const _TestDeviceIdService(),
+        keyStore: _FakeKeyStore(),
+        registrationStore: _MemoryGatewayRegistrationStore(),
+        transport: transport,
+      );
+      expect(coordinator.serverClock.now, isNull);
+      await coordinator.syncServerTime();
+      final actual = coordinator.serverClock.now!;
+      expect(actual.isUtc, isTrue);
+      expect(
+        actual.difference(expectedTime).inMilliseconds,
+        inInclusiveRange(0, 1000),
+      );
+      expect(transport.requests.single.uri.path, '/apix/v1/time');
+    },
+  );
+
   test('handshake signer adds Gateway headers for websocket connect', () async {
     final keyStore = _FakeKeyStore();
     final authTransport = _FakeTransport(handler: _gatewayAuthResponse);

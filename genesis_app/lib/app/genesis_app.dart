@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../components/developer_debug_floating_button.dart';
 import '../components/internal_build_indicator.dart';
+import '../components/gems/membership_guest_login_gate.dart';
 import 'agent_control/agent_control_host.dart';
 import 'debug_page_tracker.dart';
 import 'genesis_navigator.dart';
@@ -61,7 +62,13 @@ class GenesisApp extends StatelessWidget {
                     child: ForceUpgradeGate(
                       child: DeveloperDebugFloatingButton(
                         navigatorKey: genesisNavigatorKey,
-                        child: child ?? const SizedBox.shrink(),
+                        child: MembershipGuestLoginGate(
+                          service: AppServicesScope.read(
+                            context,
+                          ).membershipPurchases,
+                          navigatorKey: genesisNavigatorKey,
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   ),

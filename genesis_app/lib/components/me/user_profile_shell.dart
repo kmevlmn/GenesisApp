@@ -410,9 +410,11 @@ class _UserProfileContentState extends State<UserProfileContent>
           ),
           if (data.isSelf) ...[
             const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: ProfileMembershipCardPreview(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _MembershipEntry(
+                stateListenable: widget.gemWalletStateListenable,
+              ),
             ),
             const SizedBox(height: 10),
             Padding(
@@ -582,6 +584,26 @@ class _UserProfileContentState extends State<UserProfileContent>
 
   int _decrementCount(int value) {
     return value > 0 ? value - 1 : 0;
+  }
+}
+
+class _MembershipEntry extends StatelessWidget {
+  const _MembershipEntry({this.stateListenable});
+  final ValueListenable<GemWalletState>? stateListenable;
+
+  @override
+  Widget build(BuildContext context) {
+    final listenable = stateListenable;
+    if (listenable == null) return const ProfileMembershipCard();
+    return ValueListenableBuilder<GemWalletState>(
+      valueListenable: listenable,
+      builder: (context, state, _) => ProfileMembershipCard(
+        isActive: state.membership?.isActive ?? false,
+        isExpired: state.membership?.status == 2,
+        membershipExpiresAt: state.membership?.expiresAt?.toLocal(),
+        blueBalanceCent: state.membership?.blueGemsCent,
+      ),
+    );
   }
 }
 

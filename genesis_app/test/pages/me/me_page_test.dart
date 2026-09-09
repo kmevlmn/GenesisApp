@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:genesis_flutter_android/app/gems/gem_wallet_store.dart';
+import 'package:genesis_flutter_android/components/gems/profile_membership_card.dart';
+import 'package:genesis_flutter_android/network/models/gem_wallet.dart';
 import 'package:genesis_flutter_android/components/me/user_profile_content.dart';
 import 'package:genesis_flutter_android/pages/me/me_page.dart';
 import 'package:genesis_flutter_android/routers/app_router.dart';
@@ -11,6 +13,86 @@ import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/utils/entity_deleted.dart';
 
 void main() {
+  testWidgets(
+    'Me shows one membership card and keeps wallet and membership balances independent',
+    (tester) async {
+      final state = ValueNotifier<GemWalletState>(
+        const GemWalletState(ownerUid: 'user'),
+      );
+      addTearDown(state.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: UserProfileContent(
+              data: const UserProfileData(
+                avatarUrl: '',
+                displayName: 'User',
+                uid: 'user',
+                followingCount: 0,
+                followerCount: 0,
+                origins: [],
+                worlds: [],
+              ),
+              gemWalletStateListenable: state,
+            ),
+          ),
+        ),
+      );
+      expect(find.byType(ProfileMembershipCard), findsOneWidget);
+      expect(find.text('Subscribe'), findsOneWidget);
+      expect(find.text('Expired'), findsNothing);
+      for (final status in [1, 2, 0, 1]) {
+        state.value = GemWalletState(
+          ownerUid: 'user',
+          balanceCent: 548240,
+          membership: GemWalletMembership(
+            status: status,
+            planCode: 'pro_yearly',
+            expiresAt: DateTime(2027, 9, 8),
+            autoRenew: false,
+            blueGemsCent: status == 1 ? 30000 : 0,
+            hasOverlap: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(ProfileMembershipCard), findsOneWidget);
+        expect(
+          find.text('Subscribe'),
+          status == 1 ? findsNothing : findsOneWidget,
+        );
+        expect(
+          find.text('Expired'),
+          status == 2 ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.text('Expires 2027-09-08'),
+          status == 1 ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.text('300.0', findRichText: true),
+          status == 1 ? findsOneWidget : findsNothing,
+        );
+        expect(find.text('5,482.4', findRichText: true), findsOneWidget);
+      }
+      state.value = const GemWalletState(
+        ownerUid: 'user',
+        balanceCent: 518240,
+        membership: GemWalletMembership(
+          status: 1,
+          planCode: 'pro_monthly',
+          expiresAt: null,
+          autoRenew: false,
+          blueGemsCent: 0,
+          hasOverlap: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Subscribe'), findsNothing);
+      expect(find.text('Expires —'), findsOneWidget);
+      expect(find.text('0.0', findRichText: true), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   test('empty backend name and avatar render uid and default avatar', () {
     const current = UserProfileData(
       avatarUrl: 'https://cdn.example.com/old_avatar.webp',
@@ -92,25 +174,17 @@ void main() {
     final gemBalance = tester.widget<Text>(
       find.byKey(const ValueKey('user-profile-gems-balance')),
     );
-    expect(gemBalance.data, '0.0');
+    expect(gemBalance.textSpan?.toPlainText(), '0.0');
     expect(gemBalance.style?.fontWeight, FontWeight.w600);
     expect(find.text('--'), findsNothing);
     expect(
       tester.getSize(find.byKey(const ValueKey('user-profile-gem-icon'))),
       const Size(16, 24),
     );
-    final balanceFinder = find.byKey(
-      const ValueKey('user-profile-gems-balance'),
-    );
-    final unitFinder = find.byKey(const ValueKey('user-profile-gems-unit'));
-    expect(
-      tester.getBottomLeft(unitFinder).dy,
-      closeTo(tester.getBottomLeft(balanceFinder).dy, 0.1),
-    );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('user-profile-gems-entry')),
-        matching: find.text('Balance'),
+        matching: find.text('Gems'),
       ),
       findsOneWidget,
     );

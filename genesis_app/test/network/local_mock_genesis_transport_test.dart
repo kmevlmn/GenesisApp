@@ -7,18 +7,74 @@ import 'package:genesis_flutter_android/network/local_mock_genesis_transport.dar
 import 'package:genesis_flutter_android/network/mock_data/mock_v1_data.dart';
 import 'package:genesis_flutter_android/network/models/gem_purchase_report.dart';
 import 'package:genesis_flutter_android/network/models/membership_product.dart';
+import 'package:genesis_flutter_android/network/models/membership_purchase.dart';
 import 'package:genesis_flutter_android/network/models/origin.dart';
 import 'package:genesis_flutter_android/network/models/search_v2.dart';
 import 'package:genesis_flutter_android/network/models/world.dart';
 
 void main() {
+  test(
+    'local mock never acknowledges a membership receipt or prepares a purchase identity',
+    () async {
+      final api = GenesisApi(useMock: true);
+      await expectLater(
+        api.v1.membership.claimGuest(
+          const MembershipGuestIdentity(
+            guestId: 'test-guest',
+            accountUuid: '4b74ec68-7abc-4cce-a223-e997e31dc811',
+            claimToken: '1234567890123456789012345678901234567890123',
+          ),
+        ),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 5000)),
+      );
+      await expectLater(
+        api.v1.membership.prepareGuest(
+          provider: MembershipProvider.google,
+          deviceId: 'test-device',
+        ),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 5000)),
+      );
+      final product = MembershipProduct(
+        title: 'Test Pro Monthly',
+        benefits: const [],
+        planCode: 'pro_monthly',
+        provider: MembershipProvider.google,
+        storeProductId: 'test-pro',
+        basePlanId: 'test-month',
+        billingMonths: 1,
+        monthlyGemsCent: 100,
+        priceCurrencyCode: 'USD',
+        priceAmount: 999,
+        canPurchase: true,
+        purchaseBlockReason: '',
+      );
+      await expectLater(
+        api.v1.membership.reportPurchase(
+          MembershipPurchaseRequest(
+            product: product,
+            requestId: 'test-request',
+            purchaseToken: 'test-token',
+          ),
+        ),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 5000)),
+      );
+      await expectLater(
+        api.v1.membership.restorePurchase(
+          MembershipPurchaseRequest(
+            product: product,
+            requestId: 'test-restore-request',
+            purchaseToken: 'test-token',
+          ),
+        ),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 5000)),
+      );
+    },
+  );
   test('local membership catalog uses the documented empty response', () async {
     final api = GenesisApi(useMock: true);
     for (final provider in MembershipProvider.values) {
-      expect(
-        (await api.v1.membership.products(provider: provider)).products,
-        isEmpty,
-      );
+      final result = await api.v1.membership.products(provider: provider);
+      expect(result.products, isEmpty);
     }
   });
 

@@ -9,7 +9,6 @@ import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/startup/app_startup_coordinator.dart';
 import '../../app/telemetry/firebase_performance_operation.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
-import '../../components/auth/login_guard.dart';
 import '../../components/common/list_loading_skeleton.dart';
 import '../../components/gems/pro_colors.dart';
 import '../../components/home/world_item_card.dart';

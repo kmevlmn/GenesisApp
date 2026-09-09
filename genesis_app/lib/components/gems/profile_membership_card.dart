@@ -7,16 +7,20 @@ import '../../ui/tokens/genesis_typography.dart';
 import 'gem_balance_text.dart';
 import 'gem_card_action_style.dart';
 
-/// Membership data is optional until the wallet contract exposes these fields.
+/// Uses the server's membership status; dates and balances are display data.
 class ProfileMembershipCard extends StatelessWidget {
   const ProfileMembershipCard({
     super.key,
+    this.isActive = false,
+    this.isExpired = false,
     this.membershipExpiresAt,
     this.blueBalanceCent,
     this.blueGemsExpiresAt,
   });
 
   final DateTime? membershipExpiresAt;
+  final bool isActive;
+  final bool isExpired;
   final int? blueBalanceCent;
   final DateTime? blueGemsExpiresAt;
 
@@ -28,7 +32,15 @@ class ProfileMembershipCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final expiry = membershipExpiresAt;
-    final isMember = expiry != null && expiry.isAfter(DateTime.now());
+    final isMember = isActive;
+    const title = Text(
+      'Pro',
+      style: TextStyle(
+        color: Color(0xFFF5DFA3),
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+      ),
+    );
     void openMembership() => Navigator.of(
       context,
     ).pushNamed(RouteNames.gemWallet, arguments: 'subscription');
@@ -82,20 +94,46 @@ class ProfileMembershipCard extends StatelessWidget {
                           height: 28,
                         ),
                         const SizedBox(width: 6),
-                        const Expanded(
-                          child: Text(
-                            'Pro',
-                            style: TextStyle(
-                              color: Color(0xFFF5DFA3),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        Expanded(
+                          child: !isMember && isExpired
+                              ? Row(
+                                  children: [
+                                    title,
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      key: const ValueKey(
+                                        'user-profile-membership-expired-tag',
+                                      ),
+                                      height: 20,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                      ),
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0x1FFFFFFF),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: const Color(0x2EFFFFFF),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Expired',
+                                        style: TextStyle(
+                                          color: Color(0xB8FFFFFF),
+                                          fontSize: 11,
+                                          height: 14 / 11,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : title,
                         ),
                         const SizedBox(width: 8),
                         if (isMember)
                           Text(
-                            'Expires ${_date(expiry)}',
+                            'Expires ${expiry == null ? '—' : _date(expiry)}',
                             maxLines: 1,
                             textAlign: TextAlign.right,
                             style: const TextStyle(
@@ -187,28 +225,6 @@ class ProfileMembershipCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Temporary stacked state comparison in Me, using preview values only.
-class ProfileMembershipCardPreview extends StatelessWidget {
-  const ProfileMembershipCardPreview({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const ProfileMembershipCard(),
-        const SizedBox(height: 10),
-        ProfileMembershipCard(
-          membershipExpiresAt: DateTime(now.year + 1, now.month, now.day),
-          blueBalanceCent: 30000,
-          blueGemsExpiresAt: DateTime(now.year, now.month + 1, 0),
-        ),
-      ],
     );
   }
 }

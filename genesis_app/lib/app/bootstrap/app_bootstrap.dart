@@ -39,6 +39,7 @@ class AppBootstrap {
     final services = ServiceRegistry.build(config: config);
     final billing = services.billing;
     if (billing != null) unawaited(billing.start());
+    unawaited(services.membershipPurchases?.start());
     return services;
   }
 
@@ -119,7 +120,13 @@ class AppBootstrap {
     }
 
     if (uid != null && (authToken == null || authToken.isEmpty)) {
-      unawaited(_restoreMissingBackendToken(services));
+      unawaited(
+        _restoreMissingBackendToken(
+          services,
+        ).then((_) => services.membership.start()),
+      );
+    } else {
+      unawaited(services.membership.start());
     }
   }
 

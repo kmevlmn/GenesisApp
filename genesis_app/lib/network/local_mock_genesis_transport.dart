@@ -45,6 +45,14 @@ class LocalMockGenesisTransport implements HttpTransport {
     final method = request.method.toUpperCase();
     final body = _decodeBody(request.bodyBytes);
 
+    if (method == 'POST' && path == '/api_internal/v1/membership/set') {
+      return _ok({
+        'err_no': 5000,
+        'err_msg': 'manual membership setting unavailable in mock',
+        'data': null,
+      });
+    }
+
     if (path == '/health') {
       return _ok({'status': 'ok'});
     }
@@ -757,6 +765,20 @@ class LocalMockGenesisTransport implements HttpTransport {
         });
       }
       return _v1Ok(<String, dynamic>{'list': <Object>[]});
+    }
+
+    if (method == 'POST' &&
+        (path == 'membership/purchase/report' ||
+            path == 'membership/restore' ||
+            path == 'membership/guest/prepare' ||
+            path == 'membership/guest/purchase/report' ||
+            path == 'membership/claim')) {
+      // Local mock cannot prepare store identities or verify real receipts.
+      return _ok(<String, dynamic>{
+        'err_no': 5000,
+        'err_msg': 'membership store unavailable in mock',
+        'data': null,
+      });
     }
 
     if (method == 'GET' && path == 'gem/tasks') {
@@ -2101,6 +2123,14 @@ class _MockState {
   Map<String, dynamic> v1GemWallet() {
     return {
       'wallet': {'balance_cent': _v1GemBalanceCent},
+      'membership': {
+        'membership_status': 0,
+        'plan_code': '',
+        'expires_at': null,
+        'auto_renew': false,
+        'blue_gems_cent': 0,
+        'has_overlap': false,
+      },
     };
   }
 

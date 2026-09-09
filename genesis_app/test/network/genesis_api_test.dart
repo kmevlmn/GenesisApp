@@ -389,6 +389,15 @@ void main() {
               'data': {
                 'list': [
                   {
+                    'title': 'Server yearly title',
+                    'benefits': [
+                      {
+                        'code': 'server_benefit',
+                        'title': 'Server benefit title',
+                        'icon_key': 'blue_gem',
+                        'display_type': 'enhanced',
+                      },
+                    ],
                     'plan_code': 'pro_yearly',
                     'provider': provider.name,
                     'store_product_id': 'test_store_product',
@@ -398,8 +407,10 @@ void main() {
                       'offer_id': 'test-offer',
                     'billing_months': 12,
                     'monthly_gems_cent': 180025,
-                    'config_version': 'test-config',
-                    'sale_enabled': false,
+                    'price_currency_code': 'EUR',
+                    'price_amount': 12345,
+                    'can_purchase': true,
+                    'purchase_block_reason': '',
                   },
                 ],
               },
@@ -427,8 +438,20 @@ void main() {
         });
         expect(result.products.single.monthlyGemsCent, 180025);
         expect(result.products.single.billingMonths, 12);
-        expect(result.products.single.configVersion, 'test-config');
-        expect(result.products.single.saleEnabled, isFalse);
+        expect(result.products.single.priceCurrencyCode, 'EUR');
+        expect(result.products.single.priceAmount, 12345);
+        expect(result.products.single.canPurchase, isTrue);
+        expect(result.products.single.purchaseBlockReason, '');
+        expect(result.products.single.title, 'Server yearly title');
+        expect(result.products.single.benefits.single.code, 'server_benefit');
+        expect(
+          result.products.single.benefits.single.title,
+          'Server benefit title',
+        );
+        expect(
+          result.products.single.benefits.single.displayType.name,
+          'enhanced',
+        );
         expect(
           result.products.single.offerId,
           provider == MembershipProvider.google ? 'test-offer' : '',

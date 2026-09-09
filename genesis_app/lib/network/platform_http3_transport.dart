@@ -10,6 +10,7 @@ import '../app/telemetry/firebase_performance_monitoring.dart';
 import 'dio_http_transport.dart';
 import 'http_transport.dart';
 import 'io_http_transport.dart';
+import 'membership_request_privacy.dart';
 import 'static_image_network_config.dart';
 
 typedef HttpProtocolResolver = String? Function(http.StreamedResponse response);
@@ -42,7 +43,10 @@ class PlatformHttp3Transport implements HttpTransport {
 
   @override
   Future<TransportResponse> send(TransportRequest request) {
-    if (request.uri.scheme.toLowerCase() != 'https') {
+    // Native http clients unconditionally profile bodies when DevTools is on.
+    // The Dio path supports per-request exclusion for membership credentials.
+    if (request.uri.scheme.toLowerCase() != 'https' ||
+        isPrivateMembershipRequest(request.uri)) {
       return _nonHttpsTransport.send(request);
     }
     return runWithNetworkDeadline(

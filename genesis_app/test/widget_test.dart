@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import 'package:genesis_flutter_android/app/bootstrap/app_services_scope.dart';
+import 'package:genesis_flutter_android/app/bootstrap/app_bootstrap.dart';
 import 'package:genesis_flutter_android/app/bootstrap/service_registry.dart';
 import 'package:genesis_flutter_android/app/blocked_user_review_return.dart';
 import 'package:genesis_flutter_android/app/config/app_config.dart';
@@ -23,6 +24,7 @@ import 'package:genesis_flutter_android/app/debug/location_chat_bubble_layout_se
 import 'package:genesis_flutter_android/app/debug/location_chat_header_effect_settings.dart';
 import 'package:genesis_flutter_android/app/debug/origin_world_sheet_debug_settings.dart';
 import 'package:genesis_flutter_android/app/debug/world_new_content_debug_settings.dart';
+import 'package:genesis_flutter_android/app/debug/membership_guest_login_debug_settings.dart';
 import 'package:genesis_flutter_android/app/debug_floating_button_unlock.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_safe_area.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_static_network_image.dart';
@@ -138,6 +140,8 @@ import 'package:genesis_flutter_android/platform/device/device_id_service.dart';
 import 'package:genesis_flutter_android/platform/keyboard/genesis_keyboard_animation.dart';
 import 'package:genesis_flutter_android/platform/privacy/app_tracking_transparency_service.dart';
 import 'package:genesis_flutter_android/platform/session/memory_user_session_store.dart';
+import 'package:genesis_flutter_android/platform/session/user_session_store.dart';
+import 'package:genesis_flutter_android/pages/gems/gem_wallet_page.dart';
 import 'package:genesis_flutter_android/routers/app_router.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_avatar.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_character_avatar.dart';
@@ -2608,6 +2612,7 @@ void main() {
     locationChatHeaderEffectSettings.resetForTesting();
     originWorldSheetDebugSettings.resetForTesting();
     worldNewContentDebugSettings.resetForTesting();
+    membershipGuestLoginDebugSettings.resetForTesting();
     networkCaptureController.resetForTesting();
     webSocketCaptureController.resetForTesting();
     resetDeveloperPageTabForTesting();
@@ -3254,6 +3259,99 @@ void main() {
     },
   );
 
+  testWidgets('membership starts during bootstrap before opening Me', (
+    tester,
+  ) async {
+    final session = MemoryUserSessionStore();
+    final response = Completer<GemWallet>();
+    var calls = 0;
+    final wallet = GemWalletStore(
+      readUid: session.readUid,
+      loadWallet: () {
+        calls++;
+        return response.future;
+      },
+    );
+    final services = await _testServices(
+      sessionStoreOverride: session,
+      initialAuthToken: 'backend-token',
+      gemWallet: wallet,
+    );
+    try {
+      await AppBootstrap.warmUp(services);
+      await tester.pump();
+      expect(calls, 1);
+      expect(services.membership.debugState.isRefreshing, isTrue);
+      response.complete(
+        const GemWallet(
+          balanceCent: 12345,
+          membership: GemWalletMembership(
+            status: 1,
+            planCode: 'pro_yearly',
+            expiresAt: null,
+            autoRenew: false,
+            blueGemsCent: 600,
+            hasOverlap: false,
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(services.membership.debugState.isVip, isTrue);
+      expect(wallet.state.value.balanceCent, 12345);
+    } finally {
+      services.dispose();
+    }
+  });
+
+  testWidgets('membership session notifications load login and clear logout', (
+    tester,
+  ) async {
+    final session = MemoryUserSessionStore();
+    var calls = 0;
+    final wallet = GemWalletStore(
+      readUid: session.readUid,
+      loadWallet: () async {
+        calls++;
+        return const GemWallet(
+          balanceCent: 12345,
+          membership: GemWalletMembership(
+            status: 1,
+            planCode: 'pro_yearly',
+            expiresAt: null,
+            autoRenew: false,
+            blueGemsCent: 600,
+            hasOverlap: false,
+          ),
+        );
+      },
+    );
+    final services = await _testServices(
+      initialUid: null,
+      sessionStoreOverride: session,
+      gemWallet: wallet,
+    );
+    try {
+      await services.membership.start();
+      expect(services.membership.debugState.isVip, isFalse);
+      expect(calls, 0);
+      await session.saveUid('member');
+      await session.saveAuthToken('backend-token');
+      services.notifySessionChanged();
+      expect(services.membership.debugState.isVip, isNull);
+      await tester.pump();
+      expect(services.membership.debugState.isVip, isTrue);
+      expect(calls, 1);
+      await session.clearUid();
+      services.notifySessionChanged();
+      expect(services.membership.debugState.membership, isNull);
+      await tester.pump();
+      expect(services.membership.debugState.isVip, isFalse);
+      expect(calls, 1);
+    } finally {
+      services.dispose();
+    }
+  });
+
   testWidgets(
     'AppShell owns initial and background-to-foreground billing recovery',
     (WidgetTester tester) async {
@@ -3709,7 +3807,7 @@ void main() {
     expect(find.text('Buy Gems'), findsOneWidget);
   });
 
-  testWidgets('Home Gem entry asks for login while signed out', (
+  testWidgets('Home crown opens Subscription while signed out', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -3717,9 +3815,7 @@ void main() {
         services: await _testServices(useMock: true, initialUid: null),
         child: MaterialApp(
           home: const HomePage(),
-          routes: {
-            RouteNames.gemWallet: (_) => const Scaffold(body: Text('Buy Gems')),
-          },
+          onGenerateRoute: AppRouter.onGenerateRoute,
         ),
       ),
     );
@@ -3730,11 +3826,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(LoginSheet), findsOneWidget);
+    expect(find.byType(LoginSheet), findsNothing);
+    expect(find.text('Subscription'), findsOneWidget);
     expect(find.text('Buy Gems'), findsNothing);
+    expect(find.byType(GemWalletPage), findsOneWidget);
   });
 
-  testWidgets('Home Gem entry waits for a second tap after login', (
+  testWidgets('Home crown reopens purchases without creating a login session', (
     WidgetTester tester,
   ) async {
     final sessionStore = MemoryUserSessionStore();
@@ -3773,13 +3871,13 @@ void main() {
       find.byKey(const ValueKey<String>('home-gem-wallet-entry')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Continue with Google'));
-    await tester.pumpAndSettle();
-
-    expect(backendAuth.loginCount, 1);
-    expect(await sessionStore.readUid(), 'backend_uid');
+    expect(backendAuth.loginCount, 0);
+    expect(await sessionStore.readLoginUid(), isNull);
     expect(find.byType(LoginSheet), findsNothing);
-    expect(find.text('Buy Gems'), findsNothing);
+    expect(find.text('Buy Gems'), findsOneWidget);
+
+    Navigator.of(tester.element(find.text('Buy Gems'))).pop();
+    await tester.pumpAndSettle();
 
     await tester.tap(
       find.byKey(const ValueKey<String>('home-gem-wallet-entry')),
@@ -3787,7 +3885,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Buy Gems'), findsOneWidget);
-    expect(backendAuth.loginCount, 1);
+    expect(backendAuth.loginCount, 0);
   });
 
   for (final continueAfterLogin in [false, true]) {
@@ -24749,6 +24847,52 @@ void main() {
       isTrue,
     );
   });
+
+  testWidgets(
+    'developer page controls mandatory login after guest VIP purchase',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppServicesScope(
+            services: await _testServices(),
+            child: const DeveloperPage(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('switch'));
+      await tester.pumpAndSettle();
+      final toggle = find.byKey(
+        const ValueKey<String>('developer-membership-guest-force-login-switch'),
+      );
+      await tester.scrollUntilVisible(
+        toggle,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byKey(
+                const PageStorageKey<String>(
+                  'developer-test-switch-tab-scroll',
+                ),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(tester.widget<Switch>(toggle).value, isTrue);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Switch>(toggle).value, isFalse);
+      expect(membershipGuestLoginDebugSettings.forceLogin, isFalse);
+      final preferences = await SharedPreferences.getInstance();
+      expect(
+        preferences.getBool(
+          MembershipGuestLoginDebugSettingsController.storageKey,
+        ),
+        isFalse,
+      );
+    },
+  );
 
   testWidgets('developer page controls forced world is_new state', (
     WidgetTester tester,

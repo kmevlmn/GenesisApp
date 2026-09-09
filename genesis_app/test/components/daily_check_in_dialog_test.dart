@@ -102,6 +102,8 @@ void main() {
     await tester.tap(find.text('Get 100'));
     await tester.pumpAndSettle();
     expect(find.byType(ProSubscriptionContent), findsOneWidget);
+    expect(find.text('Subscription'), findsOneWidget);
+    expect(find.text('Buy Gems'), findsNothing);
     expect(find.text('Daily Check-in'), findsNothing);
     expect(checkedIn, isNull);
     await tester.tap(find.byKey(const ValueKey('gem-purchase-sheet-close')));

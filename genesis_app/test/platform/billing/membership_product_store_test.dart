@@ -55,14 +55,12 @@ List<ProductDetails> details(List<SubscriptionOfferDetailsWrapper> offers) =>
 
 void main() {
   test(
-    'disabled plans still query store prices without purchase operations',
+    'store lookup matches both configured base plans without purchasing',
     () async {
       final store = _MembershipStore(details([offer(), offer(yearly: true)]));
-      final prices = await MembershipProductStore(inAppPurchase: store)
-          .loadPrices([
-            membershipProduct(saleEnabled: false),
-            membershipProduct(yearly: true, saleEnabled: false),
-          ]);
+      final prices = await MembershipProductStore(
+        inAppPurchase: store,
+      ).loadPrices([membershipProduct(), membershipProduct(yearly: true)]);
       expect(store.queriedIds, {'test_pro'});
       expect(prices['pro_monthly']?.formattedPrice, r'$12.99');
       expect(prices['pro_yearly']?.formattedPrice, r'$109.99');

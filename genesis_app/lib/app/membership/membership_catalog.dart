@@ -1,33 +1,48 @@
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 import '../../network/models/membership_product.dart';
-import '../../platform/billing/membership_product_store.dart';
-
-class MembershipLoginRequired implements Exception {}
 
 class MembershipPlatformUnavailable implements Exception {}
 
 class MembershipOffer {
-  const MembershipOffer({required this.product, this.price});
+  const MembershipOffer({required this.product});
   final MembershipProduct product;
-  final MembershipStorePrice? price;
-  bool get available => product.saleEnabled && price != null;
+  MembershipDisplayPrice? get price => product.priceAmount == null
+      ? null
+      : MembershipDisplayPrice(
+          amountCent: product.priceAmount!,
+          currencyCode: product.priceCurrencyCode,
+        );
+  bool get available => price != null;
 }
 
-typedef MembershipCatalogLoader = Future<List<MembershipOffer>> Function();
+class MembershipDisplayPrice {
+  const MembershipDisplayPrice({
+    required this.amountCent,
+    required this.currencyCode,
+  });
+  final int amountCent;
+  final String currencyCode;
+
+  String get formattedPrice => NumberFormat.simpleCurrency(
+    name: currencyCode,
+    decimalDigits: 2,
+  ).format(amountCent / 100);
+}
+
+class MembershipCatalogData {
+  const MembershipCatalogData({this.offers = const []});
+  final List<MembershipOffer> offers;
+}
+
+typedef MembershipCatalogLoader = Future<MembershipCatalogData> Function();
 
 class MembershipCatalog {
-  MembershipCatalog({
-    required this.readLoginUid,
-    required this.loadProducts,
-    required this.loadPrices,
-    required this.provider,
-  });
+  MembershipCatalog({required this.loadProducts, required this.provider});
 
-  final Future<String?> Function() readLoginUid;
   final Future<MembershipProductList> Function(MembershipProvider provider)
   loadProducts;
-  final MembershipPricesLoader loadPrices;
   final MembershipProvider? provider;
 
   static MembershipProvider? get currentProvider => kIsWeb
@@ -38,29 +53,22 @@ class MembershipCatalog {
           _ => null,
         };
 
-  Future<List<MembershipOffer>> load() async {
-    if (await readLoginUid() == null) throw MembershipLoginRequired();
+  Future<MembershipCatalogData> load() async {
     final platform = provider;
     if (platform == null) throw MembershipPlatformUnavailable();
-    final products = (await loadProducts(platform)).products.toList();
+    final response = await loadProducts(platform);
+    final products = response.products.toList();
     if (products.any((product) => product.provider != platform) ||
         products.map((product) => product.planCode).toSet().length !=
             products.length) {
       throw const FormatException('Invalid membership catalog');
     }
     products.sort((a, b) => b.billingMonths.compareTo(a.billingMonths));
-    Map<String, MembershipStorePrice> prices;
-    try {
-      prices = products.isEmpty
-          ? {}
-          : await loadPrices(products).timeout(const Duration(seconds: 15));
-    } catch (_) {
-      prices = {};
-    }
-    return [
-      for (final product in products)
-        MembershipOffer(product: product, price: prices[product.planCode]),
-    ];
+    return MembershipCatalogData(
+      offers: List.unmodifiable([
+        for (final product in products) MembershipOffer(product: product),
+      ]),
+    );
   }
 }
 
@@ -68,22 +76,19 @@ int? membershipYearlySavings(
   MembershipOffer yearly,
   List<MembershipOffer> offers,
 ) {
-  if (yearly.price == null ||
-      !yearly.product.isYearly ||
-      yearly.price!.hasIntroductoryPrice) {
+  if (yearly.price == null || !yearly.product.isYearly) {
     return null;
   }
   for (final monthly in offers) {
     if (monthly.price == null ||
         monthly.product.isYearly ||
-        monthly.price!.hasIntroductoryPrice ||
         monthly.price!.currencyCode != yearly.price!.currencyCode ||
         monthly.product.monthlyGemsCent != yearly.product.monthlyGemsCent) {
       continue;
     }
-    final fullYear = monthly.price!.amountMicros * 12;
-    if (fullYear <= yearly.price!.amountMicros) return null;
-    final savings = ((fullYear - yearly.price!.amountMicros) * 100 / fullYear)
+    final fullYear = monthly.price!.amountCent * 12;
+    if (fullYear <= yearly.price!.amountCent) return null;
+    final savings = ((fullYear - yearly.price!.amountCent) * 100 / fullYear)
         .round();
     return savings > 0 && savings < 100 ? savings : null;
   }

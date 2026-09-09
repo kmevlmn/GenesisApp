@@ -45,6 +45,13 @@ class InAppPurchaseAndroidPlatformAddition extends InAppPurchasePlatformAddition
     );
   }
 
+  /// Reads subscriptions without querying or emitting consumable purchases.
+  Future<PurchasesResultWrapper> querySubscriptionPurchases() {
+    return _billingClientManager.runWithClient(
+      (BillingClient client) => client.queryPurchases(ProductType.subs),
+    );
+  }
+
   /// Mark that the user has consumed a product.
   ///
   /// You are responsible for consuming all consumable purchases once they are

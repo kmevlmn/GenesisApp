@@ -17,6 +17,7 @@ import 'gem_billing_purchase_dialog.dart';
 import 'gem_colors.dart';
 import 'gem_purchase_catalog.dart';
 import 'purchase_options_sheet.dart';
+import 'purchase_session_builder.dart';
 
 typedef GemPurchaseProductsLoader = Future<List<GemProduct>> Function();
 
@@ -83,19 +84,22 @@ Future<void> showSubscriptionPurchaseBottomSheet(BuildContext context) async {
     builder: (_) => FractionallySizedBox(
       heightFactor: 0.8,
       alignment: Alignment.bottomCenter,
-      child: PurchaseOptionsSheet(
-        initialTab: PurchaseSheetTab.subscription,
-        gemsBuilder: (_) => services == null || billingService == null
-            ? const SizedBox.expand()
-            : GemPurchaseBottomSheet(
-                embedded: true,
-                alert: const GemBalanceAlert(kind: GemBalanceAlertKind.low),
-                productsLoader: () async =>
-                    (await services.api.v1.gem.products()).products,
-                walletStore: services.gemWallet,
-                billingService: billingService,
-                payTrackPageId: payTrackPageId,
-              ),
+      child: PurchaseSessionBuilder(
+        builder: (_, showBuyGems) => PurchaseOptionsSheet(
+          showBuyGems: showBuyGems,
+          initialTab: PurchaseSheetTab.subscription,
+          gemsBuilder: (_) => services == null || billingService == null
+              ? const SizedBox.expand()
+              : GemPurchaseBottomSheet(
+                  embedded: true,
+                  alert: const GemBalanceAlert(kind: GemBalanceAlertKind.low),
+                  productsLoader: () async =>
+                      (await services.api.v1.gem.products()).products,
+                  walletStore: services.gemWallet,
+                  billingService: billingService,
+                  payTrackPageId: payTrackPageId,
+                ),
+        ),
       ),
     ),
   );

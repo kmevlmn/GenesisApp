@@ -25,7 +25,11 @@ import '../config/platform_config.dart';
 import '../debug/location_chat_debug_storage.dart';
 import '../gems/gem_wallet_store.dart';
 import '../membership/membership_catalog.dart';
-import '../../platform/billing/membership_product_store.dart';
+import '../membership/membership_access_store.dart';
+import '../membership/membership_purchase_service.dart';
+import '../../platform/billing/membership_checkout_platform.dart';
+import '../../platform/billing/membership_pending_store.dart';
+import '../../platform/billing/membership_store_restorer.dart';
 import '../telemetry/device_info_telemetry.dart';
 import '../telemetry/genesis_telemetry.dart';
 import '../version/app_version_check_service.dart';
@@ -53,16 +57,17 @@ class AppServices {
     this.gatewayAuth,
     GemWalletStore? gemWallet,
     this.billing,
+    this.membershipPurchases,
     MembershipCatalog? membershipCatalog,
     ValueNotifier<int>? sessionRevision,
     AppGlobalConfigStore? appGlobalConfig,
   }) : membershipCatalog =
            membershipCatalog ??
            MembershipCatalog(
-             readLoginUid: sessionStore.readLoginUid,
-             loadProducts: (provider) =>
-                 api.v1.membership.products(provider: provider),
-             loadPrices: MembershipProductStore().loadPrices,
+             loadProducts: (provider) async => api.v1.membership.products(
+               provider: provider,
+               deviceId: await deviceId.getDeviceId(),
+             ),
              provider: MembershipCatalog.currentProvider,
            ),
        deviceInfoTelemetry =
@@ -77,7 +82,16 @@ class AppServices {
        appGlobalConfig =
            appGlobalConfig ??
            AppGlobalConfigStore(loadConfig: api.v1.app.config),
-       sessionRevision = sessionRevision ?? ValueNotifier<int>(0);
+       sessionRevision = sessionRevision ?? ValueNotifier<int>(0) {
+    membership = MembershipAccessStore(
+      wallet: this.gemWallet,
+      readLoginUid: sessionStore.readLoginUid,
+      hasBackendSession: () async =>
+          (await sessionStore.readAuthToken())?.trim().isNotEmpty == true,
+      serverNow: () => gatewayAuth?.serverClock.now,
+    );
+    this.sessionRevision.addListener(_membershipSessionChanged);
+  }
 
   final AppConfig config;
   final PlatformConfig platformConfig;
@@ -95,11 +109,19 @@ class AppServices {
   final DeviceInfoTelemetryReporter deviceInfoTelemetry;
   final GatewayAuthCoordinator? gatewayAuth;
   final GemWalletStore gemWallet;
+  late final MembershipAccessStore membership;
   final BillingService? billing;
+  final MembershipPurchaseService? membershipPurchases;
   final MembershipCatalog membershipCatalog;
   final AppGlobalConfigStore appGlobalConfig;
   final ValueNotifier<int> sessionRevision;
   final ValueNotifier<String?> pendingLoginCheckInUid = ValueNotifier(null);
+
+  void _membershipSessionChanged() {
+    membership.resetForSession();
+    unawaited(membership.start());
+    membershipPurchases?.resetForSession();
+  }
 
   void notifySessionChanged() {
     pendingLoginCheckInUid.value = null;
@@ -109,8 +131,11 @@ class AppServices {
   }
 
   void dispose() {
+    sessionRevision.removeListener(_membershipSessionChanged);
     pendingLoginCheckInUid.dispose();
     billing?.dispose();
+    membershipPurchases?.dispose();
+    membership.dispose();
     gemWallet.dispose();
     appGlobalConfig.dispose();
   }
@@ -262,25 +287,60 @@ class ServiceRegistry {
       TargetPlatform.iOS => AppStoreBillingPlatform(),
       _ => null,
     };
-    final billing = billingPlatform == null
+    Future<String> loadBillingAccountUuid() async {
+      await api.ensureUid();
+      final userInfo = await api.v1.user.info();
+      await cacheCurrentUserInfoResponse(
+        sessionStore: sessionStore,
+        response: userInfo,
+      );
+      return asString(userInfo['uuid']);
+    }
+
+    BillingService? billing;
+    final membershipProvider = MembershipCatalog.currentProvider;
+    final membershipPurchases =
+        billingPlatform == null || membershipProvider == null
+        ? null
+        : MembershipPurchaseService(
+            platform: StoreMembershipCheckoutPlatform(),
+            store: SecureMembershipPendingStore(),
+            provider: membershipProvider,
+            readLoginUid: sessionStore.readLoginUid,
+            loadProducts: () async => (await api.v1.membership.products(
+              provider: membershipProvider,
+              deviceId: await deviceId.getDeviceId(),
+            )).products,
+            loadAccountUuid: loadBillingAccountUuid,
+            prepareGuest: () async => api.v1.membership.prepareGuest(
+              provider: membershipProvider,
+              deviceId: await deviceId.getDeviceId(),
+            ),
+            reportPurchase: api.v1.membership.reportPurchase,
+            claimGuest: api.v1.membership.claimGuest,
+            restorePurchase: api.v1.membership.restorePurchase,
+            queryRestorePurchases: MembershipStoreRestorer(
+              provider: membershipProvider,
+            ).query,
+            queryPurchases: billingPlatform.queryRecoverablePurchases,
+            otherPurchaseBusy: () =>
+                billing?.state.value.hasBusyPurchase ?? false,
+            refreshWallet: gemWallet.refreshAfterMembershipChanged,
+          );
+    billing = billingPlatform == null
         ? null
         : GooglePlayBillingService(
             platform: billingPlatform,
             pendingPurchaseStore: SqfliteBillingPendingPurchaseStore(),
-            loadBillingAccountId: () async {
-              await api.ensureUid();
-              final userInfo = await api.v1.user.info();
-              await cacheCurrentUserInfoResponse(
-                sessionStore: sessionStore,
-                response: userInfo,
-              );
-              return asString(userInfo['uuid']);
-            },
+            loadBillingAccountId: loadBillingAccountUuid,
             loadProductCatalog: () async =>
                 (await api.v1.gem.products()).products,
             reportPurchase: api.v1.gem.reportPurchase,
             refreshWallet: gemWallet.refreshAfterEntitlementGranted,
             readUid: sessionStore.readUid,
+            interceptPurchase: membershipPurchases?.interceptPurchase,
+            otherPurchaseBusy: () => membershipPurchases?.isBusy ?? false,
+            onPurchaseStreamError: membershipPurchases?.handleStreamError,
           );
     final directMessageConversations = DirectMessageConversationStore(
       api: api,
@@ -319,6 +379,7 @@ class ServiceRegistry {
       gatewayAuth: gatewayAuthCoordinator,
       gemWallet: gemWallet,
       billing: billing,
+      membershipPurchases: membershipPurchases,
       sessionRevision: sessionRevision,
     );
   }
@@ -327,7 +388,7 @@ class ServiceRegistry {
     AppServices current, {
     required AppConfig config,
   }) {
-    return build(
+    final updated = build(
       config: config,
       deviceIdOverride: current.deviceId,
       sessionStoreOverride: current.sessionStore,
@@ -335,5 +396,7 @@ class ServiceRegistry {
       sessionRevisionOverride: current.sessionRevision,
       chatroomMessagesOverride: current.chatroomMessages,
     );
+    unawaited(updated.membership.start());
+    return updated;
   }
 }

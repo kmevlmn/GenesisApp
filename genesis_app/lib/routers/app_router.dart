@@ -28,6 +28,7 @@ import '../network/chatroom/world_chatroom_service.dart';
 import '../network/models/world.dart';
 import '../components/discuss/origin_discuss_list.dart';
 import '../components/chat/shared/chat_ui.dart';
+import '../components/gems/purchase_session_builder.dart';
 
 sealed class RouteNames {
   static const shell = '/';
@@ -695,8 +696,11 @@ sealed class AppRouter {
       case RouteNames.gemWallet:
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => GemWalletPage(
-            showSubscriptionInitially: settings.arguments == 'subscription',
+          builder: (_) => PurchaseSessionBuilder(
+            builder: (_, showBuyGems) => GemWalletPage(
+              showBuyGems: showBuyGems,
+              showSubscriptionInitially: settings.arguments == 'subscription',
+            ),
           ),
         );
       case RouteNames.gemRecords:

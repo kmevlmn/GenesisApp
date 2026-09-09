@@ -361,7 +361,7 @@ void main() {
       expect(find.text(r'Monthly: $9.99'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('pro-subscribe-button')));
       await tester.pump();
-      expect(find.text('Pro subscriptions are coming soon.'), findsOneWidget);
+      expect(find.text('Pro subscriptions are coming soon.'), findsNothing);
       await tester.pump(const Duration(seconds: 3));
       final pages = find.byKey(const ValueKey('wallet-purchase-pages'));
       final swipe = await tester.startGesture(tester.getCenter(pages));

@@ -25,6 +25,9 @@ extension _GooglePlayBillingRecovery on GooglePlayBillingService {
 
     final seenPurchaseKeys = <String>{};
     for (final purchase in purchases) {
+      if (await _routeSubscription(purchase, productCatalog: productCatalog)) {
+        continue;
+      }
       final purchaseIdentity = purchase.purchaseToken.trim();
       final purchaseKey = '${purchase.provider.name}:$purchaseIdentity';
       if (purchaseIdentity.isNotEmpty && !seenPurchaseKeys.add(purchaseKey)) {
@@ -171,6 +174,12 @@ extension _GooglePlayBillingRecovery on GooglePlayBillingService {
     String? billingAccountId,
     int? sessionGeneration,
   }) async {
+    final gemPurchases = <BillingPurchase>[];
+    for (final purchase in purchases) {
+      if (!await _routeSubscription(purchase)) gemPurchases.add(purchase);
+    }
+    purchases = gemPurchases;
+    if (purchases.isEmpty) return;
     for (final purchase in purchases) {
       _recordVerifiedPurchaseForAnalytics(purchase);
     }
