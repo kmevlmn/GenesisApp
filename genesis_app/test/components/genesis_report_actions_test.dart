@@ -240,6 +240,9 @@ void main() {
     );
     expect(input.style?.color, GenesisColors.darkTextPrimary);
     expect(input.cursorColor, GenesisColors.darkTextPrimary);
+    expect(input.decoration?.filled, isTrue);
+    expect(input.decoration?.fillColor, GenesisColors.darkFaintFill);
+    expect(input.decoration?.focusedBorder?.borderSide, BorderSide.none);
     expect(
       input.decoration?.hintStyle?.color,
       GenesisColors.darkInputPlaceholder,
@@ -265,7 +268,9 @@ void main() {
     final inputRect = tester.getRect(
       find.byKey(const ValueKey<String>('genesis-report-content-input')),
     );
-    expect(titleRect.top - titleRowRect.top, closeTo(16, 1));
+    // The fixed-height title row centers this group (14px in the existing
+    // layout); its separate title-to-input spacing remains 16px.
+    expect(titleRect.top - titleRowRect.top, closeTo(14, 1));
     expect(inputRect.top - titleRect.bottom, closeTo(16, 1));
   });
 }

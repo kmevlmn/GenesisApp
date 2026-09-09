@@ -1,13 +1,13 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../components/common/genesis_center_toast.dart';
 import '../../components/page_header.dart';
 import '../../platform/app/app_metadata_service.dart';
 import '../../routers/app_router.dart';
-import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/genesis_ui.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 import '../legal/legal_document_page.dart';
 
 class AboutUsPage extends StatelessWidget {
@@ -31,30 +31,45 @@ class AboutUsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: const GenesisBackAppBar(pageName: 'About'),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 40, 16, 24),
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: kGenesisLightSystemUiOverlayStyle,
+          child: Scaffold(
+            backgroundColor: GenesisColors.darkBackground,
+            appBar: const GenesisBackAppBar(
+              backgroundColor: GenesisColors.darkBackground,
+              foregroundColor: GenesisColors.darkTextPrimary,
+              systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+              pageName: 'About',
+            ),
+            body: SafeArea(
+              child: Column(
                 children: [
-                  const _AboutBrandHeader(),
-                  const SizedBox(height: 8),
-                  const _AboutVersionText(),
-                  const SizedBox(height: 34),
-                  const _AboutDescription(),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 40, 16, 24),
+                      children: [
+                        const _AboutBrandHeader(),
+                        const SizedBox(height: 8),
+                        const _AboutVersionText(),
+                        const SizedBox(height: 34),
+                        const _AboutDescription(),
+                      ],
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: _AboutLegalLinks(),
+                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: _AboutLegalLinks(),
-            ),
-            const SizedBox(height: 20),
-          ],
+          ),
         ),
       ),
     );
@@ -78,7 +93,7 @@ class _AboutVersionText extends StatelessWidget {
             fontSize: 13,
             height: 1.2,
             fontWeight: FontWeight.w400,
-            color: Colors.black,
+            color: GenesisColors.darkTextTertiary,
           ),
         );
       },
@@ -121,10 +136,10 @@ class _AboutDescriptionState extends State<_AboutDescription> {
       fontSize: 15,
       height: 1.55,
       fontWeight: FontWeight.w400,
-      color: Color(0xFF333333),
+      color: GenesisColors.darkTextSecondary,
     );
     final emailStyle = bodyStyle.copyWith(
-      color: const Color(0xFF3E5B8A),
+      color: GenesisColors.darkTextPrimary,
       fontWeight: FontWeight.w600,
     );
 
@@ -152,11 +167,16 @@ class _AboutBrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: SvgPicture.asset(
-        'assets/svg/worldo-logo.svg',
-        key: const Key('about_genesis_launch_logo'),
-        width: 236,
-        fit: BoxFit.contain,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.asset(
+          'assets/images/app_icon.png',
+          key: const Key('about_genesis_launch_logo'),
+          width: 96,
+          height: 96,
+          fit: BoxFit.contain,
+          semanticLabel: 'Worldo',
+        ),
       ),
     );
   }
@@ -204,13 +224,13 @@ class _AboutLegalLinksState extends State<_AboutLegalLinks> {
     const bodyStyle = TextStyle(
       fontSize: 11,
       height: 1.35,
-      color: Color(0xFF6F6F6F),
+      color: GenesisColors.darkTextTertiary,
       fontWeight: FontWeight.w400,
     );
     const linkStyle = TextStyle(
       fontSize: 11,
       height: 1.35,
-      color: GenesisColors.brand,
+      color: GenesisColors.darkTextSecondary,
       fontWeight: FontWeight.w600,
     );
 

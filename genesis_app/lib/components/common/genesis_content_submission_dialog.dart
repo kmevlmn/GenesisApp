@@ -103,19 +103,25 @@ class _GenesisContentSubmissionDialogState
         maxLines: 3,
         textInputAction: TextInputAction.newline,
         decoration: InputDecoration(
+          filled: true,
+          fillColor: GenesisColors.darkFaintFill,
           hintText: 'Describe the issue',
           hintStyle: const TextStyle(color: GenesisColors.darkInputPlaceholder),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 12,
             vertical: 10,
           ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: GenesisColors.darkFaintFill),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: GenesisColors.darkFaintFill),
+            borderSide: BorderSide.none,
           ),
         ),
         onChanged: (_) => setState(() {}),

@@ -163,6 +163,7 @@ void main() {
     RouteNames.discuss,
     RouteNames.postDetail,
     RouteNames.search,
+    RouteNames.legal,
   ]) {
     testWidgets(
       '$name keeps outgoing Android transition dark under a light app theme',

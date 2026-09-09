@@ -40,6 +40,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('About us'), findsOneWidget);
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+      GenesisColors.darkBackground,
+    );
+    final logout = tester.widget<GenesisPrimaryButton>(
+      find.widgetWithText(GenesisPrimaryButton, 'Log out'),
+    );
+    expect(logout.backgroundColor, GenesisColors.darkFaintFill);
+    expect(logout.foregroundColor, GenesisColors.darkTextTertiary);
     expect(find.text('Account'), findsOneWidget);
     expect(find.text('Join Discord'), findsOneWidget);
     expect(find.text('Feedback'), findsOneWidget);
@@ -65,6 +74,18 @@ void main() {
       find.text('Current login account:'),
     );
     expect(currentLoginAccountText.style?.fontSize, 16);
+    final accountCard = tester.widget<DecoratedBox>(
+      find
+          .ancestor(
+            of: find.text('Current login account:'),
+            matching: find.byType(DecoratedBox),
+          )
+          .first,
+    );
+    expect(
+      (accountCard.decoration as BoxDecoration).color,
+      GenesisColors.darkFaintFill,
+    );
     expect(find.text('Account Deletion Agreement'), findsOneWidget);
     expect(
       find.text('I have read the Account Deletion Agreement'),
@@ -98,7 +119,7 @@ void main() {
       findsOneWidget,
     );
     final gemsWarning = tester.widget<Text>(gemsWarningFinder);
-    expect(gemsWarning.style?.color, const Color(0xFFFF2442));
+    expect(gemsWarning.style?.color, GenesisColors.redSecondary);
     await tester.tap(find.widgetWithText(GenesisPrimaryButton, 'Delete'));
     await tester.pump();
     expect(find.text('Agree to our terms to continue.'), findsOneWidget);
@@ -107,7 +128,7 @@ void main() {
     await tester.pump();
     final selectedCheckbox = tester.widget<Checkbox>(find.byType(Checkbox));
     expect(selectedCheckbox.value, isTrue);
-    expect(selectedCheckbox.activeColor, const Color(0xFFFF4D4F));
+    expect(selectedCheckbox.activeColor, GenesisColors.redPrimary);
     await tester.tap(find.widgetWithText(GenesisPrimaryButton, 'Delete'));
     await tester.pumpAndSettle();
 
@@ -137,6 +158,9 @@ void main() {
     expect(input.maxLines, 3);
     expect(input.autofocus, isTrue);
     expect(input.focusNode?.hasFocus, isTrue);
+    expect(input.decoration?.filled, isTrue);
+    expect(input.decoration?.fillColor, GenesisColors.darkFaintFill);
+    expect(input.decoration?.focusedBorder?.borderSide, BorderSide.none);
 
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     await tester.pumpAndSettle();

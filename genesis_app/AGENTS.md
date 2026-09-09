@@ -164,7 +164,7 @@ HTTP 映射层的图片规则：
 - 主面板与独立 Cancel 面板均使用 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.4)`（40% 不透明度），叠加局限于面板圆角内的背景模糊（`sigmaX / sigmaY = 20`）；外边框为 1px `darkFaintFill`（约 12% 白），分隔线同样使用 `darkFaintFill`。这些参数在公共组件中集中管理，不在页面重复配置；透明度只作用于面板填充，不给整个弹窗或文字增加 Opacity。
 - 标题与普通操作使用 `darkTextPrimary`，说明正文使用 `darkTextSecondary`，UID / WID / 时间等辅助信息和禁用操作使用 `darkTextTertiary`。
 - 公共弹窗内的红色文字统一使用 `GenesisColors.redSecondary`，包括主要操作、危险操作和红色强调正文，不使用品牌红 `redPrimary`。主要操作默认继承公共组件颜色，调用处不重复覆盖；Cancel、Reject 等普通操作使用一级白字。
-- 自定义标题、正文和输入框也须引用公共 token；输入文字和光标使用 `darkTextPrimary`，Placeholder 使用 `darkInputPlaceholder`，输入边框使用 `darkFaintFill`。保留各交互所需的输入行数和布局。
+- 自定义标题、正文和输入框也须引用公共 token；输入文字和光标使用 `darkTextPrimary`，Placeholder 使用 `darkInputPlaceholder`，输入填充使用 `darkFaintFill`，不额外描边。保留各交互所需的输入行数和布局。
 - 保留公共弹窗的尺寸、圆角和交互；Report / 消息长按浮动菜单仍按浮动菜单专项规范执行。
 
 ## iOS 字体倾斜规则
@@ -199,6 +199,8 @@ HTTP 映射层的图片规则：
 - `GenesisColors.darkInputPlaceholder` 是 `darkTextTertiary` 的语义别名；深色光标引用 `darkTextPrimary`。后续调整标准色时，修改公共 token 即可同步这些别名和使用处。
 - 需要透明度变体时，从对应 token 派生，例如 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.8)`；不得用变体替代规定的三级文字颜色。
 - 不创建肉眼接近的背景色或文字透明度。纯白 `#FFFFFF` 不作为深色内容区常规文字颜色，除非设计明确要求更高强调层级；输入区域和浮动操作菜单按后文专项规范执行。
+
+- 深色页面的命名路由和直接 `Navigator.push` 统一使用 `GenesisDarkPageRoute<T>`（`lib/ui/navigation/genesis_dark_page_route.dart`）。它为 Android 进入、退出和被覆盖时的转场显式提供 `darkBackground`，避免转场读取页面局部 Theme 之外的浅色背景；保留平台返回手势及路由结果类型。
 
 ## 原生启动页
 

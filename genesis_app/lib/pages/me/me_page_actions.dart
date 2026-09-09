@@ -49,9 +49,9 @@ extension _MePageActions on _MePageState {
   }
 
   Future<void> _openSettings() async {
-    final loggedOut = await Navigator.of(
-      context,
-    ).push<bool>(MaterialPageRoute<bool>(builder: (_) => const SettingsPage()));
+    final loggedOut = await Navigator.of(context).push<bool>(
+      GenesisDarkPageRoute<bool>(builder: (_) => const SettingsPage()),
+    );
     if (loggedOut == true) {
       widget.onLoggedOut?.call();
     }
