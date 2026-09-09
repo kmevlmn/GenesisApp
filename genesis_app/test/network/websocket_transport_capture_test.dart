@@ -66,7 +66,7 @@ void main() {
 
   for (final logFrames in [false, true]) {
     test(
-      'DevTools receives regeneration frames with logFrames=$logFrames',
+      'DevTools groups regeneration frames with logFrames=$logFrames',
       () async {
         final previousProfiling = HttpClientRequestProfile.profilingEnabled;
         HttpClientRequestProfile.profilingEnabled = true;
@@ -82,10 +82,20 @@ void main() {
           'client_msg_id': 'regen-1',
         });
         final frames = [
-          jsonEncode({
-            'type': 'llm_card_stream',
-            'payload': {'content': '新的分片'},
-          }),
+          for (final phase in ['start', 'chunk', 'end'])
+            jsonEncode({
+              'type': 'llm_card_stream',
+              'stream_type': phase,
+              'world_id': 'test',
+              'location_id': 'loc-1',
+              'conversation_round_id': 10,
+              'global_message_id': 100,
+              'sender_id': 'character-1',
+              'payload': {
+                'card_id': 20,
+                'content': phase == 'start' ? '' : '新的分片',
+              },
+            }),
           jsonEncode({
             'type': 'llm_card_generation_end',
             'payload': {'content': '完成'},
@@ -144,13 +154,19 @@ void main() {
           'WS_RECV',
         ]);
         expect(utf8.decode(profiles.first.requestData.bodyBytes), requestBody);
-        for (var i = 0; i < frames.length; i++) {
-          expect(
-            utf8.decode(profiles[i + 1].responseData.bodyBytes),
-            frames[i],
-          );
-          expect(profiles[i + 1].requestUri, contains('type=llm_card_'));
-        }
+        expect(
+          const LineSplitter().convert(
+            utf8.decode(profiles[1].responseData.bodyBytes),
+          ),
+          frames.take(3).toList(),
+        );
+        expect(profiles[1].responseData.endTime, isNotNull);
+        expect(utf8.decode(profiles[2].responseData.bodyBytes), frames.last);
+        expect(profiles[1].requestUri, contains('type=llm_card_stream'));
+        expect(
+          profiles[2].requestUri,
+          contains('type=llm_card_generation_end'),
+        );
       },
     );
   }

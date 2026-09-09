@@ -23,6 +23,7 @@ import 'package:genesis_flutter_android/network/chatroom/chatroom_http_models.da
 import 'package:genesis_flutter_android/network/chatroom/chatroom_message_storage.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_models.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_reply_action_storage.dart';
+import 'package:genesis_flutter_android/network/chatroom/chatroom_inspiration_storage.dart';
 import 'package:genesis_flutter_android/network/genesis_api.dart';
 import 'package:genesis_flutter_android/network/http_transport.dart';
 import 'package:genesis_flutter_android/network/local_mock_genesis_transport.dart';
@@ -2345,7 +2346,7 @@ void main() {
   );
 
   testWidgets(
-    'non-member reply buttons only expand subscription and issue no business requests',
+    'non-member inspiration loads API results without a subscription',
     (tester) async {
       final backend = _LocationChatReplyHttpTransport();
       final harness = await _mountCompletedReplyActionPanel(
@@ -2353,34 +2354,145 @@ void main() {
         backend: backend,
         isMember: false,
       );
-      final requestCount = backend.requests.length;
-      for (final label in ['Regenerate', 'Go on', 'Edit', 'Inspiration']) {
-        await tester.tap(find.bySemanticsLabel(label));
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const ValueKey('edit-subscription-prompt')),
-          findsOneWidget,
-          reason: label,
-        );
-        expect(find.byType(LocationChatEditPage), findsNothing, reason: label);
-        expect(
-          find.byKey(const ValueKey('inspiration-replies-carousel')),
-          findsNothing,
-          reason: label,
-        );
-        expect(backend.requests, hasLength(requestCount), reason: label);
-        expect(
-          harness.socket.replyActionFrames('regenerate_llm_card'),
-          isEmpty,
-          reason: label,
-        );
-        expect(
-          harness.socket.replyActionFrames('go_on'),
-          isEmpty,
-          reason: label,
-        );
-        expect(harness.socket.sendMessageCount, 0, reason: label);
+      await tester.tap(find.bySemanticsLabel('Inspiration'));
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => tester
+            .widget<LocationChatAnchoredMessageList>(
+              find.byType(LocationChatAnchoredMessageList),
+            )
+            .inspirationMessages
+            .isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('inspiration-replies-carousel')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('edit-subscription-prompt')),
+        findsNothing,
+      );
+      expect(backend.inspirationRequests, hasLength(1));
+      expect(backend.inspirationRequests.single, {
+        'conversation_round_id': 301,
+        'refresh': false,
+      });
+      expect(harness.socket.sendMessageCount, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+      unawaited(harness.service.dispose());
+      await tester.pump();
+    },
+  );
+
+  for (final outcome in ['success', 'failure', 'new-round']) {
+    testWidgets('inspiration confirms its card before sending: $outcome', (
+      tester,
+    ) async {
+      final backend = _LocationChatReplyHttpTransport();
+      final harness = await _mountCompletedReplyActionPanel(
+        tester,
+        backend: backend,
+        isMember: false,
+      );
+      backend.cards.addAll([
+        backend._cardJson(501, 1, 'succeeded', 'Original reply.'),
+        backend._cardJson(502, 2, 'succeeded', 'Candidate reply.'),
+      ]);
+      unawaited(
+        harness.service.refreshLatestMessages(locationId: 'location-current'),
+      );
+      await _pumpUntilLocationChatTest(
+        tester,
+        () =>
+            harness.service.replyActions!
+                .stateFor('location-current')!
+                .cardCount ==
+            2,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('location-chat-reply-next-card')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Inspiration'));
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => tester
+            .widget<LocationChatAnchoredMessageList>(
+              find.byType(LocationChatAnchoredMessageList),
+            )
+            .inspirationMessages
+            .isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+      expect(backend.inspirationRequests.single['card_id'], 502);
+      backend.selectionBarrier = Completer<void>();
+      backend.selectionFails = outcome == 'failure';
+      await tester.tap(
+        find.byKey(const ValueKey('chat-message-bubble-inspiration-0')),
+      );
+      await tester.pump();
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => backend.selectionRequests.isNotEmpty,
+      );
+      expect(harness.socket.sendMessageCount, 0);
+      expect(backend.selectionRequests.single['card_id'], 502);
+      if (outcome == 'new-round') {
+        harness.socket.serverWaitingConversationRound(roundId: 401);
+        await tester.pump();
       }
+      backend.selectionBarrier!.complete();
+      if (outcome == 'success') {
+        await _pumpUntilLocationChatTest(
+          tester,
+          () => harness.socket.sendMessageCount == 1,
+        );
+        final sent = harness.socket._sentFrames.lastWhere(
+          (frame) => frame['type'] == 'send_message',
+        );
+        expect(sent['payload']['content'], 'Good job!');
+        expect(backend.selectedCardId, 502);
+        harness.socket.serverV2AckForLatestSend(errNo: 4001);
+      }
+      await tester.pump(const Duration(seconds: 4));
+      expect(harness.socket.sendMessageCount, outcome == 'success' ? 1 : 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+      unawaited(harness.service.dispose());
+      await tester.pump();
+    });
+  }
+
+  testWidgets(
+    'a new round removes inspiration and disables requests until complete',
+    (tester) async {
+      final backend = _LocationChatReplyHttpTransport();
+      final harness = await _mountCompletedReplyActionPanel(
+        tester,
+        backend: backend,
+      );
+      await tester.tap(find.bySemanticsLabel('Inspiration'));
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => tester
+            .widget<LocationChatAnchoredMessageList>(
+              find.byType(LocationChatAnchoredMessageList),
+            )
+            .inspirationMessages
+            .isNotEmpty,
+      );
+      harness.socket.serverWaitingConversationRound(roundId: 401);
+      await tester.pump();
+      await tester.pump();
+      final list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(list.inspirationEnabled, isFalse);
+      expect(list.inspirationMessages, isEmpty);
+      list.onInspirationExpanded!(true);
+      await tester.pump();
+      expect(backend.inspirationRequests, hasLength(1));
       await tester.pumpWidget(const SizedBox.shrink());
       unawaited(harness.service.dispose());
       await tester.pump();
@@ -2390,25 +2502,20 @@ void main() {
   testWidgets('inspiration uses the composer focus and existing send flow', (
     tester,
   ) async {
-    final harness = await _connectedLocationChatTestService();
-    await tester.pumpWidget(
-      AppServicesScope(
-        services: harness.services,
-        child: MaterialApp(
-          scrollBehavior: const GenesisScrollBehavior(),
-          home: LocationChatPanel(
-            worldId: 'world-current',
-            locationId: 'location-current',
-            service: harness.service,
-            leaveOnInactive: false,
-            messageQueueInitializationCovered: true,
-          ),
-        ),
-      ),
+    final backend = _LocationChatReplyHttpTransport();
+    final harness = await _mountCompletedReplyActionPanel(
+      tester,
+      backend: backend,
     );
+    await tester.tap(find.bySemanticsLabel('Inspiration'));
     await _pumpUntilLocationChatTest(
       tester,
-      () => harness.service.state.joinedLocationId == 'location-current',
+      () => tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .inspirationMessages
+          .isNotEmpty,
     );
     final list = tester.widget<LocationChatAnchoredMessageList>(
       find.byType(LocationChatAnchoredMessageList),
@@ -6179,6 +6286,7 @@ _connectedLocationChatTestService({
           ),
     client: client,
     replyActionStorage: MemoryChatroomReplyActionStorage(),
+    inspirationStorage: MemoryChatroomInspirationStorage(),
     messageStorage: MemoryChatroomMessageStorage(),
     refreshInitialSnapshotOnConnect: false,
   );
@@ -6325,6 +6433,11 @@ class _LocationChatReplyHttpTransport implements HttpTransport {
   final requests = <TransportRequest>[];
   final cards = <Map<String, Object?>>[];
   Completer<void>? batchBarrier;
+  Completer<void>? selectionBarrier;
+  bool selectionFails = false;
+  int selectedCardId = 0;
+  final inspirationRequests = <Map<String, dynamic>>[];
+  final selectionRequests = <Map<String, dynamic>>[];
 
   void seedGoOnReply() {
     messages.add(
@@ -6423,6 +6536,51 @@ class _LocationChatReplyHttpTransport implements HttpTransport {
   @override
   Future<TransportResponse> send(TransportRequest request) async {
     requests.add(request);
+    if (request.uri.path.endsWith('/inspiration')) {
+      final body =
+          jsonDecode(utf8.decode(request.bodyBytes!)) as Map<String, dynamic>;
+      inspirationRequests.add(body);
+      final card = body['card_id'] as int? ?? selectedCardId;
+      return _ok({
+        'conversation_round_id': body['conversation_round_id'],
+        'card_id': card,
+        'source_card_id': card == 501 ? 0 : card,
+        'messages': [
+          'Good job!',
+          'A different suggestion.',
+          'Try another path.',
+          'One more idea.',
+        ],
+        'gateway_request_id': '',
+      });
+    }
+    if (request.uri.path.endsWith('/llm-messages/select')) {
+      final body =
+          jsonDecode(utf8.decode(request.bodyBytes!)) as Map<String, dynamic>;
+      selectionRequests.add(body);
+      await selectionBarrier?.future;
+      if (selectionFails) {
+        return TransportResponse(
+          statusCode: 200,
+          headers: const {},
+          body: jsonEncode({
+            'err_no': 5002,
+            'err_msg': 'Selection failed',
+            'data': {},
+          }),
+        );
+      }
+      selectedCardId = body['card_id'] as int;
+      return _ok({
+        'conversation_round_id': body['conversation_round_id'],
+        'selected_card_id': selectedCardId,
+        'confirmed': true,
+        'start_conversation_round_id': 301,
+        'end_conversation_round_id': 301,
+        'newest_message_id': 302,
+      });
+    }
+
     if (request.uri.path.endsWith('/llm-messages/cards')) {
       final round = int.parse(
         request.uri.queryParameters['conversation_round_id']!,
@@ -6443,9 +6601,13 @@ class _LocationChatReplyHttpTransport implements HttpTransport {
       return _ok({
         'conversation_round_id': 301,
         'original_card_id': cards.isEmpty ? 0 : 501,
-        'selected_card_id': cards.isEmpty ? 0 : 501,
-        'active_card_id': cards.isEmpty ? 0 : 502,
-        'confirmed': false,
+        'selected_card_id': selectedCardId,
+        'active_card_id': selectedCardId > 0
+            ? selectedCardId
+            : cards.isEmpty
+            ? 0
+            : 502,
+        'confirmed': selectedCardId > 0,
         'can_regenerate': true,
         'can_confirm': cards.isNotEmpty,
         'list': cards,

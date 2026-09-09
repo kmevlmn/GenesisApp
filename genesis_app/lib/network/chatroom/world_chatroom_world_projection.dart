@@ -343,10 +343,18 @@ extension _WorldChatroomWorldProjection on WorldChatroomService {
     return worldMessage.copyWith(locationId: fallbackLocationId);
   }
 
-  void _setState(WorldChatroomState state) {
+  void _setState(
+    WorldChatroomState state, {
+    String? inspirationReplacementLocation,
+  }) {
     if (_disposed) return;
     _state = state;
-    _observeReplyHistory();
+    _inspirationReplacementLocation = inspirationReplacementLocation;
+    try {
+      _observeReplyHistory();
+    } finally {
+      _inspirationReplacementLocation = null;
+    }
     if (!_states.isClosed) _states.add(state);
   }
 

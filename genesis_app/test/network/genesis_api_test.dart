@@ -1255,6 +1255,53 @@ void main() {
   );
 
   test(
+    'inspiration business errors toast once while session expiry stays separate',
+    () async {
+      var code = 2012;
+      final toasts = <String>[];
+      final expired = <String>[];
+      final transport = _FakeTransport(
+        handler: (_) => TransportResponse(
+          statusCode: 200,
+          headers: const {'content-type': 'application/json'},
+          body: jsonEncode({
+            'err_no': code,
+            'err_msg': 'server message $code',
+            'data': null,
+          }),
+        ),
+      );
+      final api = GenesisApi(
+        transport: transport,
+        useMock: false,
+        sessionStore: MemoryUserSessionStore(),
+        appHeaderProvider: () async => {},
+        onChatroomMessageMutationError: toasts.add,
+        onSessionExpired: (message) async {
+          expired.add(message);
+        },
+        onPageNotFound: (_) async =>
+            fail('Inspiration errors should toast, not navigate'),
+      );
+      for (final errorCode in [2012, 5002, 1404, 10001]) {
+        code = errorCode;
+        toasts.clear();
+        await expectLater(
+          api.chatroomHttp.getInspirations(
+            worldId: 'w/a',
+            locationId: 'l b',
+            conversationRoundId: 1,
+          ),
+          throwsA(isA<ApiException>().having((e) => e.code, 'code', code)),
+        );
+        expect(toasts, code == 10001 ? isEmpty : ['server message $code']);
+      }
+      expect(expired, hasLength(1));
+      expect(transport.requests, hasLength(4));
+    },
+  );
+
+  test(
     'message mutations keep session expiry and response errors separate',
     () async {
       Object? envelope = {'err_no': 10001, 'err_msg': 'expired', 'data': false};

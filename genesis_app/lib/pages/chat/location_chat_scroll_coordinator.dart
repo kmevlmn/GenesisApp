@@ -313,6 +313,11 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
     this.replyCardsConfirmed = false,
     this.onPreviousReplyCard,
     this.onNextReplyCard,
+    this.inspirationMessages = const [],
+    this.inspirationLoading = false,
+    this.inspirationEnabled = true,
+    this.inspirationIdentity,
+    this.onInspirationExpanded,
     this.onInspirationSend,
     this.onInspirationEdit,
     this.onEditReply,
@@ -362,6 +367,10 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
   final bool replyCardsConfirmed;
   final VoidCallback? onPreviousReplyCard;
   final VoidCallback? onNextReplyCard;
+  final List<String> inspirationMessages;
+  final bool inspirationLoading, inspirationEnabled;
+  final String? inspirationIdentity;
+  final ValueChanged<bool>? onInspirationExpanded;
   final ValueChanged<String>? onInspirationSend;
   final ValueChanged<String>? onInspirationEdit;
   final VoidCallback? onEditReply;
@@ -467,7 +476,8 @@ class _LocationChatAnchoredMessageListState
       _replySwitchAnchor = null;
     }
     if (oldWidget.active != widget.active ||
-        oldReplyIdentity != _replyIdentity) {
+        oldReplyIdentity != _replyIdentity ||
+        oldWidget.inspirationIdentity != widget.inspirationIdentity) {
       _inspirationExpanded = false;
       _editPromptExpanded = false;
       _inspirationPage = 0;
@@ -1257,6 +1267,9 @@ class _LocationChatAnchoredMessageListState
           padding: EdgeInsets.only(bottom: style.rowBottomPadding),
           child: LocationChatReplyActions(
             key: ValueKey('reply-actions-$_replyIdentity'),
+            inspirationMessages: widget.inspirationMessages,
+            inspirationLoading: widget.inspirationLoading,
+            inspirationEnabled: widget.inspirationEnabled,
             onInspirationSend: widget.onInspirationSend,
             onInspirationEdit: widget.onInspirationEdit,
             onEditReply: widget.onEditReply,
@@ -1289,6 +1302,7 @@ class _LocationChatAnchoredMessageListState
             onInspirationPageChanged: (page) => _inspirationPage = page,
             onInspirationExpandedChanged: (expanded) {
               setState(() => _inspirationExpanded = expanded);
+              widget.onInspirationExpanded?.call(expanded);
               if (expanded) {
                 widget.coordinator.requestBottom(
                   reason: LocationChatBottomReason.inspirationExpanded,

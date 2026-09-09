@@ -29,6 +29,8 @@ import '../../components/world_new_badge.dart';
 import '../../network/chatroom/chatroom_connection_controller.dart';
 import '../../network/chatroom/chatroom_message_type.dart';
 import '../../network/chatroom/chatroom_models.dart';
+import '../../network/chatroom/chatroom_inspiration.dart';
+import '../../network/chatroom/chatroom_inspiration_controller.dart';
 import '../../network/chatroom/chatroom_message_batch.dart';
 import '../../network/chatroom/chatroom_timeline_payload.dart';
 import '../../network/chatroom/world_chatroom_service.dart';
@@ -58,6 +60,7 @@ part 'location_chat_panel_connection.dart';
 part 'location_chat_message_reconciler.dart';
 part 'location_chat_send_actions.dart';
 part 'location_chat_reply_binding.dart';
+part 'location_chat_inspiration_binding.dart';
 part 'location_chat_edit_page.dart';
 part 'location_chat_message_window.dart';
 part 'location_chat_mentions.dart';
@@ -385,6 +388,14 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
   late final LocationChatMentionEditingController _textController;
   final _composerFocusNode = FocusNode();
   ChatroomReplyActionsController? _replyController;
+  ChatroomInspirationController? _inspirationController;
+  ChatroomInspirationSource? _inspirationRequestSource;
+  ChatroomInspirationSource? _inspirationDisplayedSource;
+  List<String> _inspirationMessages = const [];
+  bool _inspirationLoading = false;
+  int _inspirationRequestGeneration = 0;
+  int _inspirationResetRevision = 0;
+  int? _inspirationEpoch;
   final _restoredReplyLocations = <String>{};
   bool _replyRebuildScheduled = false;
   int _replyBindingGeneration = 0;
@@ -924,7 +935,16 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         replyCardsConfirmed: replyState?.confirmed ?? false,
         onPreviousReplyCard: () => _browseReplyCard(-1),
         onNextReplyCard: () => _browseReplyCard(1),
-        onInspirationSend: (text) => unawaited(_send(textOverride: text)),
+        inspirationMessages: _inspirationMessages,
+        inspirationLoading: _inspirationLoading,
+        inspirationEnabled:
+            _currentInspirationSource != null &&
+            !_sending &&
+            !_preparingReplyAction,
+        inspirationIdentity:
+            '${_currentInspirationSource?.key}:$_inspirationResetRevision',
+        onInspirationExpanded: _onInspirationExpanded,
+        onInspirationSend: _sendInspiration,
         onInspirationEdit: _editInspiration,
         onEditReply: () => unawaited(
           _editCurrentReply(

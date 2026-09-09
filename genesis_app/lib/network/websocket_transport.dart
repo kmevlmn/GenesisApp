@@ -114,6 +114,7 @@ class _IoNetworkWebSocket implements NetworkWebSocket {
           return message;
         })
         .handleError((Object error, StackTrace stackTrace) {
+          unawaited(_frameProfile?.close(reason: 'WebSocket stream error'));
           developer.log(
             'socket stream error',
             name: _logName,
@@ -124,6 +125,7 @@ class _IoNetworkWebSocket implements NetworkWebSocket {
         .transform(
           StreamTransformer<String, String>.fromHandlers(
             handleDone: (sink) {
+              unawaited(_frameProfile?.close());
               developer.log(
                 'socket closed code=${_socket.closeCode} reason=${_socket.closeReason ?? ''}',
                 name: _logName,
@@ -142,6 +144,7 @@ class _IoNetworkWebSocket implements NetworkWebSocket {
 
   @override
   Future<void> close([int? code, String? reason]) {
+    unawaited(_frameProfile?.close());
     developer.log(
       'closing socket code=${code ?? ''} reason=${reason ?? ''}',
       name: _logName,

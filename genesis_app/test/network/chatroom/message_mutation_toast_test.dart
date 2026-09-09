@@ -2,6 +2,7 @@ import 'package:genesis_flutter_android/network/chatroom/chatroom_http_models.da
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/components/common/genesis_center_toast.dart';
+import 'package:genesis_flutter_android/components/chat/chatroom_failure_toast.dart';
 import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/network/genesis_api.dart';
 import 'package:genesis_flutter_android/network/http_transport.dart';
@@ -16,6 +17,54 @@ class _FakeTransport implements HttpTransport {
 }
 
 void main() {
+  testWidgets('inspiration err_msg displays once through the global toast', (
+    tester,
+  ) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(navigatorKey: navigatorKey, home: const Scaffold()),
+    );
+    const message = '灵感生成失败，请稍后重试';
+    var toastCount = 0;
+    final api = GenesisApi(
+      transport: _FakeTransport(
+        handler: (_) => const TransportResponse(
+          statusCode: 200,
+          headers: {'content-type': 'application/json'},
+          body: '{"err_no":5002,"err_msg":"$message","data":null}',
+        ),
+      ),
+      useMock: false,
+      sessionStore: MemoryUserSessionStore(),
+      appHeaderProvider: () async => {},
+      onChatroomMessageMutationError: (text) {
+        toastCount++;
+        showGenesisToastInOverlay(navigatorKey.currentState!.overlay!, text);
+      },
+    );
+    await expectLater(
+      api.chatroomHttp.getInspirations(
+        worldId: 'w',
+        locationId: 'l',
+        conversationRoundId: 1,
+      ),
+      throwsA(
+        isA<ApiException>()
+            .having((e) => e.message, 'server err_msg', message)
+            .having(
+              isChatroomErrorPresentedGlobally,
+              'page suppresses duplicate toast',
+              isTrue,
+            ),
+      ),
+    );
+    await tester.pump();
+    expect(toastCount, 1);
+    expect(find.text(message), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text(message), findsNothing);
+  });
+
   testWidgets('message mutation err_msg displays in the global toast', (
     tester,
   ) async {

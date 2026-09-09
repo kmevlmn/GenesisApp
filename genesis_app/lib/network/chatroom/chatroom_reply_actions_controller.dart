@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'chatroom_inspiration.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../api_exception.dart';
@@ -53,6 +55,7 @@ class ChatroomReplyRoundState {
   bool _invalidated = false;
   bool _active = false;
   bool _ended = false;
+  bool _roundFailed = false;
   bool _generating = false;
   bool _regenerateDispatching = false;
   bool _busy = false;
@@ -139,6 +142,42 @@ class ChatroomReplyRoundState {
       _controller._isReady(locationId) &&
       !_controller._isTickLocked();
   ChatroomLlmCard? get viewedCard => _card(_viewedCardId);
+
+  int get inspirationTailMessageId => _formal.fold<int>(
+    0,
+    (tail, message) =>
+        message.locationMessageId > tail ? message.locationMessageId : tail,
+  );
+
+  ChatroomInspirationSource? get inspirationSource {
+    if (!isLatest ||
+        _invalidated ||
+        !complete ||
+        _roundFailed ||
+        !_controller._isReady(locationId) ||
+        _controller._isTickLocked() ||
+        !_formal.any(_isReply) ||
+        busy ||
+        frozen) {
+      return null;
+    }
+    final card = confirmed ? _card(selectedCardId) : viewedCard;
+    if (hasCardGroup &&
+        (card == null || !_completeCard(card) || card.cardId <= 0)) {
+      return null;
+    }
+    if (hasCardGroup && !confirmed && !isOwnRound) return null;
+    return ChatroomInspirationSource(
+      ownerUid: _controller.ownerUid,
+      worldId: _controller.worldId,
+      locationId: locationId,
+      roundId: roundId,
+      cardId: isOwnRound ? card?.cardId : null,
+      sourceCardId: card == null || card.isOriginal ? 0 : card.cardId,
+      tailMessageId: inspirationTailMessageId,
+    );
+  }
+
   int get cardPosition =>
       _cards.indexWhere((card) => card.cardId == _viewedCardId) + 1;
   int get cardCount => _cards.length;
@@ -248,6 +287,7 @@ class ChatroomReplyActionsController extends ChangeNotifier {
 
   ChatroomReplyRoundState? stateFor(String locationId) =>
       _states[locationId]?[_latest[locationId]];
+  Iterable<String> get locationIds => _states.keys;
   ChatroomReplyRoundState? stateForRound(String locationId, int roundId) =>
       _states[locationId]?[roundId];
   Iterable<ChatroomReplyRoundState> statesFor(String locationId) =>
@@ -1032,16 +1072,39 @@ class ChatroomReplyActionsController extends ChangeNotifier {
     }
   }
 
-  Future<void> finalizeBeforeSend(String locationId) {
+  Future<void> finalizeBeforeSend(
+    String locationId, {
+    ChatroomInspirationSource? expectedSource,
+  }) async {
+    void verify() {
+      if (expectedSource != null &&
+          !expectedSource.sameOrigin(stateFor(locationId)?.inspirationSource)) {
+        throw StateError('The reply changed. Please select inspiration again.');
+      }
+    }
+
+    verify();
     final existing = _finalizations[locationId];
-    if (existing != null) return existing;
+    if (existing != null) {
+      await existing;
+      verify();
+      return;
+    }
+    if (expectedSource != null) {
+      final sourceState = stateFor(locationId)!;
+      if (sourceState.hasCardGroup && !sourceState.confirmed) {
+        sourceState._fixedCardId = sourceState.viewedCardId;
+        sourceState._frozen = true;
+      }
+    }
     final task = _finalizeLocation(locationId);
     _finalizations[locationId] = task;
-    return task.whenComplete(() {
+    await task.whenComplete(() {
       if (identical(_finalizations[locationId], task)) {
         _finalizations.remove(locationId);
       }
     });
+    verify();
   }
 
   Future<void> _finalizeLocation(String locationId) async {
@@ -1341,6 +1404,7 @@ class ChatroomReplyActionsController extends ChangeNotifier {
       final state = _state(event.locationId, round);
       state._active = false;
       state._ended = true;
+      state._roundFailed = !event.ok;
       if (event.userId.isNotEmpty) state._owner = event.userId;
       for (final source in statesFor(event.locationId)) {
         if (source.goOnPending && source.goOnRoundId == round) {

@@ -192,6 +192,17 @@ extension _WorldChatroomConnection on WorldChatroomService {
       'world=$_worldId joined=${_state.joinedLocationId}',
     );
     _replyActionsController?.receiveEvent(event);
+    if (event is ChatroomWaitingConversationRound &&
+        event.worldId == _worldId) {
+      final round = int.tryParse(event.conversationRoundId);
+      if (round != null && round > 0) {
+        _inspirations?.observe(
+          event.locationId,
+          roundId: round,
+          tailMessageId: 0,
+        );
+      }
+    }
     _prepareWorldRefreshForQueuedEvent(event);
     _eventQueue = _eventQueue.then((_) => _handleEvent(event)).catchError((
       Object error,
@@ -258,6 +269,7 @@ extension _WorldChatroomConnection on WorldChatroomService {
 
   Future<void> _handleConnectionLost() async {
     if (_userDisconnected || _disposed) return;
+    _suspendInspirations();
     await _detachSession(disconnect: true);
     _setState(_state.copyWith(connected: false, joinedLocationId: ''));
     _scheduleReconnect();

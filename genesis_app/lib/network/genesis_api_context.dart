@@ -148,7 +148,7 @@ abstract class _GenesisApiContext {
   Object? _processGenesisResponse(ApiResponse response) {
     final data = _defaultGenesisProcessor(response);
     _throwIfSessionExpired(response);
-    if (_isChatroomMessageMutationResponse(response.uri)) {
+    if (_isChatroomReplyActionResponse(response.uri)) {
       final envelope = response.data;
       if (envelope is Map &&
           envelope['err_no'] is int &&
@@ -164,14 +164,18 @@ abstract class _GenesisApiContext {
     return data;
   }
 
-  bool _isChatroomMessageMutationResponse(Uri uri) {
+  bool _isChatroomReplyActionResponse(Uri uri) {
     final segments = uri.pathSegments;
+    if (segments.length < 8 ||
+        segments[0] != 'aitown-chat' ||
+        segments[1] != 'api' ||
+        segments[2] != 'v1' ||
+        segments[3] != 'worlds' ||
+        segments[5] != 'locations') {
+      return false;
+    }
+    if (segments.length == 8 && segments[7] == 'inspiration') return true;
     return segments.length == 9 &&
-        segments[0] == 'aitown-chat' &&
-        segments[1] == 'api' &&
-        segments[2] == 'v1' &&
-        segments[3] == 'worlds' &&
-        segments[5] == 'locations' &&
         segments[7] == 'llm-messages' &&
         const {'batch', 'cards', 'select'}.contains(segments[8]);
   }

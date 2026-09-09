@@ -333,6 +333,16 @@ class LocalMockGenesisTransport implements HttpTransport {
       );
     }
 
+    if (method == 'POST' &&
+        RegExp(
+          r'^aitown-chat/api/v1/worlds/[^/]+/locations/[^/]+/inspiration$',
+        ).hasMatch(path)) {
+      return _error(
+        501,
+        'Inspiration generation is not simulated by the local transport',
+      );
+    }
+
     final cards = RegExp(
       r'^aitown-chat/api/v1/worlds/[^/]+/locations/[^/]+/llm-messages/(cards|select)$',
     ).firstMatch(path);

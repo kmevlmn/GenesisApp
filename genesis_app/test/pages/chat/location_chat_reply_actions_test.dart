@@ -8,60 +8,45 @@ import 'package:genesis_flutter_android/components/gems/purchase_options_sheet.d
 import 'package:genesis_flutter_android/components/common/genesis_bottom_sheet_panel.dart';
 import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
 
+const _inspirationReplies = [
+  'Good job!',
+  "You're right to ask for a plan. Give me a little time to listen, and I'll come back with something we can actually build together.",
+  "I don't have every answer yet, but I came back for a reason. Let's talk to the people who still believe in this town, hear what they need, and give them a reason to walk through these doors again.",
+];
+
 void main() {
-  testWidgets('all four non-member actions only show the subscription prompt', (
+  testWidgets('all four actions are available without membership', (
     tester,
   ) async {
-    var actionCalls = 0;
+    var calls = 0;
     await tester.pumpWidget(
       MaterialApp(
-        scrollBehavior: const GenesisScrollBehavior(),
         home: Scaffold(
-          body: SizedBox(
-            width: 390,
-            child: LocationChatReplyActions(
-              style: kLocationChatStyle,
-              isMember: false,
-              onRegenerate: () => actionCalls++,
-              onGoOn: () => actionCalls++,
-              onEditReply: () => actionCalls++,
-            ),
+          body: LocationChatReplyActions(
+            style: kLocationChatStyle,
+            isMember: false,
+            inspirationMessages: _inspirationReplies,
+            onRegenerate: () => calls++,
+            onGoOn: () => calls++,
+            onEditReply: () => calls++,
           ),
         ),
       ),
     );
-    final prompt = find.byKey(const ValueKey('edit-subscription-prompt'));
-    expect(prompt, findsNothing);
     for (final action in ['Regenerate', 'Go on', 'Edit', 'Inspiration']) {
       await tester.tap(find.bySemanticsLabel(action));
       await tester.pumpAndSettle();
-      expect(actionCalls, 0);
-      expect(prompt, findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('inspiration-replies-carousel')),
-        findsNothing,
-      );
     }
-    final label = tester.widget<Text>(
-      find.descendant(of: prompt, matching: find.byType(Text)),
-    );
-    expect(label.textSpan!.toPlainText(), 'Members only. Subscribe >');
-    expect(label.maxLines, 1);
-    expect(label.softWrap, isFalse);
-    expect(label.style!.fontSize, 13);
-    final icons = find.byKey(
-      const ValueKey('location-chat-reply-actions-four-icons'),
+    expect(calls, 3);
+    expect(
+      find.byKey(const ValueKey('edit-subscription-prompt')),
+      findsNothing,
     );
     expect(
-      tester.getTopLeft(prompt).dy,
-      greaterThan(tester.getBottomRight(icons).dy),
-    );
-    await tester.tap(prompt);
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('subscription-placeholder')),
+      find.byKey(const ValueKey('inspiration-replies-carousel')),
       findsOneWidget,
     );
+    expect(find.byKey(const ValueKey('inspiration-get-more')), findsNothing);
   });
 
   testWidgets('default members invoke actions with independent availability', (
@@ -71,6 +56,7 @@ void main() {
     Widget host({bool busy = false}) => MaterialApp(
       home: Scaffold(
         body: LocationChatReplyActions(
+          inspirationMessages: _inspirationReplies,
           style: kLocationChatStyle,
           onRegenerate: () => calls.add('regenerate'),
           onGoOn: () => calls.add('goOn'),
@@ -131,6 +117,7 @@ void main() {
               builder: (context, setState) {
                 setHostState = setState;
                 return LocationChatReplyActions(
+                  inspirationMessages: _inspirationReplies,
                   style: kLocationChatStyle,
                   cardIndex: page,
                   cardCount: count,
@@ -211,6 +198,7 @@ void main() {
                           maxWidthCap: 230,
                         ),
                         LocationChatReplyActions(
+                          inspirationMessages: _inspirationReplies,
                           style: style,
                           selfMessageBubbleMaxWidthCap: 230,
                         ),
@@ -236,23 +224,7 @@ void main() {
       final carousel = find.byKey(
         const ValueKey('inspiration-replies-carousel'),
       );
-      final footer = find.byKey(const ValueKey('inspiration-get-more'));
-      final footerSurface = tester.widget<ChatStableBackdropSurface>(
-        find.descendant(
-          of: footer,
-          matching: find.byType(ChatStableBackdropSurface),
-        ),
-      );
-      expect(footerSurface.sigma, style.bubbleBackdropBlurSigma);
-      final footerContainer = tester.widget<Container>(
-        find.descendant(of: footer, matching: find.byType(Container)),
-      );
-      expect(
-        (footerContainer.decoration! as BoxDecoration).color,
-        chatNarratorMessageBackgroundColor(
-          style,
-        ).withValues(alpha: style.selfBubbleColor.a),
-      );
+      expect(find.byKey(const ValueKey('inspiration-get-more')), findsNothing);
       for (var index = 0; index < 3; index++) {
         if (index > 0) {
           await tester.drag(carousel, const Offset(-230, 0));
@@ -325,6 +297,7 @@ void main() {
             child: SizedBox(
               width: 390,
               child: LocationChatReplyActions(
+                inspirationMessages: _inspirationReplies,
                 style: kLocationChatStyle,
                 onInspirationSend: sent.add,
                 onInspirationEdit: edited.add,
@@ -422,6 +395,7 @@ void main() {
           width: 390,
           height: 600,
           child: LocationChatAnchoredMessageList(
+            inspirationMessages: _inspirationReplies,
             coordinator: coordinator,
             active: active,
             messages: messages,
@@ -490,6 +464,7 @@ void main() {
               width: 390,
               height: 600,
               child: LocationChatAnchoredMessageList(
+                inspirationMessages: _inspirationReplies,
                 coordinator: coordinator,
                 messages: messages,
                 topTitle: '',
@@ -522,49 +497,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'Get more opens Subscription and tabs switch without eager gems loading',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          scrollBehavior: const GenesisScrollBehavior(),
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: LocationChatReplyActions(style: kLocationChatStyle),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Inspiration'));
-      await tester.pumpAndSettle();
-      final getMore = find.byKey(const ValueKey('inspiration-get-more'));
-      await tester.ensureVisible(getMore);
-      await tester.tap(getMore);
-      await tester.pumpAndSettle();
-      expect(find.text('Subscription'), findsOneWidget);
-      expect(find.text('Buy Gems'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('subscription-placeholder')),
-        findsOneWidget,
-      );
-      await tester.tap(find.text('Buy Gems'));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('subscription-placeholder')),
-        findsNothing,
-      );
-      await tester.tap(find.text('Subscription'));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('subscription-placeholder')),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(const ValueKey('gem-purchase-sheet-close')));
-      await tester.pumpAndSettle();
-      expect(find.byType(PurchaseOptionsSheet), findsNothing);
-    },
-  );
   testWidgets('purchase tabs preserve the original header and close position', (
     tester,
   ) async {
@@ -632,6 +564,7 @@ void main() {
               child: NotificationListener<ScrollNotification>(
                 onNotification: coordinator.handleScrollNotification,
                 child: LocationChatAnchoredMessageList(
+                  inspirationMessages: _inspirationReplies,
                   coordinator: coordinator,
                   messages: messages,
                   topTitle: '',
@@ -652,7 +585,7 @@ void main() {
       expect(coordinator.isAtBottom, isTrue);
       final viewport = tester.getRect(find.byKey(viewportKey));
       final footer = tester.getRect(
-        find.byKey(const ValueKey('inspiration-get-more')),
+        find.byKey(const ValueKey('inspiration-replies-carousel')),
       );
       expect(footer.bottom, lessThanOrEqualTo(viewport.bottom));
       await tester.drag(
@@ -694,6 +627,7 @@ void main() {
             width: 390,
             height: 600,
             child: LocationChatAnchoredMessageList(
+              inspirationMessages: _inspirationReplies,
               coordinator: coordinator,
               messages: messages,
               topTitle: '',
@@ -765,6 +699,7 @@ void main() {
                 child: NotificationListener<ScrollNotification>(
                   onNotification: coordinator.handleScrollNotification,
                   child: LocationChatAnchoredMessageList(
+                    inspirationMessages: _inspirationReplies,
                     coordinator: coordinator,
                     topTitle: '',
                     oldestEdgeLoading: loading,
@@ -841,6 +776,7 @@ void main() {
             child: NotificationListener<ScrollNotification>(
               onNotification: coordinator.handleScrollNotification,
               child: LocationChatAnchoredMessageList(
+                inspirationMessages: _inspirationReplies,
                 coordinator: coordinator,
                 topTitle: '',
                 oldestEdgeLoading: loading,

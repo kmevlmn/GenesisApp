@@ -6,9 +6,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../components/chat/shared/chat_ui.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../components/gems/gem_purchase_bottom_sheet.dart';
+import 'location_chat_loading_bubble.dart';
 import '../../ui/tokens/genesis_colors.dart';
 
-/// Reply actions with local inspiration suggestions and host-owned messaging.
+/// Reply actions with source-bound inspiration suggestions and host-owned messaging.
 class LocationChatReplyActions extends StatefulWidget {
   const LocationChatReplyActions({
     super.key,
@@ -16,7 +17,9 @@ class LocationChatReplyActions extends StatefulWidget {
     this.selfMessageBubbleMaxWidthCap,
     this.inspirationExpanded,
     this.onInspirationExpandedChanged,
-    this.freeInspirationUsesLeft = 3,
+    this.inspirationMessages = const [],
+    this.inspirationLoading = false,
+    this.inspirationEnabled = true,
     this.inspirationPage,
     this.onInspirationPageChanged,
     this.onInspirationSend,
@@ -63,8 +66,9 @@ class LocationChatReplyActions extends StatefulWidget {
   final ValueChanged<bool>? onEditPromptExpandedChanged;
   final ChatUiStyleConfig style;
   final double? selfMessageBubbleMaxWidthCap;
-  // Demo value until the inspiration quota API is available.
-  final int freeInspirationUsesLeft;
+  final List<String> inspirationMessages;
+  final bool inspirationLoading;
+  final bool inspirationEnabled;
   final int? inspirationPage;
   final ValueChanged<int>? onInspirationPageChanged;
   final bool? inspirationExpanded;
@@ -83,9 +87,6 @@ class LocationChatReplyActions extends StatefulWidget {
 
 class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
   bool _localInspirationExpanded = false;
-  bool _localEditPromptExpanded = false;
-  bool get _editPromptExpanded =>
-      widget.editPromptExpanded ?? _localEditPromptExpanded;
   int _localInspirationPage = 0;
   bool get _inspirationExpanded =>
       widget.inspirationExpanded ?? _localInspirationExpanded;
@@ -93,8 +94,6 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
   void _setEditPromptExpanded(bool expanded) {
     if (widget.onEditPromptExpandedChanged case final onChanged?) {
       onChanged(expanded);
-    } else {
-      setState(() => _localEditPromptExpanded = expanded);
     }
   }
 
@@ -112,12 +111,6 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
   }
 
   VoidCallback? _memberAction(VoidCallback? action, {bool enabled = true}) {
-    if (!widget.isMember) {
-      return () {
-        _setInspirationExpanded(false);
-        _setEditPromptExpanded(true);
-      };
-    }
     if (!enabled || action == null) return null;
     return () {
       _setEditPromptExpanded(false);
@@ -233,45 +226,38 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 label: 'Inspiration',
                 icon: _ReplyActionIconType.inspiration,
                 expanded: _inspirationExpanded,
-                onTap: _memberAction(_toggleInspiration),
+                onTap: _memberAction(
+                  _toggleInspiration,
+                  enabled:
+                      widget.inspirationEnabled && !widget.inspirationLoading,
+                ),
               ),
             ],
           ),
         ),
-        if (!widget.isMember && _editPromptExpanded) ...[
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.center,
-            child: LocationChatSubscriptionPrompt(
-              style: style,
-              promptKey: const ValueKey('edit-subscription-prompt'),
-              semanticsLabel: 'Subscribe to use reply actions',
-              message: const TextSpan(text: 'Members only.'),
-              actionLabel: 'Subscribe >',
-              singleLine: true,
-            ),
-          ),
-        ],
         if (_inspirationExpanded) ...[
           const SizedBox(height: 12),
-          _InspirationReplies(
-            onSend: (text) {
-              _setInspirationExpanded(false);
-              widget.onInspirationSend?.call(text);
-            },
-            onEdit: (text) {
-              _setInspirationExpanded(false);
-              widget.onInspirationEdit?.call(text);
-            },
-            style: style,
-            maxWidthCap: widget.selfMessageBubbleMaxWidthCap,
-            freeUsesLeft: widget.freeInspirationUsesLeft,
-            initialPage: widget.inspirationPage ?? _localInspirationPage,
-            onPageChanged: (page) {
-              _localInspirationPage = page;
-              widget.onInspirationPageChanged?.call(page);
-            },
-          ),
+          if (widget.inspirationLoading)
+            LocationChatLoadingBubble(style: style)
+          else if (widget.inspirationMessages.isNotEmpty)
+            _InspirationReplies(
+              replies: widget.inspirationMessages,
+              onSend: (text) {
+                _setInspirationExpanded(false);
+                widget.onInspirationSend?.call(text);
+              },
+              onEdit: (text) {
+                _setInspirationExpanded(false);
+                widget.onInspirationEdit?.call(text);
+              },
+              style: style,
+              maxWidthCap: widget.selfMessageBubbleMaxWidthCap,
+              initialPage: widget.inspirationPage ?? _localInspirationPage,
+              onPageChanged: (page) {
+                _localInspirationPage = page;
+                widget.onInspirationPageChanged?.call(page);
+              },
+            ),
         ],
       ],
     );
@@ -282,7 +268,7 @@ class _InspirationReplies extends StatefulWidget {
   const _InspirationReplies({
     required this.style,
     required this.maxWidthCap,
-    required this.freeUsesLeft,
+    required this.replies,
     required this.initialPage,
     required this.onPageChanged,
     required this.onSend,
@@ -291,7 +277,7 @@ class _InspirationReplies extends StatefulWidget {
 
   final ChatUiStyleConfig style;
   final double? maxWidthCap;
-  final int freeUsesLeft;
+  final List<String> replies;
   final int initialPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<String> onSend;
@@ -304,7 +290,10 @@ class _InspirationReplies extends StatefulWidget {
 class _InspirationRepliesState extends State<_InspirationReplies> {
   PageController? _pageController;
   double _viewportFraction = 1;
-  late int _currentPage = widget.initialPage;
+  late int _currentPage = widget.initialPage.clamp(
+    0,
+    widget.replies.length - 1,
+  );
 
   static const double _editStripWidth = 27;
 
@@ -352,12 +341,7 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
     super.dispose();
   }
 
-  // Demo-only suggestions; let the bubble width determine line wrapping.
-  static const replies = [
-    'Good job!',
-    "You're right to ask for a plan. Give me a little time to listen, and I'll come back with something we can actually build together.",
-    "I don't have every answer yet, but I came back for a reason. Let's talk to the people who still believe in this town, hear what they need, and give them a reason to walk through these doors again.",
-  ];
+  List<String> get replies => widget.replies;
 
   @override
   Widget build(BuildContext context) {
@@ -450,8 +434,8 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
                                     style.bubbleBorderRadius,
                                   ),
                                   message: ChatMessageVm(
-                                    localId: 'inspiration-demo-$index',
-                                    senderId: 'inspiration-demo',
+                                    localId: 'inspiration-$index',
+                                    senderId: 'inspiration',
                                     senderName: '',
                                     text: replies[index],
                                     isMe: true,
@@ -495,34 +479,6 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: EdgeInsets.zero,
-                child: Align(
-                  alignment: Alignment.center,
-                  child: SizedBox(
-                    width: width,
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: LocationChatSubscriptionPrompt(
-                        style: style,
-                        promptKey: const ValueKey('inspiration-get-more'),
-                        semanticsLabel: 'Get more inspiration',
-                        message: const TextSpan(
-                          children: [
-                            TextSpan(text: 'Free inspiration uses left: '),
-                            TextSpan(
-                              text: '"3"',
-                              style: TextStyle(color: GenesisColors.brand),
-                            ),
-                          ],
-                        ),
-                        actionLabel: 'Get more >',
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ],

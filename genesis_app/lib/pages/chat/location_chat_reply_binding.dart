@@ -2,6 +2,7 @@ part of 'location_chat_page.dart';
 
 extension _LocationChatReplyBinding on _LocationChatPanelState {
   void _detachReplyActions() {
+    _detachInspirations();
     _replyBindingGeneration++;
     _replyController?.removeListener(_onReplyActionsChanged);
     _replyController = null;
@@ -27,6 +28,7 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
       _detachReplyActions();
       _replyController = next;
       next.addListener(_onReplyActionsChanged);
+      _bindInspirations();
       service.setReplyWalletRefresher(
         AppServicesScope.read(context).gemWallet.refresh,
       );
@@ -47,6 +49,7 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
     scheduleMicrotask(() {
       _replyRebuildScheduled = false;
       if (mounted && widget.active) {
+        _syncInspirationView();
         final error = _replyController?.stateFor(widget.locationId)?.error;
         if (error != null &&
             !identical(error, _lastReplyStatusError) &&
@@ -66,7 +69,7 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
     bool regenerating = false,
   }) async {
     final controller = _replyController;
-    if (!widget.isMember || controller == null || _preparingReplyAction) return;
+    if (controller == null || _preparingReplyAction || _sending) return;
     final location = widget.locationId;
     final bindingGeneration = _replyBindingGeneration;
     _setLocationChatState(() {
@@ -117,7 +120,7 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
 
   void _browseReplyCard(int delta) {
     final controller = _replyController;
-    if (controller == null) return;
+    if (controller == null || _sending || _preparingReplyAction) return;
     unawaited(
       controller.browse(widget.locationId, delta).catchError((Object error) {
         debugPrint('[ReplyActions] card position persistence failed: $error');
@@ -249,8 +252,8 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
     double? otherCap,
   ) async {
     final controller = _replyController;
-    if (!widget.isMember ||
-        controller == null ||
+    if (controller == null ||
+        _sending ||
         _preparingReplyAction ||
         _replyEditorOpen) {
       return;

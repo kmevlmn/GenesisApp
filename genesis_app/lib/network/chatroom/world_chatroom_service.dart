@@ -19,6 +19,8 @@ import 'chatroom_message_storage.dart';
 import 'chatroom_models.dart';
 import 'chatroom_reply_actions_controller.dart';
 import 'chatroom_reply_action_storage.dart';
+import 'chatroom_inspiration_controller.dart';
+import 'chatroom_inspiration_storage.dart';
 
 export 'chatroom_reply_actions_controller.dart';
 import 'chatroom_timeline_payload.dart';
@@ -159,9 +161,11 @@ class WorldChatroomService {
     Duration conversationRoundTimeout = conversationRoundFallbackTimeout,
     bool refreshInitialSnapshotOnConnect = true,
     ChatroomReplyActionStorage? replyActionStorage,
+    ChatroomInspirationStorage? inspirationStorage,
   }) : _api = api,
        _client = client,
        _replyActionStorage = replyActionStorage,
+       _inspirationStorage = inspirationStorage,
        _messageStorage = messageStorage,
        _heartbeatInterval = heartbeatInterval,
        _reconnectInterval = reconnectInterval,
@@ -170,6 +174,59 @@ class WorldChatroomService {
 
   final ChatroomReplyActionStorage? _replyActionStorage;
   ChatroomReplyActionsController? _replyActionsController;
+  final ChatroomInspirationStorage? _inspirationStorage;
+  ChatroomInspirationController? _inspirations;
+  final _inspirationValidatedLocations = <String>{};
+  int _inspirationConnectionGeneration = 0;
+  String? _inspirationReplacementLocation;
+
+  ChatroomInspirationController? get inspirations {
+    if (replyActions == null) return null;
+    return _inspirations ??= ChatroomInspirationController(
+      ownerUid: _storageOwnerUid,
+      worldId: _worldId,
+      httpApi: _api.chatroomHttp,
+      storage: _inspirationStorage,
+    );
+  }
+
+  Future<void> ensureInspirationHistory(String locationId) async {
+    if (_inspirationValidatedLocations.contains(locationId)) return;
+    final generation = _inspirationConnectionGeneration;
+    await _fetchLatestLocationMessages(
+      locationId: locationId,
+      limit: 20,
+      emitLatestFetched: false,
+    );
+    if (_disposed || generation != _inspirationConnectionGeneration) {
+      throw StateError('The active chat changed');
+    }
+    _inspirationValidatedLocations.add(locationId);
+    _syncInspirationContexts();
+  }
+
+  void _syncInspirationContexts() {
+    final controller = _inspirations;
+    final replies = _replyActionsController;
+    if (controller == null || replies == null) return;
+    for (final location in replies.locationIds) {
+      if (!_inspirationValidatedLocations.contains(location)) continue;
+      final round = replies.stateFor(location)!;
+      controller.observe(
+        location,
+        roundId: round.roundId,
+        tailMessageId: round.inspirationTailMessageId,
+        replacing: _inspirationReplacementLocation == location,
+      );
+    }
+  }
+
+  void _suspendInspirations() {
+    _inspirationConnectionGeneration++;
+    _inspirationValidatedLocations.clear();
+    _inspirations?.suspend();
+  }
+
   final _completedReplyRounds = <String>{};
   Future<void> Function()? _replyWalletRefresher;
 
@@ -209,6 +266,7 @@ class WorldChatroomService {
       storage: _replyActionStorage,
     );
     _replyActionsController = controller;
+    controller.addListener(_syncInspirationContexts);
     _observeReplyHistory();
     return controller;
   }
@@ -672,6 +730,9 @@ class WorldChatroomService {
         (_identity != null && _identity!.userId != identity.userId)) {
       _replyActionsController?.dispose();
       _replyActionsController = null;
+      _inspirations?.dispose();
+      _inspirations = null;
+      _suspendInspirations();
       _completedReplyRounds.clear();
       _cancelHistoryRefreshes();
       _deletedMessageIds.clear();
@@ -1003,6 +1064,7 @@ class WorldChatroomService {
   }
 
   Future<void> disconnect() async {
+    _suspendInspirations();
     _cancelHistoryRefreshes();
     _userDisconnected = true;
     _userLocationsRefreshGeneration += 1;
@@ -1315,6 +1377,8 @@ class WorldChatroomService {
     _disposed = true;
     _replyActionsController?.dispose();
     _replyActionsController = null;
+    _inspirations?.dispose();
+    _inspirations = null;
     final disposeFailure = const ChatroomFailureEvent(
       code: 'service_disposed',
       message: 'Chatroom service was disposed',

@@ -41,7 +41,11 @@ extension _LocationChatSendActions on _LocationChatPanelState {
     }
   }
 
-  Future<void> _send({String? textOverride}) async {
+  Future<void> _send({
+    String? textOverride,
+    ChatroomInspirationSource? inspirationSource,
+    int? inspirationEpoch,
+  }) async {
     final service = _service;
     if (service == null ||
         _chatroomState.joinedLocationId != widget.locationId ||
@@ -63,7 +67,20 @@ extension _LocationChatSendActions on _LocationChatPanelState {
       final bindingGeneration = _replyBindingGeneration;
       _setLocationChatState(() => _sending = true);
       try {
-        await controller.finalizeBeforeSend(location);
+        await controller.finalizeBeforeSend(
+          location,
+          expectedSource: inspirationSource,
+        );
+        if (inspirationSource != null &&
+            !(_inspirationController?.isCurrent(
+                  inspirationSource,
+                  inspirationEpoch!,
+                ) ??
+                false)) {
+          throw StateError(
+            'The reply changed. Please select inspiration again.',
+          );
+        }
       } catch (error) {
         if (mounted &&
             bindingGeneration == _replyBindingGeneration &&

@@ -949,3 +949,5 @@ Query：
 - `map_updated` 仍发布递增 revision 供 Tilemap 刷新；location 只从 detail 的 `locations` 中筛选同时满足“ID 不在刷新前快照中”、S3（优先 `level=3`，缺失时按 location tree depth 判断）且 `is_new=true` 的项，character 继续按“新增 ID 且 `is_new=true`”筛选，生成去重后的顶部 Push 通知。
 - `llm_stream_start`、`llm_chunk`、`llm_stream_end` 在 Flutter 内部仍复用 `ChatroomAiMessageStream` 事件模型。
 - 原始帧通过 `developer.log(name: 'ChatroomSocketFrame')` 输出到 Flutter DevTools Logging。
+- DevTools Network 将同一回复的 `llm_stream_start/llm_chunk/llm_stream_end`（含 V2 `stream_type`）或同一卡片消息的 `llm_card_stream start/chunk/end` 合并为一条 `WS_RECV` 记录。收到首帧即创建，后续帧以 NDJSON 追加到响应正文，结束帧关闭记录；世界、地点、轮次、发送者、卡片和消息 ID 用于隔离并发流，无法唯一匹配的帧单独记录。Logging 和应用内原始帧抓取仍逐帧保留。
+- Network 正文最多保留 64 KB，超限标注截断；同时最多保留 32 条活跃流，2 分钟无新帧、断线或检测到暂停录制时结束未完成记录。心跳及最近 1024 个已发送心跳 ID 对应的 ACK 继续过滤，普通消息和业务 ACK 保持单独记录。

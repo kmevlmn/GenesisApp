@@ -329,6 +329,61 @@ ChatroomLlmCardGenerationEnd _terminal(
 );
 
 void main() {
+  test('formal inspiration permits another owner and respects readiness', () {
+    final h = _Harness();
+    addTearDown(h.controller.dispose);
+    h.controller.observeMessages('l', [_formal(user: 'another-user')]);
+    expect(h.state.inspirationSource!.cardId, isNull);
+    expect(h.state.inspirationSource!.sourceCardId, 0);
+    expect(h.state.canRegenerate, isFalse);
+    h.ready = false;
+    expect(h.state.inspirationSource, isNull);
+    h.ready = true;
+    h.locked = true;
+    expect(h.state.inspirationSource, isNull);
+  });
+
+  test(
+    'inspiration validates the exact card before and after confirmation',
+    () async {
+      final h = _Harness();
+      addTearDown(h.controller.dispose);
+      h.api.cards = _cards([_card(101), _card(102, index: 2)]);
+      await h.controller.restoreLocationCards('l');
+      final original = h.state.inspirationSource!;
+      expect(original.sourceCardId, 0);
+      expect(original.cardId, 101);
+      await h.controller.browse('l', 1);
+      final candidate = h.state.inspirationSource!;
+      expect(candidate.sourceCardId, 102);
+      await expectLater(
+        h.controller.finalizeBeforeSend('l', expectedSource: original),
+        throwsStateError,
+      );
+      expect(h.api.calls.where((call) => call.startsWith('select:')), isEmpty);
+      await h.controller.finalizeBeforeSend('l', expectedSource: candidate);
+      expect(h.state.selectedCardId, 102);
+      expect(h.state.confirmed, isTrue);
+      await h.controller.finalizeBeforeSend('l', expectedSource: candidate);
+      expect(h.api.calls.where((call) => call.startsWith('select:')), [
+        'select:102',
+      ]);
+    },
+  );
+
+  test('a newer active round never falls back to previous inspiration', () {
+    final h = _Harness();
+    addTearDown(h.controller.dispose);
+    expect(h.state.inspirationSource, isNotNull);
+    h.controller.observeMessages(
+      'l',
+      [_formal(), _formal(round: _round + 1, type: 'user')],
+      activeRoundIds: {_round + 1},
+    );
+    expect(h.state.inspirationSource, isNull);
+    expect(h.controller.stateFor('l')!.inspirationSource, isNull);
+  });
+
   test(
     'original card includes same-round narrator and character but not user or tick',
     () {

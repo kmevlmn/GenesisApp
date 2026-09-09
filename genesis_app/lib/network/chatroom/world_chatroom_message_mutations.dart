@@ -385,6 +385,9 @@ extension _WorldChatroomMessageMutations on WorldChatroomService {
                 location: snapshotTruncated,
             },
           ),
+          inspirationReplacementLocation: request.start == null
+              ? null
+              : location,
         );
       });
       if (_historyIsCurrent(location, ticket)) {
