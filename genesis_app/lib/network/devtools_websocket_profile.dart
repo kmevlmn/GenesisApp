@@ -34,6 +34,9 @@ class DevToolsWebSocketProfile {
   final Uri _uri;
   final GenesisHttpProfileFactory _profileFactory;
   final String _connectionId;
+  // Bound diagnostic state on long-lived connections, including missing ACKs.
+  final Set<String> _heartbeatClientMessageIds = <String>{};
+  static const _maxHeartbeatClientMessageIds = 1024;
   int _nextSequence = 1;
 
   Future<void> recordFrame({
@@ -41,16 +44,18 @@ class DevToolsWebSocketProfile {
     required String message,
   }) async {
     if (const bool.fromEnvironment('dart.vm.product')) return;
+    final isOutgoing = direction == '=>';
+    // Track heartbeats even while recording is paused so later ACKs stay hidden.
+    if (_shouldSkipFrame(message, isOutgoing: isOutgoing)) return;
     // The Network recording toggle controls profiling. A lifetime frame quota
     // would permanently hide later business traffic on long-lived sockets.
     if (!HttpClientRequestProfile.profilingEnabled) return;
 
-    final isOutgoing = direction == '=>';
-    final sequence = _nextSequence++;
     HttpClientRequestProfile? profile;
     try {
       final recordedAt = DateTime.now();
       final payload = _profilePayload(message);
+      final sequence = _nextSequence++;
       final requestUri = _profileUri(
         _uri,
         connectionId: _connectionId,
@@ -144,6 +149,37 @@ class DevToolsWebSocketProfile {
         }
       }
     }
+  }
+
+  bool _shouldSkipFrame(String message, {required bool isOutgoing}) {
+    Object? decoded;
+    try {
+      decoded = jsonDecode(message);
+    } catch (_) {
+      return false;
+    }
+    if (decoded is! Map) return false;
+    final type = _profileField(decoded, 'type');
+    final payload = decoded['payload'];
+    final clientMessageId = decoded.containsKey('client_msg_id')
+        ? _profileField(decoded, 'client_msg_id')
+        : payload is Map
+        ? _profileField(payload, 'client_msg_id')
+        : null;
+    if (type == 'heartbeat') {
+      if (isOutgoing && clientMessageId != null) {
+        _heartbeatClientMessageIds.add(clientMessageId);
+        if (_heartbeatClientMessageIds.length > _maxHeartbeatClientMessageIds) {
+          _heartbeatClientMessageIds.remove(_heartbeatClientMessageIds.first);
+        }
+      }
+      return true;
+    }
+    // Retain recent IDs after an ACK to suppress duplicate acknowledgements too.
+    return !isOutgoing &&
+        type == 'ack' &&
+        clientMessageId != null &&
+        _heartbeatClientMessageIds.contains(clientMessageId);
   }
 }
 

@@ -185,7 +185,6 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 key: const ValueKey(_ReplyActionIconType.regenerate),
                 label: 'Regenerate',
                 icon: _ReplyActionIconType.regenerate,
-                busy: widget.isMember && widget.regenerateBusy,
                 onTap: _memberAction(
                   widget.onRegenerate,
                   enabled: widget.regenerateEnabled && !widget.regenerateBusy,
@@ -200,7 +199,6 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 key: const ValueKey(_ReplyActionIconType.goOn),
                 label: 'Go on',
                 icon: _ReplyActionIconType.goOn,
-                busy: widget.isMember && widget.goOnBusy,
                 onTap: _memberAction(
                   widget.onGoOn,
                   enabled: widget.goOnEnabled && !widget.goOnBusy,
@@ -215,7 +213,6 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 key: const ValueKey(_ReplyActionIconType.edit),
                 label: 'Edit',
                 icon: _ReplyActionIconType.edit,
-                busy: widget.isMember && widget.editBusy,
                 onTap: _memberAction(
                   widget.onEditReply == null
                       ? null
@@ -605,14 +602,12 @@ class _ReplyActionIcon extends StatelessWidget {
     required this.icon,
     this.onTap,
     this.expanded,
-    this.busy = false,
   });
 
   final String label;
   final _ReplyActionIconType icon;
   final VoidCallback? onTap;
   final bool? expanded;
-  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -621,7 +616,6 @@ class _ReplyActionIcon extends StatelessWidget {
       enabled: onTap != null,
       button: true,
       expanded: expanded,
-      value: busy ? 'In progress' : null,
       child: Tooltip(
         message: label,
         excludeFromSemantics: true,
@@ -631,32 +625,23 @@ class _ReplyActionIcon extends StatelessWidget {
           child: SizedBox.square(
             dimension: LocationChatReplyActions.buttonSize,
             child: Center(
-              child: busy
-                  ? const SizedBox.square(
-                      dimension: LocationChatReplyActions.iconSize,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: Color(0xF2FFFFFF),
-                      ),
-                    )
-                  : SvgPicture.asset(
-                      switch (icon) {
-                        _ReplyActionIconType.regenerate => regenerateIconAsset,
-                        _ReplyActionIconType.goOn => goOnIconAsset,
-                        _ReplyActionIconType.edit => editSquareIconAsset,
-                        _ReplyActionIconType.inspiration =>
-                          inspirationIconAsset,
-                      },
-                      width: LocationChatReplyActions.iconSize,
-                      height: LocationChatReplyActions.iconSize,
-                      colorFilter: ColorFilter.mode(
-                        onTap == null
-                            ? const Color(0x73FFFFFF)
-                            : const Color(0xF2FFFFFF),
-                        BlendMode.srcIn,
-                      ),
-                      excludeFromSemantics: true,
-                    ),
+              child: SvgPicture.asset(
+                switch (icon) {
+                  _ReplyActionIconType.regenerate => regenerateIconAsset,
+                  _ReplyActionIconType.goOn => goOnIconAsset,
+                  _ReplyActionIconType.edit => editSquareIconAsset,
+                  _ReplyActionIconType.inspiration => inspirationIconAsset,
+                },
+                width: LocationChatReplyActions.iconSize,
+                height: LocationChatReplyActions.iconSize,
+                colorFilter: ColorFilter.mode(
+                  onTap == null
+                      ? const Color(0x73FFFFFF)
+                      : const Color(0xF2FFFFFF),
+                  BlendMode.srcIn,
+                ),
+                excludeFromSemantics: true,
+              ),
             ),
           ),
         ),

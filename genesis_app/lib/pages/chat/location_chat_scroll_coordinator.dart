@@ -14,6 +14,7 @@ enum LocationChatViewportMode { initializing, followingLatest, detached }
 
 enum LocationChatBottomReason {
   sentMessage,
+  replyGeneration,
   unseenMessageNotice,
   composerFocus,
   inspirationExpanded,
@@ -95,6 +96,7 @@ class LocationChatScrollCoordinator extends ChangeNotifier {
   void requestBottom({
     required LocationChatBottomReason reason,
     required LocationChatBottomBehavior behavior,
+    Duration duration = bottomAnimationDuration,
   }) {
     if (_disposed) return;
     final generation = ++_commandGeneration;
@@ -107,7 +109,12 @@ class LocationChatScrollCoordinator extends ChangeNotifier {
         case LocationChatBottomBehavior.jump:
           _jumpTo(target);
         case LocationChatBottomBehavior.animate:
-          _animateTo(target);
+          _animateTo(
+            target,
+            duration,
+            generation,
+            settleAtLatest: reason == LocationChatBottomReason.replyGeneration,
+          );
       }
     });
   }
@@ -240,12 +247,24 @@ class LocationChatScrollCoordinator extends ChangeNotifier {
     controller.jumpTo(target);
   }
 
-  void _animateTo(double target) {
-    controller.animateTo(
+  Future<void> _animateTo(
+    double target,
+    Duration duration,
+    int generation, {
+    required bool settleAtLatest,
+  }) async {
+    await controller.animateTo(
       target,
-      duration: bottomAnimationDuration,
+      duration: duration,
       curve: Curves.easeOut,
     );
+    if (settleAtLatest &&
+        _commandIsCurrent(generation) &&
+        controller.hasClients &&
+        shouldFollowLatest) {
+      // Content may have grown while the request and scroll ran together.
+      _jumpTo(controller.position.maxScrollExtent);
+    }
   }
 
   @override

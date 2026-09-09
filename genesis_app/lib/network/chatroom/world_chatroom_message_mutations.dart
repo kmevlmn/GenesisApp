@@ -387,6 +387,9 @@ extension _WorldChatroomMessageMutations on WorldChatroomService {
           ),
         );
       });
+      if (_historyIsCurrent(location, ticket)) {
+        await _loadReplyCardsForHistory(location, incoming, ticket);
+      }
     } catch (error) {
       if (!current()) return;
       _recordFailure(

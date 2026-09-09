@@ -450,6 +450,10 @@ extension _LocationChatMessageReconciler on _LocationChatPanelState {
   }) {
     final world = (identityState ?? _chatroomState).world;
     return _locationChatMessageBelongsToCurrentRole(
+      messageBusinessType:
+          message.hasExplicitBusinessType || message.isLlmStreamMessage
+          ? locationChatBusinessType(message)
+          : '',
       messageUserId: message.userId,
       messageSenderId: message.senderId,
       currentUserIds: _myUserIdKeys,

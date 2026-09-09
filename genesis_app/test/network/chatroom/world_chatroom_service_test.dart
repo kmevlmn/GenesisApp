@@ -5701,6 +5701,9 @@ class _FakeChatroomSocket implements ChatroomSocket {
 }
 
 class _MutationHttpTransport extends _WorldChatroomHttpTransport {
+  final cardRequests = <TransportRequest>[];
+  Completer<void>? cardBarrier;
+  Object? cardError;
   final historyRequests = <TransportRequest>[];
   final writeRequests = <TransportRequest>[];
   Future<TransportResponse> Function(TransportRequest)? history;
@@ -5742,6 +5745,28 @@ class _MutationHttpTransport extends _WorldChatroomHttpTransport {
               : v,
         ),
       );
+    }
+    if (request.method == 'GET' &&
+        request.uri.path.endsWith('/llm-messages/cards')) {
+      cardRequests.add(request);
+      await cardBarrier?.future;
+      if (cardError != null) throw cardError!;
+      return _json({
+        'err_no': 0,
+        'data': {
+          'conversation_round_id': int.parse(
+            request.uri.queryParameters['conversation_round_id']!,
+          ),
+          'original_card_id': 0,
+          'selected_card_id': 0,
+          'active_card_id': 0,
+          'confirmed': false,
+          'can_regenerate': true,
+          'can_confirm': false,
+          'list': [],
+          'total': 0,
+        },
+      });
     }
     if (request.uri.path.contains('/llm-messages/')) {
       writeRequests.add(request);
@@ -6588,6 +6613,115 @@ class _BlockingMutationStorage extends MemoryChatroomMessageStorage {
 }
 
 void _replyCompletionTests() {
+  test(
+    'unjoined preload, latest refresh and pagination share card history loading',
+    () async {
+      final socket = _FakeChatroomSocket();
+      final http = _MutationHttpTransport()
+        ..messagesByLocation['loc-1'] = [
+          {..._mutationRow(1, 1, 9), 'user_id': 'user-1'},
+          {..._mutationRow(2, 2, 10), 'user_id': 'user-1'},
+        ];
+      final service = await _service(
+        socketTransport: _FakeChatroomTransport(socket),
+        httpTransport: http,
+        useV2Protocol: true,
+        refreshInitialSnapshotOnConnect: false,
+      );
+      addTearDown(service.dispose);
+      await service.connect(worldId: 'world-1', identity: _identity());
+      service.applyWorldSnapshot(_worldSnapshot());
+      http.cardBarrier = Completer<void>();
+      var completed = false;
+      final loading = service
+          .initializeLeafLocationQueues(locationIds: ['loc-1'])
+          .then((_) => completed = true);
+      await _waitFor(() => http.cardRequests.isNotEmpty);
+      expect(completed, isFalse, reason: 'History includes the card read');
+      http.cardBarrier!.complete();
+      await loading;
+      expect(socket.sentTypes, isNot(contains('join')));
+      expect(http.cardRequests, hasLength(1));
+      expect(
+        http.cardRequests.single.uri.queryParameters['conversation_round_id'],
+        '10',
+      );
+      await service.refreshLatestMessages(locationId: 'loc-1');
+      expect(http.cardRequests, hasLength(2));
+      await service.loadOlderMessages(locationId: 'loc-1', beforeMessageId: 3);
+      expect(http.cardRequests, hasLength(3));
+      await service.loadOlderMessages(locationId: 'loc-1', beforeMessageId: 2);
+      expect(
+        http.cardRequests,
+        hasLength(3),
+        reason: 'Older rounds do not refetch the tail card group',
+      );
+      http.cardError = StateError('card read failed');
+      final history = await service.refreshLatestMessages(locationId: 'loc-1');
+      expect(history, hasLength(2));
+      expect(service.state.lastFailure?.code, 'card_history_failed');
+      expect(service.state.messagesByLocation['loc-1'], hasLength(2));
+    },
+  );
+  for (final closeBeforeHistory in [false, true]) {
+    test(
+      'entry supplements cards only after history, disposed=$closeBeforeHistory',
+      () async {
+        final socket = _FakeChatroomSocket();
+        final history = Completer<TransportResponse>();
+        final http = _MutationHttpTransport()..history = (_) => history.future;
+        final service = await _service(
+          socketTransport: _FakeChatroomTransport(socket),
+          httpTransport: http,
+          useV2Protocol: true,
+          ackTimeout: const Duration(seconds: 1),
+          refreshInitialSnapshotOnConnect: false,
+        );
+        addTearDown(service.dispose);
+        await service.connect(worldId: 'world-1', identity: _identity());
+        service.applyWorldSnapshot(_worldSnapshot());
+        final joining = service.join(locationId: 'loc-1');
+        await _waitFor(() => socket.sentTypes.contains('join'));
+        final join = socket.sent
+            .map((raw) => jsonDecode(raw) as Map)
+            .lastWhere((frame) => frame['type'] == 'join');
+        socket.serverV2Ack(clientMsgId: join['client_msg_id'] as String);
+        await joining;
+        await _waitFor(() => http.historyRequests.isNotEmpty);
+        expect(http.cardRequests, isEmpty);
+        if (closeBeforeHistory) await service.dispose();
+        history.complete(
+          http._page([
+            {..._mutationRow(1, 1, 10), 'user_id': 'user-1'},
+          ], newest: 1),
+        );
+        if (closeBeforeHistory) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          expect(http.cardRequests, isEmpty);
+        } else {
+          await _waitFor(() => http.cardRequests.isNotEmpty);
+          expect(
+            http
+                .cardRequests
+                .single
+                .uri
+                .queryParameters['conversation_round_id'],
+            '10',
+          );
+          expect(
+            service.state.messagesByLocation['loc-1']!.single.content,
+            'original',
+          );
+          await service.refreshLocationHistory(locationId: 'loc-1');
+          expect(
+            http.cardRequests,
+            hasLength(2),
+            reason: 'Cards belong to each matching history refresh',
+          );
+        }
+      },
+    );
+  }
   test(
     'Go on round end replaces unfinished streams with empty authoritative history',
     () async {

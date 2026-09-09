@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/components/common/genesis_center_toast.dart';
+import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/components/chat/shared/chat_ui.dart';
 import 'package:genesis_flutter_android/pages/chat/location_chat_page.dart';
 import 'package:genesis_flutter_android/routers/app_router.dart';
@@ -393,6 +395,42 @@ void main() {
       expect(result!.texts, {'narrator': 'The room falls silent.'});
       expect(source[2].text, 'Welcome back.');
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'business save failure only shows the global toast and retains the draft',
+    (tester) async {
+      final navigatorKey = GlobalKey<NavigatorState>();
+      await openEditor(
+        tester,
+        navigatorKey: navigatorKey,
+        onSave: (_) async {
+          showGenesisToastInOverlay(
+            navigatorKey.currentState!.overlay!,
+            '服务端编辑失败提示',
+          );
+          throw ApiException(
+            message: '服务端编辑失败提示',
+            code: 2012,
+            kind: ApiExceptionKind.business,
+          );
+        },
+      );
+      final field = find.byKey(const ValueKey('chat-message-editor-reply'));
+      await tester.enterText(field, 'Keep this draft.');
+      await tester.tap(find.byKey(const ValueKey('location-chat-edit-done')));
+      await tester.pumpAndSettle();
+      expect(find.text('服务端编辑失败提示'), findsOneWidget);
+      expect(find.textContaining('ApiException'), findsNothing);
+      expect(find.byType(LocationChatEditPage), findsOneWidget);
+      expect(
+        tester.widget<TextField>(field).controller!.text,
+        'Keep this draft.',
+      );
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('服务端编辑失败提示'), findsNothing);
+      expect(find.textContaining('2012'), findsNothing);
     },
   );
 

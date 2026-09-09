@@ -1,6 +1,37 @@
 part of 'world_chatroom_service.dart';
 
 extension _WorldChatroomHistoryRepository on WorldChatroomService {
+  Future<void> _loadReplyCardsForHistory(
+    String locationId,
+    Iterable<WorldChatroomMessage> messages,
+    _HistoryTicket ticket,
+  ) async {
+    bool current() => _historyIsCurrent(locationId, ticket);
+    if (!current()) return;
+    final rounds = messages
+        .map((message) => message.conversationRoundNumber)
+        .where((round) => round > 0)
+        .toSet();
+    if (rounds.isEmpty) return;
+    try {
+      await replyActions?.loadHistoryCards(
+        locationId,
+        roundIds: rounds,
+        isCurrent: current,
+      );
+    } catch (error) {
+      if (!current()) return;
+      _recordFailure(
+        ChatroomFailureEvent(
+          code: 'card_history_failed',
+          message: 'Failed to refresh reply cards',
+          sourceType: 'history',
+          cause: error,
+        ),
+      );
+    }
+  }
+
   Future<void> _initializeLeafLocationQueue({
     required String locationId,
     required int latestLimit,

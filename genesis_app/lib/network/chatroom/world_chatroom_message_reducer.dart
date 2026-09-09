@@ -313,6 +313,10 @@ extension _WorldChatroomMessageReducer on WorldChatroomService {
     if (!_historyIsCurrent(locationId, ticket)) {
       return const <WorldChatroomMessage>[];
     }
+    await _loadReplyCardsForHistory(locationId, worldMessages, ticket);
+    if (!_historyIsCurrent(locationId, ticket)) {
+      return const <WorldChatroomMessage>[];
+    }
     if (LocationChatDebugSlice.enabled) {
       LocationChatDebugSlice.recordEvent(
         source: 'service',

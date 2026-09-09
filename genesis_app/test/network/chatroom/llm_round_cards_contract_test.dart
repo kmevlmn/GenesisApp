@@ -1078,6 +1078,49 @@ void main() {
     },
   );
 
+  test(
+    'candidate business errors enter global failure channel without ACK or stream append',
+    () async {
+      final socket = _Socket();
+      final session = await _session(socket);
+      final failures = <ChatroomFailureEvent>[];
+      final streams = <ChatroomAiMessageStream>[];
+      final a = session.failures.listen(failures.add);
+      final b = session.streams.listen(streams.add);
+      addTearDown(a.cancel);
+      addTearDown(b.cancel);
+      final sent = socket.sent.length;
+      for (final type in ['llm_card_stream', 'llm_card_generation_end']) {
+        for (final code in [2023, 10001]) {
+          socket.emit(
+            _frame(
+              type,
+              code: code,
+              stream: type == 'llm_card_stream' ? 'end' : '',
+              payload: {
+                'card_id': _id + 1,
+                'card_message_index': 1,
+                'seq': 1,
+                'content': '',
+                'generation_state': 'failed',
+                'billing': _billing('cancelled'),
+              },
+            ),
+          );
+        }
+      }
+      await _tick();
+      expect(failures.map((e) => e.code), ['2023', '10001', '2023', '10001']);
+      expect(failures.map((e) => e.message), everyElement('server failure'));
+      expect(
+        failures.map((e) => e.requestType),
+        everyElement('regenerate_llm_card'),
+      );
+      expect(streams, isEmpty);
+      expect(socket.sent.length, sent);
+    },
+  );
+
   test('candidate frame validation and handlers isolate malformed input', () {
     ChatroomEvent parse(Map<String, Object?> frame) =>
         chatroomEventFromV2Message(

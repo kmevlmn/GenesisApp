@@ -6,6 +6,11 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
     _replyController?.removeListener(_onReplyActionsChanged);
     _replyController = null;
     _preparingReplyAction = false;
+    _replyRequestLoading = false;
+    _replyStreamStarted = false;
+    _replyLoadingSourceRound = null;
+    _replyLoadingPreviousCardIds = const {};
+    _lastReplyStatusError = null;
     _replyEditorState?.value = const LocationChatEditExternalState(
       frozen: true,
       error: 'This chat is no longer active.',
@@ -36,22 +41,54 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
   }
 
   void _onReplyActionsChanged() {
+    _markReplyStreamStarted();
     if (_replyRebuildScheduled) return;
     _replyRebuildScheduled = true;
     scheduleMicrotask(() {
       _replyRebuildScheduled = false;
-      if (mounted && widget.active) _setLocationChatState(() {});
+      if (mounted && widget.active) {
+        final error = _replyController?.stateFor(widget.locationId)?.error;
+        if (error != null &&
+            !identical(error, _lastReplyStatusError) &&
+            !_preparingReplyAction &&
+            !isChatroomErrorPresentedGlobally(error)) {
+          showGenesisToast(context, chatroomOperationErrorMessage(error));
+        }
+        _lastReplyStatusError = error;
+        _setLocationChatState(() {});
+      }
     });
   }
 
   Future<void> _runReplyAction(
-    Future<void> Function(ChatroomReplyActionsController) action,
-  ) async {
+    Future<void> Function(ChatroomReplyActionsController) action, {
+    bool generating = false,
+    bool regenerating = false,
+  }) async {
     final controller = _replyController;
     if (!widget.isMember || controller == null || _preparingReplyAction) return;
     final location = widget.locationId;
     final bindingGeneration = _replyBindingGeneration;
-    _setLocationChatState(() => _preparingReplyAction = true);
+    _setLocationChatState(() {
+      _preparingReplyAction = true;
+      _replyRequestLoading = generating;
+      if (generating) {
+        final source = controller.stateFor(location);
+        _replyStreamStarted = false;
+        _replyLoadingForRegeneration = regenerating;
+        _replyLoadingSourceRound = source?.roundId;
+        _replyLoadingPreviousCardIds = {
+          for (final card in source?.cards ?? const []) card.cardId,
+        };
+      }
+    });
+    if (generating) {
+      _scrollCoordinator.requestBottom(
+        reason: LocationChatBottomReason.replyGeneration,
+        behavior: LocationChatBottomBehavior.animate,
+        duration: const Duration(milliseconds: 500),
+      );
+    }
     try {
       await action(controller);
     } catch (error) {
@@ -60,9 +97,9 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
           bindingGeneration == _replyBindingGeneration &&
           widget.locationId == location &&
           identical(controller, _replyController)) {
-        // HTTP business errors already use the application's error presenter.
-        if (error is! ApiException || error.kind != ApiExceptionKind.business) {
-          showGenesisToast(context, '$error');
+        // HTTP and WS business errors already use the global presenter.
+        if (!isChatroomErrorPresentedGlobally(error)) {
+          showGenesisToast(context, chatroomOperationErrorMessage(error));
         }
       }
     } finally {
@@ -70,7 +107,10 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
           bindingGeneration == _replyBindingGeneration &&
           widget.locationId == location &&
           identical(controller, _replyController)) {
-        _setLocationChatState(() => _preparingReplyAction = false);
+        _setLocationChatState(() {
+          _preparingReplyAction = false;
+          _replyRequestLoading = false;
+        });
       }
     }
   }
@@ -90,31 +130,20 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
   ) {
     final source = _locationChatDisplayMessages();
     if (state == null) return (messages: source, anchorIndex: null);
-    final round = '${state.roundId}';
-    final output = <ChatMessageVm>[];
-    int? anchor;
-    var inserted = false;
-    final replacements = state.showCandidates
-        ? _replyMessageVms(state.displayedMessages, cardId: state.viewedCardId)
-        : const <ChatMessageVm>[];
-    for (final message in source) {
-      if (message.roundId == round && !message.isMe && !message.isSystem) {
-        if (state.showCandidates) {
-          if (!inserted) output.addAll(replacements);
-          inserted = true;
-        } else {
-          output.add(message);
-        }
-        anchor = output.length;
-      } else {
-        output.add(message);
-      }
-    }
-    if (state.showCandidates && !inserted) {
-      output.addAll(replacements);
-      anchor = output.length;
-    }
-    return (messages: output, anchorIndex: anchor ?? output.length);
+    return buildLocationChatReplyPresentation(
+      source: source,
+      roundId: '${state.roundId}',
+      replyMessageIds: state.formalReplyMessages
+          .map((message) => message.globalMessageId)
+          .where((id) => id > 0)
+          .toSet(),
+      candidates: state.showCandidates
+          ? _replyMessageVms(
+              state.displayedMessages,
+              cardId: state.viewedCardId,
+            )
+          : null,
+    );
   }
 
   List<ChatMessageVm> _replyMessageVms(
@@ -165,48 +194,53 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
     ];
   }
 
-  Widget? _replyStatusWidget(ChatroomReplyRoundState? state) {
-    if (state == null) return null;
+  void _markReplyStreamStarted() {
+    final round = _replyLoadingSourceRound;
+    if (_replyStreamStarted || round == null) return;
+    if (_replyLoadingForRegeneration) {
+      _replyStreamStarted =
+          _replyController
+              ?.stateForRound(widget.locationId, round)
+              ?.hasNewCandidateContent(_replyLoadingPreviousCardIds) ??
+          false;
+    } else {
+      final messages =
+          (_service?.state ?? _chatroomState).messagesByLocation[widget
+              .locationId] ??
+          const <WorldChatroomMessage>[];
+      _replyStreamStarted = messages.any(
+        (message) =>
+            message.conversationRoundNumber > round &&
+            const {
+              'character',
+              'narrator',
+              'ai',
+              'llm',
+            }.contains(message.businessType) &&
+            message.content.trim().isNotEmpty,
+      );
+    }
+  }
+
+  Widget? _replyStatusWidget(
+    ChatroomReplyRoundState? state,
+    ChatUiStyleConfig style,
+  ) {
     final pending = _replyController
         ?.statesFor(widget.locationId)
-        .where(
-          (source) =>
-              source.goOnPending &&
-              (source.roundId == state.roundId ||
-                  source.goOnRoundId == state.roundId),
-        )
+        .where((source) => source.goOnPending)
         .firstOrNull;
-    final awaitingRecovery = pending != null && !_sendAwaitingResponse;
-    final message = pending?.goOnUnknown == true
-        ? 'Result pending confirmation.'
-        : state.error != null
-        ? '${state.error}'
-        : awaitingRecovery
-        ? 'Reply is pending confirmation.'
-        : pending != null && state.displayedMessages.isEmpty
-        ? 'Waiting for the next reply…'
-        : state.showCandidates &&
-              state.displayedMessages.isEmpty &&
-              state.generating
-        ? 'Generating…'
+    final loading =
+        _replyRequestLoading ||
+        (state?.generating == true && state?.error == null) ||
+        (pending != null &&
+            !pending.goOnUnknown &&
+            pending.error == null &&
+            _sendAwaitingResponse);
+    _markReplyStreamStarted();
+    return loading && !_replyStreamStarted
+        ? LocationChatLoadingBubble(style: style)
         : null;
-    if (message == null) return null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message, style: const TextStyle(color: Color(0xFFF4F3F6))),
-          if (awaitingRecovery || state.error != null)
-            TextButton(
-              onPressed: () => unawaited(
-                _runReplyAction((controller) => controller.reconnect()),
-              ),
-              child: const Text('Check status'),
-            ),
-        ],
-      ),
-    );
   }
 
   Future<void> _editCurrentReply(
@@ -299,7 +333,11 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
               !state.busy &&
               state.error == null &&
               state.completionRevision > initialRevision,
-          error: state.error == null ? null : '${state.error}',
+          error:
+              state.error == null ||
+                  isChatroomErrorPresentedGlobally(state.error)
+              ? null
+              : chatroomOperationErrorMessage(state.error!),
         );
       }
 
@@ -362,8 +400,8 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
       }
     } catch (error) {
       if (mounted && currentEditor()) {
-        if (error is! ApiException || error.kind != ApiExceptionKind.business) {
-          showGenesisToast(context, '$error');
+        if (!isChatroomErrorPresentedGlobally(error)) {
+          showGenesisToast(context, chatroomOperationErrorMessage(error));
         }
       }
     } finally {

@@ -154,12 +154,19 @@ extension _WorldChatroomConnection on WorldChatroomService {
           ),
         );
         _backgroundHistoryRefresh(
-          refreshLocationHistory(locationId: joinedLocationId),
+          refreshLocationHistory(locationId: joinedLocationId).then((_) async {
+            if (_disposed ||
+                _session != session ||
+                _desiredLocationId != joinedLocationId ||
+                _state.joinedLocationId != joinedLocationId) {
+              return;
+            }
+            await replyActions?.restoreLocationCards(
+              joinedLocationId,
+              reloadCards: false,
+            );
+          }),
         );
-      }
-      final replyController = _replyActionsController;
-      if (replyController != null) {
-        unawaited(replyController.reconnect().catchError((Object _) {}));
       }
       return joined;
     } catch (_) {

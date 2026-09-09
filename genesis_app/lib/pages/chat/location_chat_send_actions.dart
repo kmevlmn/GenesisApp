@@ -70,9 +70,8 @@ extension _LocationChatSendActions on _LocationChatPanelState {
             widget.locationId == location &&
             identical(service, _service)) {
           _setLocationChatState(() => _sending = false);
-          if (error is! ApiException ||
-              error.kind != ApiExceptionKind.business) {
-            showGenesisToast(context, '$error');
+          if (!isChatroomErrorPresentedGlobally(error)) {
+            showGenesisToast(context, chatroomOperationErrorMessage(error));
           }
         }
         return;
@@ -165,9 +164,8 @@ extension _LocationChatSendActions on _LocationChatPanelState {
             widget.locationId == location &&
             identical(service, _service)) {
           _setLocationChatState(() => _sending = false);
-          if (error is! ApiException ||
-              error.kind != ApiExceptionKind.business) {
-            showGenesisToast(context, '$error');
+          if (!isChatroomErrorPresentedGlobally(error)) {
+            showGenesisToast(context, chatroomOperationErrorMessage(error));
           }
         }
         return;

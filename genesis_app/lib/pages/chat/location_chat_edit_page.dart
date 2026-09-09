@@ -367,7 +367,12 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
       if (mounted) _complete(result);
     } catch (error) {
       if (mounted && !_completed) {
-        setState(() => _saveError = error.toString());
+        // Server errors are shown once by the global centered toast.
+        setState(
+          () => _saveError = isChatroomErrorPresentedGlobally(error)
+              ? null
+              : chatroomOperationErrorMessage(error),
+        );
       }
     } finally {
       if (mounted && !_completed) setState(() => _saving = false);

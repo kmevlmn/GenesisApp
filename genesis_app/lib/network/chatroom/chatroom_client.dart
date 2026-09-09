@@ -918,6 +918,26 @@ class ChatroomSession {
         sourceType: event.streamType,
       );
       stream?.complete(event);
+    } else if (event is ChatroomLlmCardStream && event.errNo != 0) {
+      _emitFailure(
+        ChatroomFailureEvent(
+          code: event.errNo.toString(),
+          message: event.errMsg,
+          sourceType: 'llm_card_stream',
+          requestType: 'regenerate_llm_card',
+          cause: event,
+        ),
+      );
+    } else if (event is ChatroomLlmCardGenerationEnd && event.errNo != 0) {
+      _emitFailure(
+        ChatroomFailureEvent(
+          code: event.errNo.toString(),
+          message: event.errMsg,
+          sourceType: 'llm_card_generation_end',
+          requestType: 'regenerate_llm_card',
+          cause: event,
+        ),
+      );
     } else if (event is ChatroomErrorEvent) {
       _emitError(event);
       _emitFailure(ChatroomFailureEvent.fromError(event));

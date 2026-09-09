@@ -30,7 +30,6 @@ import '../../network/chatroom/chatroom_connection_controller.dart';
 import '../../network/chatroom/chatroom_message_type.dart';
 import '../../network/chatroom/chatroom_models.dart';
 import '../../network/chatroom/chatroom_message_batch.dart';
-import '../../network/api_exception.dart';
 import '../../network/chatroom/chatroom_timeline_payload.dart';
 import '../../network/chatroom/world_chatroom_service.dart';
 import '../../network/genesis_api.dart';
@@ -50,6 +49,8 @@ import '../../utils/genesis_image_resource.dart';
 import '../../utils/genesis_ugc_text.dart';
 import '../create/create_form_widgets.dart' show CreateFormDeleteButton;
 import 'location_chat_scroll_coordinator.dart';
+import 'location_chat_reply_presentation.dart';
+import 'location_chat_loading_bubble.dart';
 import 'message_parsers/location_chat_message_parsers.dart';
 import '../world/world_constants.dart' show worldCharacterAvatarLogicalSize;
 
@@ -388,6 +389,12 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
   bool _replyRebuildScheduled = false;
   int _replyBindingGeneration = 0;
   bool _preparingReplyAction = false;
+  bool _replyRequestLoading = false;
+  bool _replyStreamStarted = false;
+  bool _replyLoadingForRegeneration = false;
+  int? _replyLoadingSourceRound;
+  Set<int> _replyLoadingPreviousCardIds = const {};
+  Object? _lastReplyStatusError;
   ValueNotifier<LocationChatEditExternalState>? _replyEditorState;
   bool _replyEditorOpen = false;
   final Object _rosterTapRegionGroup = Object();
@@ -890,17 +897,20 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
             : '${widget.worldId}/${widget.locationId}/${replyState.roundId}',
         replyActionsAnchorIndex: replyPresentation.anchorIndex,
         replyPresentationRevision: replyState?.presentationRevision ?? 0,
-        replyStatus: _replyStatusWidget(replyState),
+        replyStatus: _replyStatusWidget(replyState, style),
         isMember: widget.isMember,
         onRegenerate: () => unawaited(
           _runReplyAction(
             (controller) => controller.regenerate(widget.locationId),
+            generating: true,
+            regenerating: true,
           ),
         ),
         onGoOn: () => unawaited(
-          _runReplyAction((controller) async {
-            await controller.goOn(widget.locationId);
-          }),
+          _runReplyAction(
+            (controller) => controller.goOn(widget.locationId),
+            generating: true,
+          ),
         ),
         regenerateEnabled:
             !replyBlocked && (replyState?.canRegenerate ?? false),

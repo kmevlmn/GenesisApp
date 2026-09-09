@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:genesis_flutter_android/components/chat/shared/chat_ui.dart';
 import 'package:genesis_flutter_android/pages/chat/location_chat_reply_actions.dart';
 import 'package:genesis_flutter_android/pages/chat/location_chat_scroll_coordinator.dart';
@@ -94,19 +95,25 @@ void main() {
       findsNothing,
     );
     await tester.pumpWidget(host(busy: true));
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(SvgPicture), findsNWidgets(4));
     expect(
       tester
           .widget<Semantics>(find.bySemanticsLabel('Regenerate'))
           .properties
           .value,
-      'In progress',
+      isNull,
     );
     for (final action in ['Regenerate', 'Go on', 'Edit']) {
       await tester.tap(find.bySemanticsLabel(action));
       await tester.pump();
     }
     expect(calls, ['regenerate', 'goOn', 'edit', 'edit']);
+    await tester.pumpWidget(host());
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Regenerate'));
+    await tester.pump();
+    expect(calls.last, 'regenerate');
     await tester.pumpWidget(const SizedBox());
   });
 

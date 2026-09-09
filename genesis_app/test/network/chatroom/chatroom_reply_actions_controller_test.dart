@@ -262,6 +262,11 @@ class _Harness {
     );
     controller.observeMessages('l', [_formal(user: owner)]);
   }
+  Future<ChatroomReplyEditorTarget> prepareEditor() async {
+    await controller.restoreLocationCards('l');
+    return controller.prepareEditor('l');
+  }
+
   final api = _Api();
   final session = _Session();
   late ChatroomReplyActionsController controller;
@@ -300,23 +305,59 @@ ChatroomLlmCardStream _stream(
     },
   ),
 );
-ChatroomLlmCardGenerationEnd _terminal(String state) =>
-    ChatroomLlmCardGenerationEnd.fromV2Message(
-      ChatroomV2Message(
-        type: 'llm_card_generation_end',
-        worldId: 'w',
-        locationId: 'l',
-        userId: 'u',
-        conversationRoundId: _round,
-        payload: {
-          'card_id': 102,
-          'generation_state': state,
-          'billing': {'status': 'not_required'},
-        },
-      ),
-    );
+ChatroomLlmCardGenerationEnd _terminal(
+  String state, {
+  int errNo = 0,
+  String errMsg = '',
+  Object? error,
+}) => ChatroomLlmCardGenerationEnd.fromV2Message(
+  ChatroomV2Message(
+    type: 'llm_card_generation_end',
+    errNo: errNo,
+    errMsg: errMsg,
+    worldId: 'w',
+    locationId: 'l',
+    userId: 'u',
+    conversationRoundId: _round,
+    payload: {
+      'card_id': 102,
+      'generation_state': state,
+      if (error != null) 'error': error,
+      'billing': {'status': 'not_required'},
+    },
+  ),
+);
 
 void main() {
+  test(
+    'original card includes same-round narrator and character but not user or tick',
+    () {
+      final h = _Harness();
+      addTearDown(h.controller.dispose);
+      final messages = [
+        for (final (i, type) in [
+          'user',
+          'character',
+          'narrator',
+          'tick',
+        ].indexed)
+          WorldChatroomMessage.fromHttpMessage(
+            ChatroomHttpMessage.fromV2Message(_v2(type, id: _messageId + i)),
+          ),
+        _formal(round: _round - 1, type: 'narrator'),
+      ];
+      h.controller.observeMessages('l', messages);
+      expect(h.state.formalReplyMessages.map((m) => m.globalMessageId), [
+        _messageId + 1,
+        _messageId + 2,
+      ]);
+      expect(h.state.displayedMessages.map((m) => m.businessType), [
+        'character',
+        'narrator',
+      ]);
+    },
+  );
+
   test(
     'ownership uses user ID and refuses to infer it from the character sender',
     () async {
@@ -325,7 +366,7 @@ void main() {
       h.controller.observeMessages('l', [_formal(user: 'someone-else')]);
       expect(h.state.canGoOn, isFalse);
       expect(h.state.canRegenerate, isFalse);
-      await expectLater(h.controller.prepareEditor('l'), throwsStateError);
+      await expectLater(h.prepareEditor(), throwsStateError);
       h.controller.observeMessages('l', [_formal()]);
       expect(h.state.canGoOn, isTrue);
       h.locked = true;
@@ -334,34 +375,21 @@ void main() {
   );
 
   test(
-    'original remains during preflight and candidate appears only after approval',
+    'regeneration and editing use local cards without GET before ACK or after terminal',
     () async {
       final h = _Harness();
       addTearDown(h.controller.dispose);
-      final barrier = Completer<ChatroomLlmCardsResponse>();
-      h.api.cardsBarrier = barrier;
+      await h.controller.restoreLocationCards('l');
+      h.api.calls.clear();
       final ack = Completer<ChatroomCardRegeneration>();
       h.session.regenerateHandler = () => ack.future;
       final action = h.controller.regenerate('l');
       await _settle();
-      expect(h.state.showCandidates, isFalse);
-      expect(h.state.displayedMessages.single.content, 'Original');
-      expect(h.session.requests, isEmpty);
-      expect(h.state.canRegenerate, isFalse);
-      barrier.complete(_cards([]));
-      await _settle();
-      expect(h.state.showCandidates, isTrue);
-      expect(h.state.displayedMessages, isEmpty);
+      expect(h.api.calls, isEmpty);
       expect(h.state.cardPosition, 2);
-      expect(h.state.cardCount, 2);
-      expect(h.state.canRegenerate, isFalse);
-      expect(h.state.canGoOn, isFalse);
+      expect(h.state.displayedMessages, isEmpty);
       await h.controller.browse('l', -1);
       expect(h.state.displayedMessages.single.content, 'Original');
-      h.api.cards = _cards([
-        _card(101),
-        _card(102, index: 2, generation: 'generating'),
-      ]);
       ack.complete(
         const ChatroomCardRegeneration(
           conversationRoundId: _round,
@@ -375,49 +403,145 @@ void main() {
       );
       await action;
       expect(h.state.viewedCardId, 101);
-      expect(h.state.lastCompleteCardId, 101);
+      expect(h.state.cards.first.messages.single.content, 'Original');
+      expect(h.state.cards.first.isOriginal, isTrue);
+      await h.controller.browse('l', 1);
+      h.controller.receiveEvent(_stream('chunk', content: 'partial'));
+      h.controller.receiveEvent(
+        _stream('end', content: 'Complete local reply'),
+      );
+      h.controller.receiveEvent(_terminal('succeeded'));
+      await _settle();
+      final editor = await h.controller.prepareEditor('l');
+      expect(editor.cardId, 102);
+      expect(editor.messages.single.content, 'Complete local reply');
+      expect(editor.messages.single.globalMessageId, _messageId);
       expect(h.state.canEdit, isTrue);
-      expect(h.state.canGoOn, isTrue);
+      expect(h.api.calls, isEmpty);
     },
   );
 
-  for (final fails in [false, true]) {
-    test(
-      'preflight ${fails ? 'failure' : 'denial'} never removes the original reply',
-      () async {
-        final h = _Harness();
-        addTearDown(h.controller.dispose);
-        await h.controller.restore('l');
-        final revision = h.state.presentationRevision;
-        final snapshots = <List<String>>[];
-        h.controller.addListener(() {
-          snapshots.add(
-            h.state.displayedMessages.map((m) => m.content).toList(),
-          );
-          expect(h.state.showCandidates, isFalse);
-          expect(h.state.presentationRevision, revision);
-        });
-        final barrier = Completer<ChatroomLlmCardsResponse>();
-        h.api.cardsBarrier = barrier;
-        final action = h.controller.regenerate('l');
-        final rejected = expectLater(action, throwsStateError);
-        await _settle();
-        expect(h.state.displayedMessages.single.content, 'Original');
-        expect(h.session.requests, isEmpty);
-        if (fails) {
-          barrier.completeError(StateError('offline'));
-        } else {
-          barrier.complete(_cards([], canRegenerate: false));
-        }
-        await rejected;
-        expect(snapshots, isNotEmpty);
-        expect(snapshots, everyElement(equals(['Original'])));
-        expect(h.state.generating, isFalse);
-        expect(h.state.displayedMessages.single.content, 'Original');
-        expect(h.session.requests, isEmpty);
-      },
-    );
-  }
+  test(
+    'entry discovers the latest own card group without saved metadata',
+    () async {
+      final h = _Harness();
+      addTearDown(h.controller.dispose);
+      h.api.cards = _cards([_card(101), _card(102, index: 2)]);
+      expect(h.state.hasCardGroup, isFalse);
+      await h.controller.restoreLocationCards('l');
+      expect(h.state.cardCount, 2);
+      expect(h.api.calls, ['cards:$_round']);
+      h.api.calls.clear();
+      await h.controller.prepareEditor('l');
+      expect(h.api.calls, isEmpty);
+    },
+  );
+
+  test(
+    'card history follows history validity and cannot replace an open editor',
+    () async {
+      final h = _Harness();
+      addTearDown(h.controller.dispose);
+      h.ready = false;
+      var current = true;
+      final oldResponse = Completer<ChatroomLlmCardsResponse>();
+      h.api.cardsBarrier = oldResponse;
+      final oldRead = h.controller.loadHistoryCards(
+        'l',
+        roundIds: {_round},
+        isCurrent: () => current,
+      );
+      await _settle();
+      expect(h.api.calls, ['cards:$_round']);
+      current = false;
+      oldResponse.complete(_cards([_card(101)]));
+      await oldRead;
+      expect(h.state.hasCardGroup, isFalse);
+      h.ready = true;
+      current = true;
+      final beforeEdit = Completer<ChatroomLlmCardsResponse>();
+      h.api.cardsBarrier = beforeEdit;
+      final pendingRead = h.controller.loadHistoryCards(
+        'l',
+        roundIds: {_round},
+        isCurrent: () => current,
+      );
+      await _settle();
+      final editor = await h.controller.prepareEditor('l');
+      beforeEdit.complete(_cards([_card(101, content: 'Old server body')]));
+      await pendingRead;
+      expect(editor.messages.single.content, 'Original');
+      expect(h.state.hasCardGroup, isFalse);
+      h.api.calls.clear();
+      await h.controller.loadHistoryCards(
+        'l',
+        roundIds: {_round},
+        isCurrent: () => current,
+      );
+      expect(h.api.calls, isEmpty);
+    },
+  );
+
+  test('entry skips other users and inactive locations', () async {
+    final h = _Harness();
+    addTearDown(h.controller.dispose);
+    h.ready = false;
+    await h.controller.restoreLocationCards('l');
+    expect(h.api.calls, isEmpty);
+    h.ready = true;
+    h.controller.observeMessages('l', [_formal(user: 'another-user')]);
+    await h.controller.restoreLocationCards('l');
+    expect(h.api.calls, isEmpty);
+  });
+
+  test(
+    'terminal before the last content end waits and completes locally',
+    () async {
+      final h = _Harness();
+      addTearDown(h.controller.dispose);
+      h.session.regenerateHandler = () async => const ChatroomCardRegeneration(
+        conversationRoundId: _round,
+        originalCardId: 101,
+        cardId: 102,
+        generationState: ChatroomCardGenerationState.generating,
+        billing: ChatroomCardBilling(
+          status: ChatroomCardBillingStatus.reserved,
+        ),
+      );
+      await h.controller.regenerate('l');
+      h.controller.receiveEvent(_stream('chunk', content: 'Partial'));
+      h.controller.receiveEvent(_terminal('succeeded'));
+      await _settle();
+      expect(h.state.canEdit, isFalse);
+      expect(h.state.error, isNotNull);
+      expect(h.state.displayedMessages.single.content, 'Partial');
+      h.controller.receiveEvent(_stream('end', content: 'Final reply'));
+      await _settle();
+      expect(h.state.canEdit, isTrue);
+      expect(h.state.error, isNull);
+      expect(h.state.displayedMessages.single.content, 'Final reply');
+      h.controller.receiveEvent(_terminal('succeeded'));
+      await _settle();
+      expect(h.walletRefreshes, 1);
+      expect(h.api.calls, isEmpty);
+    },
+  );
+
+  test(
+    'entry can_regenerate=false preserves original and prevents local dispatch',
+    () async {
+      final h = _Harness();
+      addTearDown(h.controller.dispose);
+      h.api.cards = _cards([], canRegenerate: false);
+      await h.controller.restoreLocationCards('l');
+      h.api.calls.clear();
+      await expectLater(h.controller.regenerate('l'), throwsStateError);
+      expect(h.state.displayedMessages.single.content, 'Original');
+      expect(h.state.showCandidates, isFalse);
+      expect(h.session.requests, isEmpty);
+      expect(h.api.calls, isEmpty);
+    },
+  );
 
   test(
     'candidate chunks dedupe seq, sort fixed indices, end replaces text, and browsing survives terminal',
@@ -425,7 +549,7 @@ void main() {
       final h = _Harness();
       addTearDown(h.controller.dispose);
       h.api.cards = _cards([_card(101)]);
-      await h.controller.prepareEditor('l');
+      await h.prepareEditor();
       final ack = Completer<ChatroomCardRegeneration>();
       h.session.regenerateHandler = () => ack.future;
       final action = h.controller.regenerate('l');
@@ -475,9 +599,9 @@ void main() {
       expect(h.state.viewedCardId, 101);
       expect(h.walletRefreshes, 1);
       await h.controller.browse('l', 1);
-      expect(h.state.displayedMessages.first.content, 'Saved candidate');
+      expect(h.state.displayedMessages.first.content, 'Full');
       h.controller.receiveEvent(_stream('end', content: 'stale'));
-      expect(h.state.displayedMessages.first.content, 'Saved candidate');
+      expect(h.state.displayedMessages.first.content, 'Full');
     },
   );
 
@@ -488,7 +612,7 @@ void main() {
       final h = _Harness(storage: storage);
       addTearDown(h.controller.dispose);
       h.api.cards = _cards([_card(101)]);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       const blank = [
         ChatroomLlmMessageOperation.edit(
           globalMessageId: _messageId,
@@ -517,7 +641,7 @@ void main() {
       expect(h.state.confirmed, isFalse);
       expect(target.draftOperations, isEmpty);
       await expectLater(
-        h.controller.save(await h.controller.prepareEditor('l'), const [
+        h.controller.save(await h.prepareEditor(), const [
           ChatroomLlmMessageOperation.delete(globalMessageId: _messageId),
           ChatroomLlmMessageOperation.delete(globalMessageId: _messageId + 1),
         ]),
@@ -531,7 +655,7 @@ void main() {
     () async {
       final h = _Harness();
       addTearDown(h.controller.dispose);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       expect(target.cardId, isNull);
       await h.controller.save(target, []);
       expect(h.api.calls.contains('batch-formal'), isFalse);
@@ -552,7 +676,7 @@ void main() {
       final h = _Harness();
       addTearDown(h.controller.dispose);
       h.api.cards = _cards([_card(101)]);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       h.api.batchError = TimeoutException('lost response');
       h.api.applyBeforeError = true;
       const changes = [
@@ -575,9 +699,9 @@ void main() {
       final h = _Harness();
       addTearDown(h.controller.dispose);
       h.api.cards = _cards([_card(101), _card(102, index: 2, content: 'New')]);
-      await h.controller.prepareEditor('l');
+      await h.prepareEditor();
       await h.controller.browse('l', 1);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       await h.controller.setDraft(target, const [
         ChatroomLlmMessageOperation.edit(
           globalMessageId: _messageId,
@@ -606,7 +730,7 @@ void main() {
         _card(101),
         _card(102, index: 2, generation: 'generating'),
       ]);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       await h.controller.setDraft(target, const [
         ChatroomLlmMessageOperation.edit(
           globalMessageId: _messageId,
@@ -654,7 +778,7 @@ void main() {
       await _settle();
       final restored = _Harness(storage: storage);
       addTearDown(restored.controller.dispose);
-      await restored.controller.restore('l');
+      await restored.controller.restoreLocationCards('l');
       expect(restored.state.goOnUnknown, isTrue);
       expect(restored.session.requests, isEmpty);
       final other = _Harness(storage: storage, owner: 'another');
@@ -732,7 +856,7 @@ void main() {
     final h = _Harness();
     addTearDown(h.controller.dispose);
     h.api.cards = _cards([_card(101)]);
-    final target = await h.controller.prepareEditor('l');
+    final target = await h.prepareEditor();
     await h.controller.setDraft(target, const [
       ChatroomLlmMessageOperation.edit(
         globalMessageId: _messageId,
@@ -818,7 +942,7 @@ void main() {
     () async {
       final h = _Harness();
       addTearDown(h.controller.dispose);
-      final editor = await h.controller.prepareEditor('l');
+      final editor = await h.prepareEditor();
       h.controller.receiveEvent(
         ChatroomAiStreamStart.fromV2Message(
           ChatroomV2Message(
@@ -847,7 +971,7 @@ void main() {
       final h = _Harness();
       addTearDown(h.controller.dispose);
       h.api.cards = _cards([_card(101)], confirmed: true, selected: 101);
-      final editor = await h.controller.prepareEditor('l');
+      final editor = await h.prepareEditor();
       expect(editor.cardId, isNull);
       await h.controller.setDraft(editor, const [
         ChatroomLlmMessageOperation.edit(
@@ -899,7 +1023,7 @@ void main() {
       final storage = MemoryChatroomReplyActionStorage();
       final h = _Harness(storage: storage);
       h.api.cards = _cards([_card(101)]);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       h.api.batchError = TimeoutException('lost');
       h.api.applyBeforeError = true;
       const changes = [
@@ -914,7 +1038,7 @@ void main() {
       final second = _Harness(storage: storage);
       addTearDown(second.controller.dispose);
       second.api.cards = h.api.cards;
-      await second.controller.restore('l');
+      await second.controller.restoreLocationCards('l');
       await second.controller.finalizeBeforeSend('l');
       expect(
         second.api.calls.where((call) => call.startsWith('batch-')),
@@ -929,7 +1053,7 @@ void main() {
       final h = _Harness();
       addTearDown(h.controller.dispose);
       h.api.cards = _cards([_card(101), _card(102, index: 2)]);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       final old = h.api.cards;
       final saving = Completer<void>();
       h.api.saveBarrier = saving;
@@ -942,13 +1066,34 @@ void main() {
       await _settle();
       final query = Completer<ChatroomLlmCardsResponse>();
       h.api.cardsBarrier = query;
-      h.controller.receiveEvent(_terminal('succeeded'));
+      final restoring = h.controller.restoreLocationCards('l');
       await _settle();
       saving.complete();
       await save;
       query.complete(old);
-      await _settle();
+      await restoring;
       expect(h.state.displayedMessages.first.content, 'Newest');
+    },
+  );
+
+  test(
+    'generation failure retains err_no and err_msg for the global presenter',
+    () async {
+      final h = _Harness();
+      addTearDown(h.controller.dispose);
+      h.api.cards = _cards([
+        _card(101),
+        _card(102, index: 2, generation: 'generating'),
+      ]);
+      await h.prepareEditor();
+      final event = _terminal(
+        'failed',
+        errNo: 2023,
+        errMsg: 'Server generation message',
+        error: {'code': 'internal', 'message': 'Diagnostic details'},
+      );
+      h.controller.receiveEvent(event);
+      expect(h.state.error, same(event));
     },
   );
 
@@ -961,7 +1106,7 @@ void main() {
         _card(101),
         _card(102, index: 2, generation: 'generating'),
       ]);
-      await h.controller.prepareEditor('l');
+      await h.prepareEditor();
       await h.controller.browse('l', 1);
       h.controller.receiveEvent(_stream('chunk', content: 'Must disappear'));
       expect(h.state.displayedMessages.single.content, 'Must disappear');
@@ -990,7 +1135,7 @@ void main() {
         _formal(type: 'tick').copyWith(tickNo: 10, subTickNo: 1),
       ]);
       h.api.cards = _cards([_card(101)]);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       ChatroomTickAdvanceMessage tick(int number) => ChatroomTickAdvanceMessage(
         sessionId: '',
         worldId: 'w',
@@ -1032,7 +1177,7 @@ void main() {
       final h = _Harness(storage: storage);
       addTearDown(h.controller.dispose);
       h.api.cards = _cards([_card(101)]);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       await h.controller.setDraft(target, const [
         ChatroomLlmMessageOperation.edit(
           globalMessageId: _messageId,
@@ -1064,7 +1209,7 @@ void main() {
     () async {
       final h = _Harness();
       h.api.cards = _cards([_card(101)]);
-      final target = await h.controller.prepareEditor('l');
+      final target = await h.prepareEditor();
       final barrier = Completer<void>();
       h.api.saveBarrier = barrier;
       var updates = 0;
@@ -1168,7 +1313,7 @@ void main() {
       restored.controller.observeMessages('l', [
         _formal(round: _round + 1, user: ''),
       ]);
-      await restored.controller.restore('l');
+      await restored.controller.restoreLocationCards('l');
       expect(restored.controller.stateFor('l')!.roundId, _round + 1);
       expect(restored.controller.stateFor('l')!.isOwnRound, isTrue);
       expect(restored.controller.stateFor('l')!.canGoOn, isTrue);
@@ -1181,7 +1326,7 @@ void main() {
       final h = _Harness(storage: storage);
       addTearDown(h.controller.dispose);
       h.api.cards = _cards([_card(101), _card(102, index: 2)]);
-      final first = await h.controller.prepareEditor('l');
+      final first = await h.prepareEditor();
       await h.controller.setDraft(first, const [
         ChatroomLlmMessageOperation.edit(
           globalMessageId: _messageId,
@@ -1189,7 +1334,7 @@ void main() {
         ),
       ]);
       await h.controller.browse('l', 1);
-      final selected = await h.controller.prepareEditor('l');
+      final selected = await h.prepareEditor();
       await h.controller.setDraft(selected, const [
         ChatroomLlmMessageOperation.edit(
           globalMessageId: _messageId,
@@ -1225,7 +1370,7 @@ void main() {
       final h = _Harness(storage: storage);
       addTearDown(h.controller.dispose);
       h.api.cards = _cards([_card(101), _card(102, index: 2)]);
-      final first = await h.controller.prepareEditor('l');
+      final first = await h.prepareEditor();
       await h.controller.setDraft(first, const [
         ChatroomLlmMessageOperation.edit(
           globalMessageId: _messageId,
@@ -1233,7 +1378,7 @@ void main() {
         ),
       ]);
       await h.controller.browse('l', 1);
-      final selected = await h.controller.prepareEditor('l');
+      final selected = await h.prepareEditor();
       await h.controller.setDraft(selected, const [
         ChatroomLlmMessageOperation.edit(
           globalMessageId: _messageId,
@@ -1303,7 +1448,7 @@ void main() {
         confirmed: true,
         selected: 102,
       );
-      await h.controller.restore('l');
+      await h.controller.restoreLocationCards('l');
       expect(h.state.error, isA<StateError>());
       final saved = (await storage.load(
         ownerUid: 'u',

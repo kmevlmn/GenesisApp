@@ -119,7 +119,7 @@ void main() {
       for (var i = 0; i < 1005; i++) {
         await recorder.recordFrame(
           direction: '<=',
-          message: '{"type":"heartbeat"}',
+          message: '{"type":"llm_card_stream"}',
         );
       }
       expect(profiles, isEmpty);
@@ -356,9 +356,69 @@ void main() {
     },
   );
 
-  test('records regeneration after more than 1000 heartbeat frames', () async {
+  test(
+    'skips sent and received heartbeats but retains business frames',
+    () async {
+      final profiles = <HttpClientRequestProfile>[];
+      final recorder = DevToolsWebSocketProfile(
+        Uri.parse('wss://api.worldo.ai/aitown-chat/ws'),
+        profileFactory:
+            ({
+              required requestStartTime,
+              required requestMethod,
+              required requestUri,
+            }) {
+              final profile = HttpClientRequestProfile.profile(
+                requestStartTime: requestStartTime,
+                requestMethod: requestMethod,
+                requestUri: requestUri,
+              )!;
+              profiles.add(profile);
+              return profile;
+            },
+      );
+
+      for (var index = 0; index < 1005; index += 1) {
+        await recorder.recordFrame(
+          direction: index.isEven ? '=>' : '<=',
+          message: '{"type":"heartbeat"}',
+        );
+      }
+      expect(profiles, isEmpty);
+      for (final type in [
+        'regenerate_llm_card',
+        'llm_card_stream',
+        'llm_card_generation_end',
+      ]) {
+        await recorder.recordFrame(
+          direction: type == 'regenerate_llm_card' ? '=>' : '<=',
+          message: jsonEncode({
+            'type': type,
+            'payload': {'content': '新正文', 'type': 'heartbeat'},
+          }),
+        );
+      }
+      expect(profiles, hasLength(3));
+      expect(
+        Uri.splitQueryString(
+          Uri.parse(profiles.first.requestUri).fragment,
+        )['frame'],
+        '1',
+      );
+      expect(
+        profiles.last.requestUri,
+        contains('type=llm_card_generation_end'),
+      );
+      expect(
+        utf8.decode(profiles.last.responseData.bodyBytes),
+        contains('新正文'),
+      );
+    },
+  );
+
+  test('filters ACKs by connection-local heartbeat client_msg_id', () async {
     final profiles = <HttpClientRequestProfile>[];
-    final recorder = DevToolsWebSocketProfile(
+    DevToolsWebSocketProfile createRecorder() => DevToolsWebSocketProfile(
       Uri.parse('wss://api.worldo.ai/aitown-chat/ws'),
       profileFactory:
           ({
@@ -375,28 +435,39 @@ void main() {
             return profile;
           },
     );
-
-    for (var index = 0; index < 1005; index += 1) {
-      await recorder.recordFrame(
-        direction: '=>',
-        message: '{"type":"heartbeat"}',
-      );
-    }
-    for (final type in [
-      'regenerate_llm_card',
-      'llm_card_stream',
-      'llm_card_generation_end',
+    final recorder = createRecorder();
+    HttpClientRequestProfile.profilingEnabled = false;
+    await recorder.recordFrame(
+      direction: '=>',
+      message: '{"type":"heartbeat","client_msg_id":"hb-1"}',
+    );
+    HttpClientRequestProfile.profilingEnabled = true;
+    await recorder.recordFrame(
+      direction: '=>',
+      message: '{"type":"heartbeat","client_msg_id":"hb-2"}',
+    );
+    const heartbeatAck = '{"type":"ack","client_msg_id":"hb-1"}';
+    for (final message in [
+      heartbeatAck,
+      heartbeatAck,
+      '{"type":"ack","payload":{"client_msg_id":"hb-2"}}',
     ]) {
-      await recorder.recordFrame(
-        direction: type == 'regenerate_llm_card' ? '=>' : '<=',
-        message: jsonEncode({
-          'type': type,
-          'payload': {'content': '新正文'},
-        }),
-      );
+      await recorder.recordFrame(direction: '<=', message: message);
     }
-    expect(profiles, hasLength(1008));
-    expect(profiles.last.requestUri, contains('type=llm_card_generation_end'));
-    expect(utf8.decode(profiles.last.responseData.bodyBytes), contains('新正文'));
+    expect(profiles, isEmpty);
+
+    // Business ACKs, missing IDs and non-ACK frames must still be visible.
+    for (final message in [
+      '{"type":"ack","client_msg_id":"business-1"}',
+      '{"type":"ack"}',
+      '{"type":"ack","client_msg_id":"business-2",'
+          '"payload":{"client_msg_id":"hb-1"}}',
+      '{"type":"user","client_msg_id":"hb-1"}',
+    ]) {
+      await recorder.recordFrame(direction: '<=', message: message);
+    }
+    expect(profiles, hasLength(4));
+    await createRecorder().recordFrame(direction: '<=', message: heartbeatAck);
+    expect(profiles, hasLength(5));
   });
 }

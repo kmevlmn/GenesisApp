@@ -1858,6 +1858,60 @@ void main() {
     },
   );
 
+  for (final action in [
+    ('Regenerate', 'regenerate_llm_card'),
+    ('Go on', 'go_on'),
+  ]) {
+    testWidgets(
+      '${action.$1} rejected ACK displays only centered server err_msg',
+      (tester) async {
+        final harness = await _mountCompletedReplyActionPanel(
+          tester,
+          backend: _LocationChatReplyHttpTransport(),
+        );
+        await tester.tap(find.bySemanticsLabel(action.$1));
+        await _pumpUntilLocationChatTest(
+          tester,
+          () => harness.socket.replyActionFrames(action.$2).length == 1,
+        );
+        harness.socket.serverReplyActionAck(
+          action.$2,
+          roundId: 301,
+          errNo: 2010,
+          errMsg: '服务端频率限制提示',
+        );
+        await _pumpUntilLocationChatTest(
+          tester,
+          () => find.text('服务端频率限制提示').evaluate().isNotEmpty,
+        );
+        await tester.pump();
+        expect(find.text('服务端频率限制提示'), findsOneWidget);
+        expect(find.textContaining('ChatroomFailureEvent'), findsNothing);
+        expect(
+          find.text(
+            'Too little time between posts. Ease up and try again shortly.',
+          ),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('location-chat-loading-bubble')),
+          findsNothing,
+        );
+        final messages = tester
+            .widget<LocationChatAnchoredMessageList>(
+              find.byType(LocationChatAnchoredMessageList),
+            )
+            .messages;
+        expect(messages.any((m) => m.text == 'Original reply.'), isTrue);
+        await tester.pump(const Duration(seconds: 5));
+        expect(find.text('服务端频率限制提示'), findsNothing);
+        await tester.pumpWidget(const SizedBox.shrink());
+        unawaited(harness.service.dispose());
+        await tester.pump();
+      },
+    );
+  }
+
   testWidgets(
     'Regenerate button requests and displays a private candidate without replacing the user message',
     (tester) async {
@@ -1872,6 +1926,14 @@ void main() {
         () =>
             harness.socket.replyActionFrames('regenerate_llm_card').length == 1,
       );
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('location-chat-loading-bubble')),
+        findsOneWidget,
+      );
+      expect(find.text('Generating…'), findsNothing);
+      expect(find.text('Waiting for the next reply…'), findsNothing);
+      expect(find.text('Check status'), findsNothing);
       final request = harness.socket
           .replyActionFrames('regenerate_llm_card')
           .single;
@@ -1934,6 +1996,10 @@ void main() {
         list.messages.any((message) => message.text == 'Original reply.'),
         isFalse,
       );
+      expect(
+        find.byKey(const ValueKey('location-chat-loading-bubble')),
+        findsNothing,
+      );
       expect(list.editEnabled, isFalse);
       expect(list.goOnEnabled, isFalse);
       expect(find.text('2 / 2'), findsOneWidget);
@@ -1965,6 +2031,10 @@ void main() {
       expect(list.editEnabled, isTrue);
       expect(find.text('1 / 2'), findsOneWidget);
       expect(
+        find.byKey(const ValueKey('location-chat-loading-bubble')),
+        findsNothing,
+      );
+      expect(
         harness.socket.replyActionFrames('regenerate_llm_card'),
         hasLength(1),
       );
@@ -1994,6 +2064,14 @@ void main() {
         tester,
         () => harness.socket.replyActionFrames('go_on').length == 1,
       );
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('location-chat-loading-bubble')),
+        findsOneWidget,
+      );
+      expect(find.text('Generating…'), findsNothing);
+      expect(find.text('Waiting for the next reply…'), findsNothing);
+      expect(find.text('Check status'), findsNothing);
       final request = harness.socket.replyActionFrames('go_on').single;
       expect(request['world_id'], 'world-current');
       expect(request['payload'], {
@@ -2020,6 +2098,45 @@ void main() {
                 .stateFor('location-current')!
                 .roundId ==
             401,
+      );
+      harness.socket.serverV2StreamFrame(
+        streamType: 'llm_stream_start',
+        roundId: 401,
+        messageId: 402,
+        locationMessageId: 303,
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('location-chat-loading-bubble')),
+        findsOneWidget,
+      );
+      harness.socket.serverV2StreamFrame(
+        streamType: 'llm_chunk',
+        roundId: 401,
+        messageId: 402,
+        locationMessageId: 303,
+        seq: 1,
+        content: 'The story',
+      );
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => tester
+            .widget<LocationChatAnchoredMessageList>(
+              find.byType(LocationChatAnchoredMessageList),
+            )
+            .messages
+            .any((message) => message.text == 'The story'),
+      );
+      expect(
+        find.byKey(const ValueKey('location-chat-loading-bubble')),
+        findsNothing,
+      );
+      expect(
+        harness.service.replyActions!
+            .statesFor('location-current')
+            .any((state) => state.goOnPending),
+        isTrue,
       );
       backend.seedGoOnReply();
       harness.socket.serverV2StreamFrame(
@@ -2055,6 +2172,10 @@ void main() {
       expect(
         list.messages.any((message) => message.text == 'The story continues.'),
         isTrue,
+      );
+      expect(
+        find.byKey(const ValueKey('location-chat-loading-bubble')),
+        findsNothing,
       );
       expect(list.replyActionsIdentity, 'world-current/location-current/401');
       expect(harness.socket.replyActionFrames('go_on'), hasLength(1));
@@ -2756,6 +2877,64 @@ void main() {
         ),
         isFalse,
       );
+    },
+  );
+
+  test(
+    'edited AI history keeps other identity despite the initiating user ID',
+    () {
+      for (final type in ['character', 'narrator']) {
+        for (final status in [0, 20]) {
+          final message = WorldChatroomMessage.fromHttpMessage(
+            ChatroomHttpMessage.fromV2Message(
+              ChatroomV2Message.fromJson({
+                'type': type,
+                'global_message_id': 9007199254740993,
+                'world_id': 'world',
+                'location_id': 'location',
+                'conversation_round_id': 42,
+                'user_id': 'u_me',
+                'sender_type': type,
+                'sender_id': 'mateo',
+                'payload': {
+                  'content': status == 20 ? 'Edited reply' : 'Original reply',
+                  'status': status,
+                },
+              }),
+            ),
+          );
+          expect(
+            locationChatMessageBelongsToCurrentRoleForTesting(
+              messageBusinessType: locationChatBusinessType(message),
+              messageUserId: message.userId,
+              messageSenderId: message.senderId,
+              currentUserIds: const {'u_me'},
+              currentSenderIds: const {'u_me'},
+              characters: const [
+                {'char_id': 'mateo', 'player_uid': 'u_me'},
+              ],
+              characterPositions: const [],
+            ),
+            isFalse,
+            reason:
+                '$type with status=$status is a reply, not the initiating user',
+          );
+        }
+      }
+      for (final user in ['u_me', 'u_other']) {
+        expect(
+          locationChatMessageBelongsToCurrentRoleForTesting(
+            messageBusinessType: 'user',
+            messageUserId: user,
+            messageSenderId: user,
+            currentUserIds: const {'u_me'},
+            currentSenderIds: const {'u_me'},
+            characters: const [],
+            characterPositions: const [],
+          ),
+          user == 'u_me',
+        );
+      }
     },
   );
 
@@ -6245,6 +6424,22 @@ class _LocationChatReplyHttpTransport implements HttpTransport {
   Future<TransportResponse> send(TransportRequest request) async {
     requests.add(request);
     if (request.uri.path.endsWith('/llm-messages/cards')) {
+      final round = int.parse(
+        request.uri.queryParameters['conversation_round_id']!,
+      );
+      if (round != 301) {
+        return _ok({
+          'conversation_round_id': round,
+          'original_card_id': 0,
+          'selected_card_id': 0,
+          'active_card_id': 0,
+          'confirmed': false,
+          'can_regenerate': true,
+          'can_confirm': false,
+          'list': [],
+          'total': 0,
+        });
+      }
       return _ok({
         'conversation_round_id': 301,
         'original_card_id': cards.isEmpty ? 0 : 501,
@@ -6340,6 +6535,8 @@ class _LocationChatTestSocket implements ChatroomSocket {
   void serverReplyActionAck(
     String requestType, {
     required int roundId,
+    int errNo = 0,
+    String errMsg = '',
     Map<String, Object?> payload = const {},
   }) {
     final request = replyActionFrames(requestType).last;
@@ -6351,8 +6548,8 @@ class _LocationChatTestSocket implements ChatroomSocket {
       'user_id': 'user-1',
       'client_msg_id': request['client_msg_id'],
       'payload': payload,
-      'err_no': 0,
-      'err_msg': '',
+      'err_no': errNo,
+      'err_msg': errMsg,
     });
   }
 
