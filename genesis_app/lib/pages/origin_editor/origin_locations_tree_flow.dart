@@ -547,7 +547,7 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (!isNew) ...[
-                                  CreateFormDeleteButton(
+                                  GenesisDeleteButton(
                                     buttonKey: const ValueKey<String>(
                                       'locations-l3-editor-delete',
                                     ),

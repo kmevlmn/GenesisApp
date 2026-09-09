@@ -221,7 +221,7 @@ class _CreateUploadBoxState extends State<CreateUploadBox> {
         Positioned(
           right: 4,
           top: 4,
-          child: CreateFormDeleteButton(
+          child: GenesisDeleteButton(
             buttonKey: const ValueKey('create-upload-remove'),
             decorationKey: const ValueKey('create-upload-remove-container'),
             onPressed: _removeImage,

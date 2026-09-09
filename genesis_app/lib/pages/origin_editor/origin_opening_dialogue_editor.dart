@@ -363,7 +363,7 @@ class _OpeningNarratorEditor extends StatelessWidget {
         Positioned(
           right: 0,
           top: -8,
-          child: CreateFormDeleteButton(
+          child: GenesisDeleteButton(
             buttonKey: ValueKey<String>('${item.id}-delete'),
             decorationKey: ValueKey<String>('${item.id}-delete-container'),
             onPressed: onDelete,
@@ -494,7 +494,7 @@ class _OpeningCharacterEditor extends StatelessWidget {
         Positioned(
           right: 0,
           top: -8,
-          child: CreateFormDeleteButton(
+          child: GenesisDeleteButton(
             buttonKey: ValueKey<String>('${item.id}-delete'),
             decorationKey: ValueKey<String>('${item.id}-delete-container'),
             onPressed: onDelete,
@@ -780,7 +780,7 @@ class _OpeningImageEditor extends StatelessWidget {
           Positioned(
             right: 4,
             top: 4,
-            child: CreateFormDeleteButton(
+            child: GenesisDeleteButton(
               buttonKey: ValueKey<String>('${item.id}-delete'),
               decorationKey: ValueKey<String>('${item.id}-delete-container'),
               onPressed: onDelete,

@@ -18,6 +18,7 @@ import '../../routers/app_router.dart';
 import '../../ui/components/genesis_list_image.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/tokens/genesis_avatar_radii.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_image_radii.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/entity_deleted.dart';
@@ -250,7 +251,8 @@ class _DiscussPageState extends State<DiscussPage> {
                           child: DiscussPostInput(
                             bizId: data.oid,
                             backgroundColor: DiscussDarkColors.inputFill,
-                            placeholderColor: DiscussDarkColors.muted,
+                            placeholderColor:
+                                GenesisColors.darkInputPlaceholder,
                             onSubmitted: () => unawaited(
                               _discussController.refreshFirstPage(),
                             ),

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:genesis_flutter_android/ui/components/genesis_delete_button.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_profile_collection_list_item.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent, RenderParagraph;
 import 'package:flutter/services.dart';
@@ -18032,26 +18033,44 @@ void main() {
     await expectCreateButtonMatchesSaveSpacing('Story Events (Optional)');
   });
 
-  testWidgets('invalid create basics save uses the soft brand color', (
-    WidgetTester tester,
-  ) async {
-    await CreateOriginDraftStore.clear();
+  testWidgets(
+    'invalid create basics save uses the secondary red with primary text',
+    (WidgetTester tester) async {
+      await CreateOriginDraftStore.clear();
 
-    await tester.pumpWidget(const MaterialApp(home: CreateBasicsPage()));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(const MaterialApp(home: CreateBasicsPage()));
+      await tester.pumpAndSettle();
 
-    final saveButton = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Save'),
-    );
+      final saveButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Save'),
+      );
 
-    expect(saveButton.onPressed, isNull);
-    expect(
-      saveButton.style?.backgroundColor?.resolve(<WidgetState>{
-        WidgetState.disabled,
-      }),
-      GenesisColors.brandSoft,
-    );
-  });
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        GenesisColors.darkBackground,
+      );
+      final nameInput = tester.widget<TextField>(
+        find.widgetWithText(TextField, 'eg. Main Street'),
+      );
+      expect(nameInput.style?.color, GenesisColors.darkTextPrimary);
+      expect(nameInput.cursorColor, GenesisColors.darkTextPrimary);
+      expect(
+        nameInput.decoration?.hintStyle?.color,
+        GenesisColors.darkInputPlaceholder,
+      );
+      expect(
+        saveButton.style?.foregroundColor?.resolve({WidgetState.disabled}),
+        GenesisColors.darkTextPrimary,
+      );
+      expect(saveButton.onPressed, isNull);
+      expect(
+        saveButton.style?.backgroundColor?.resolve(<WidgetState>{
+          WidgetState.disabled,
+        }),
+        GenesisColors.redSecondary,
+      );
+    },
+  );
 
   testWidgets('create text counters use user-perceived characters', (
     WidgetTester tester,
@@ -19173,10 +19192,12 @@ void main() {
           find.byKey(ValueKey<String>('$itemId-delete-container')),
         );
         final deleteDecoration = deleteContainer.decoration as BoxDecoration;
-        expect(deleteDecoration.color, const Color(0xE6F4F4F6));
-        final deleteBorder = deleteDecoration.border! as Border;
-        expect(deleteBorder.top.color, const Color(0xFFD8D8DE));
-        expect(deleteBorder.top.width, 1);
+        expect(deleteDecoration.color, GenesisColors.darkFaintSurface);
+        expect(
+          deleteDecoration.border,
+          Border.all(color: GenesisColors.darkFaintFill),
+        );
+        expect(deleteDecoration.borderRadius, BorderRadius.circular(6));
       }
 
       final characterDelete = find.byKey(
@@ -20090,7 +20111,7 @@ void main() {
 
     expect(find.text('Character 1'), findsOneWidget);
     expect(find.text('Character 2'), findsNothing);
-    expect(find.byType(CreateFormDeleteButton), findsOneWidget);
+    expect(find.byType(GenesisDeleteButton), findsOneWidget);
     expect(
       tester.widget<CreateFormCard>(find.byType(CreateFormCard)).showBorder,
       isFalse,
@@ -20117,7 +20138,7 @@ void main() {
     );
     expect(
       tester.getCenter(find.text('Character 1')).dy,
-      closeTo(tester.getCenter(find.byType(CreateFormDeleteButton)).dy, 0.01),
+      closeTo(tester.getCenter(find.byType(GenesisDeleteButton)).dy, 0.01),
     );
 
     await tester.scrollUntilVisible(
@@ -20158,7 +20179,7 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'Ari');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(CreateFormDeleteButton));
+    await tester.tap(find.byType(GenesisDeleteButton));
     await tester.pumpAndSettle();
 
     expect(find.text('Character 1'), findsOneWidget);
@@ -21218,10 +21239,7 @@ void main() {
       const ValueKey<String>('locations-inline-name-Loc_2'),
     );
     await tester.tap(
-      find.descendant(
-        of: l1Editor,
-        matching: find.byType(CreateFormDeleteButton),
-      ),
+      find.descendant(of: l1Editor, matching: find.byType(GenesisDeleteButton)),
     );
     await tester.pump();
 
@@ -21236,10 +21254,7 @@ void main() {
       const ValueKey<String>('locations-inline-name-Loc_1_2'),
     );
     await tester.tap(
-      find.descendant(
-        of: l2Editor,
-        matching: find.byType(CreateFormDeleteButton),
-      ),
+      find.descendant(of: l2Editor, matching: find.byType(GenesisDeleteButton)),
     );
     await tester.pump();
 
@@ -21281,9 +21296,9 @@ void main() {
     );
     final cancelFlow = find.descendant(
       of: l2Editor,
-      matching: find.byType(CreateFormDeleteButton),
+      matching: find.byType(GenesisDeleteButton),
     );
-    expect(tester.widget<CreateFormDeleteButton>(cancelFlow).enabled, isTrue);
+    expect(tester.widget<GenesisDeleteButton>(cancelFlow).enabled, isTrue);
     await tester.tap(cancelFlow);
     await tester.pump();
 
@@ -21362,7 +21377,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: savedL2Editor,
-        matching: find.byType(CreateFormDeleteButton),
+        matching: find.byType(GenesisDeleteButton),
       ),
     );
     await tester.pumpAndSettle();
@@ -21447,7 +21462,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: harborEditor,
-          matching: find.byType(CreateFormDeleteButton),
+          matching: find.byType(GenesisDeleteButton),
         ),
       );
       await tester.pumpAndSettle();
@@ -21890,7 +21905,7 @@ void main() {
       const Color(0xFF888888),
     );
     expect(saveButtonDecoration.borderRadius, BorderRadius.circular(6));
-    final inlineDeleteButton = find.byType(CreateFormDeleteButton);
+    final inlineDeleteButton = find.byType(GenesisDeleteButton);
     expect(
       tester.getSize(inlineSaveButton),
       tester.getSize(inlineDeleteButton),
@@ -21898,7 +21913,7 @@ void main() {
     final deleteIconWidget = tester.widget<SvgPicture>(
       find.descendant(
         of: inlineDeleteButton,
-        matching: _assetSvgFinder(createFormDeleteIconAsset),
+        matching: _assetSvgFinder(GenesisDeleteButton.iconAsset),
       ),
     );
     expect(deleteIconWidget.width, saveIconWidget.width);
@@ -22007,10 +22022,7 @@ void main() {
     expect(tester.getRect(l3Sheet), sheetRectWithoutKeyboard);
     expect(find.text('Edit L3 Location'), findsOneWidget);
     expect(
-      find.descendant(
-        of: l3Sheet,
-        matching: find.byType(CreateFormDeleteButton),
-      ),
+      find.descendant(of: l3Sheet, matching: find.byType(GenesisDeleteButton)),
       findsOneWidget,
     );
     final l3Delete = find.byKey(
@@ -22323,12 +22335,9 @@ void main() {
       locationText: '- L1 Location',
       locationId: 'Loc_1',
     );
-    final l1DeleteButton = find.byType(CreateFormDeleteButton);
+    final l1DeleteButton = find.byType(GenesisDeleteButton);
     expect(l1DeleteButton, findsOneWidget);
-    expect(
-      tester.widget<CreateFormDeleteButton>(l1DeleteButton).enabled,
-      isFalse,
-    );
+    expect(tester.widget<GenesisDeleteButton>(l1DeleteButton).enabled, isFalse);
 
     await tester.tap(l1DeleteButton);
     await tester.pump();
@@ -22352,10 +22361,10 @@ void main() {
     expect(l3DeleteButton, findsOneWidget);
     expect(
       tester
-          .widget<CreateFormDeleteButton>(
+          .widget<GenesisDeleteButton>(
             find.ancestor(
               of: l3DeleteButton,
-              matching: find.byType(CreateFormDeleteButton),
+              matching: find.byType(GenesisDeleteButton),
             ),
           )
           .enabled,
@@ -22928,7 +22937,7 @@ void main() {
 
     expect(find.text('Event 1'), findsOneWidget);
     expect(find.text('Event 2'), findsNothing);
-    expect(find.byType(CreateFormDeleteButton), findsOneWidget);
+    expect(find.byType(GenesisDeleteButton), findsOneWidget);
     expect(
       tester.widget<CreateFormCard>(find.byType(CreateFormCard)).showBorder,
       isFalse,
@@ -22944,7 +22953,7 @@ void main() {
     );
     expect(
       tester.getCenter(find.text('Event 1')).dy,
-      closeTo(tester.getCenter(find.byType(CreateFormDeleteButton)).dy, 0.01),
+      closeTo(tester.getCenter(find.byType(GenesisDeleteButton)).dy, 0.01),
     );
 
     await tester.scrollUntilVisible(

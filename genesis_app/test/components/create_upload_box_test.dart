@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/pages/create/create_form_widgets.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
+import 'package:genesis_flutter_android/ui/components/genesis_delete_button.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_typography.dart';
 
 void main() {
@@ -64,7 +65,7 @@ void main() {
       expect(find.text('AVATAR\n(Optional)'), findsNothing);
       expect(find.byType(Image), findsOneWidget);
       expect(find.text('Remove'), findsNothing);
-      expect(find.byType(CreateFormDeleteButton), findsOneWidget);
+      expect(find.byType(GenesisDeleteButton), findsOneWidget);
 
       controller.text = 'assets/images/default_list_image.png';
       await tester.pump();
@@ -72,13 +73,13 @@ void main() {
       expect(find.text('AVATAR\n(Optional)'), findsNothing);
       expect(find.byType(Image), findsOneWidget);
       expect(find.text('Remove'), findsNothing);
-      expect(find.byType(CreateFormDeleteButton), findsOneWidget);
+      expect(find.byType(GenesisDeleteButton), findsOneWidget);
 
       controller.clear();
       await tester.pump();
 
       expect(find.text('AVATAR\n(Optional)'), findsOneWidget);
-      expect(find.byType(CreateFormDeleteButton), findsNothing);
+      expect(find.byType(GenesisDeleteButton), findsNothing);
     },
   );
 
@@ -108,8 +109,8 @@ void main() {
     expect(find.text('AVATAR\n(Optional)'), findsNothing);
     expect(find.text('Remove'), findsNothing);
     expect(find.byType(Image), findsOneWidget);
-    final removeButton = tester.widget<CreateFormDeleteButton>(
-      find.byType(CreateFormDeleteButton),
+    final removeButton = tester.widget<GenesisDeleteButton>(
+      find.byType(GenesisDeleteButton),
     );
     expect(removeButton.enabled, isTrue);
     final uploadRect = tester.getRect(find.byType(CreateUploadBox));
@@ -125,7 +126,7 @@ void main() {
     expect(controller.text, isEmpty);
     expect(previewBytes, isNull);
     expect(changedCount, 1);
-    expect(find.byType(CreateFormDeleteButton), findsNothing);
+    expect(find.byType(GenesisDeleteButton), findsNothing);
     expect(find.text('AVATAR\n(Optional)'), findsOneWidget);
   });
 

@@ -319,10 +319,12 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
     });
   }
 
-  Future<void> _openSection(Widget page) async {
-    await Navigator.of(
-      context,
-    ).push<bool>(MaterialPageRoute<bool>(builder: (_) => page));
+  Future<void> _openSection(Widget page, {bool dark = false}) async {
+    await Navigator.of(context).push<bool>(
+      dark
+          ? GenesisDarkPageRoute<bool>(builder: (_) => page)
+          : MaterialPageRoute<bool>(builder: (_) => page),
+    );
     if (!mounted) return;
     _clearInputFocus();
     await _reloadDraft();
@@ -605,6 +607,7 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
                                   modified: _basicsModified(_draft),
                                   onTap: () => _openSection(
                                     widget.basicsPageBuilder(widget.repository),
+                                    dark: true,
                                   ),
                                 ),
                                 _SectionRow(

@@ -196,7 +196,7 @@ HTTP 映射层的图片规则：
 - 所有百分比均指不透明度。使用处必须引用对应 token，不得重复写上述色值或建立独立的同色常量。
 - 页面或组件已有的语义别名可以保留，但必须引用上述 token。例如 Worldo Detail 和 Discuss 的颜色别名只做映射，不再自行定义色值。
 - 现有代码的 token 迁移只替换与上述标准颜色对应的色值写法，不改变视觉颜色；其他颜色或不同透明度保持原样，不因数值接近而强行归入这五个 token。
-- `GenesisColors.darkInputPlaceholder` 是 `darkTextTertiary` 的语义别名；深色光标引用 `darkTextPrimary`。后续调整标准色时，修改公共 token 即可同步这些别名和使用处。
+- `GenesisColors.darkInputPlaceholder` 独立定义为 32% 白（`0x52FFFFFF`），不与 45% 白的 `darkTextTertiary` 共用色值；深色光标引用 `darkTextPrimary`。后续调整占位文字只修改公共 placeholder token。
 - 需要透明度变体时，从对应 token 派生，例如 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.8)`；不得用变体替代规定的三级文字颜色。
 - 不创建肉眼接近的背景色或文字透明度。纯白 `#FFFFFF` 不作为深色内容区常规文字颜色，除非设计明确要求更高强调层级；输入区域和浮动操作菜单按后文专项规范执行。
 
@@ -231,6 +231,13 @@ HTTP 映射层的图片规则：
 - `GenesisBottomSheetCloseButton` 在深色主题下转用此组件；`GenesisBottomSheetPanel` 的深色面板与安全区使用 `darkRaisedBackground`，默认标题使用 `darkTextPrimary`。浅色调用沿用原样式。
 - 图片查看器、裁剪工具的专用工具栏关闭操作，以及搜索清空、附件删除，不属于普通面板关闭按钮，保留各自的布局和交互规格。
 
+## 公共删除按钮规范
+
+- 图片预览、头像上传及编辑卡片中的图标删除按钮统一使用 `GenesisDeleteButton`（`lib/ui/components/genesis_delete_button.dart`），不在页面重复拼装样式。
+- 默认按钮 24×24、删除 SVG 14px、圆角 6px；不透明底色使用 `GenesisColors.darkFaintSurface`（`#313133`），1px 描边使用 `darkFaintFill`，图标使用 `darkTextPrimary`。不叠加背景模糊。
+- 禁用时整体不透明度为 45%，禁止执行删除；可以通过 `onDisabledPressed` 提示不可删除的原因。按钮位置、删除回调和确认流程由调用方负责。
+- 本规范用于独立图标按钮；Report 菜单内的 Delete 文字操作继续遵守浮动菜单规范。
+
 ## 深色 Sheet Handle 设计规范
 
 - 顶部横向分页 Handle 的颜色以 Worldo Sheet 为基准：选中段使用 `GenesisColors.darkHandleActive`（`darkTextPrimary`，95% 白），未选中段使用 `GenesisColors.darkHandleInactive`（`darkTextTertiary`，45% 白）。不得用输入填充的 12% 白代替未选中颜色。
@@ -255,13 +262,13 @@ HTTP 映射层的图片规则：
 | 字重 / 字间距 | `FontWeight.w400` / 0；沿用项目字体体系 |
 | 对齐 | 左对齐；单行占位文字在输入区域内垂直居中 |
 | 输入正文 | `GenesisColors.darkTextPrimary`，95% 白 |
-| Placeholder | 三级白，45% 白 `Color(0x73FFFFFF)`；复用 `GenesisColors.darkInputPlaceholder` |
+| Placeholder | 32% 白 `Color(0x52FFFFFF)`；统一复用 `GenesisColors.darkInputPlaceholder` |
 | 光标 | `GenesisColors.darkTextPrimary`，95% 白；可复用同色的正文样式 |
 | 边框 | 输入区域本身不额外添加描边、下划线或 Material 默认边框 |
 
 实现约束：
 
-- Placeholder 必须显式使用上述三级白，不得继承全局浅色 `textDisabled`，也不得恢复为 `#9E9E9E` 或约 32% 白。真实输入框通过 `hintStyle` 设置；点击打开编辑器的入口通过占位 `Text` 的样式设置。
+- Placeholder 必须显式使用上述 32% 白 token，不得继承全局浅色 `textDisabled` 或使用普通三级文字色；提示引导文案保持 `darkTextTertiary`（45% 白）。真实输入框通过 `hintStyle` 设置；点击打开编辑器的入口通过占位 `Text` 的样式设置。
 - 光标不得使用纯白或品牌红。品牌红用于发送等可用操作，不用于 placeholder 或输入光标。
 - 40 是最小高度，不是固定高度；保留实际输入框随多行文字增长的行为。底部入口与打开后的发帖/回复编辑弹层是不同组件，不能把弹层的 3–6 行编辑区压缩成 40 高。
 - blur 与填充色分别管理：Location Chat 输入背景保留现有 blur 4；Worldo Detail / Discuss 入口不为追求颜色一致而新增 blur。不能用改变填充透明度来补偿 blur 差异。

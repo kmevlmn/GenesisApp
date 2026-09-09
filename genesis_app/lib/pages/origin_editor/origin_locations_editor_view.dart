@@ -196,7 +196,7 @@ class _InlineTreeLocationNameEditor extends StatelessWidget {
                   const SizedBox(width: 4),
                   Transform.translate(
                     offset: Offset(0, level == 0 ? 2.5 : 1.5),
-                    child: CreateFormDeleteButton(
+                    child: GenesisDeleteButton(
                       onPressed: onDelete,
                       enabled: deleteEnabled,
                       onDisabledPressed: onDeleteDisabled,

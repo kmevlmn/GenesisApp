@@ -19,6 +19,7 @@ import '../../routers/app_router.dart';
 import '../../ui/components/genesis_avatar.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/tokens/genesis_avatar_radii.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/entity_deleted.dart';
 import '../../utils/genesis_timestamp_formatter.dart';
@@ -650,7 +651,7 @@ class _PostDetailCommentBar extends StatelessWidget {
               child: const Text(
                 'Write a reply',
                 style: TextStyle(
-                  color: DiscussDarkColors.muted,
+                  color: GenesisColors.darkInputPlaceholder,
                   fontSize: 14,
                   height: 1.4,
                   fontWeight: FontWeight.w400,

@@ -13,6 +13,7 @@ import '../../components/common/genesis_upload_progress_overlay.dart';
 import '../../components/common/local_image_crop_page.dart';
 import '../../platform/native_image_picker.dart';
 import '../../ui/components/genesis_static_network_image.dart';
+import '../../ui/components/genesis_delete_button.dart';
 import '../../ui/text/genesis_text_input_formatters.dart';
 import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_image_radii.dart';
@@ -37,8 +38,6 @@ const Color createFormBorder = Color(0xFFE1E1E6);
 const Color createFormDash = GenesisColors.brandSoft;
 const Color createFormUploadBorder = createFormBorder;
 const Color createFormDanger = Color(0xFFFF2442);
-const String createFormDeleteIconAsset =
-    'assets/custom-icons/svg/delete-icon.svg';
 const String createFormInfoIconAsset = 'assets/custom-icons/svg/info.svg';
 const TextStyle createFormSupportTextStyle = TextStyle(
   fontSize: 12,
@@ -46,3 +45,21 @@ const TextStyle createFormSupportTextStyle = TextStyle(
 );
 
 final Object createFormTextFieldTapRegionGroup = Object();
+
+/// Opt-in styling for editor pages being migrated to dark mode.
+class CreateFormTheme extends InheritedWidget {
+  const CreateFormTheme({super.key, required super.child, this.isDark = true});
+
+  final bool isDark;
+
+  static bool isDarkOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<CreateFormTheme>()?.isDark ??
+      false;
+
+  static Color colorOf(BuildContext context, Color light, Color dark) =>
+      isDarkOf(context) ? dark : light;
+
+  @override
+  bool updateShouldNotify(CreateFormTheme oldWidget) =>
+      isDark != oldWidget.isDark;
+}

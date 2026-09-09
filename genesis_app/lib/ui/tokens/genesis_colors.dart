@@ -6,7 +6,7 @@ abstract final class GenesisColors {
   static const Color darkTextSecondary = Color(0xB8FFFFFF);
   static const Color darkTextTertiary = Color(0x73FFFFFF);
   static const Color darkRaisedBackground = Color(0xFF181C1F);
-  static const Color darkInputPlaceholder = darkTextTertiary;
+  static const Color darkInputPlaceholder = Color(0x52FFFFFF);
   static const Color darkHandleActive = darkTextPrimary;
   static const Color darkHandleInactive = darkTextTertiary;
 

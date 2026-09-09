@@ -75,7 +75,7 @@ class _DiscussComposerPanel extends StatelessWidget {
                     height: _discussComposerLineHeight,
                     fontWeight: FontWeight.w400,
                     letterSpacing: 0,
-                    color: _discussComposerMuted,
+                    color: GenesisColors.darkInputPlaceholder,
                   ),
                   border: InputBorder.none,
                   isCollapsed: true,

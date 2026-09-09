@@ -50,6 +50,10 @@ class GenesisDarkTheme extends StatelessWidget {
           color: GenesisColors.darkTextSecondary,
         ),
         dividerColor: GenesisColors.darkFaintFill,
+        inputDecorationTheme: base.inputDecorationTheme.copyWith(
+          hintStyle: (base.inputDecorationTheme.hintStyle ?? const TextStyle())
+              .copyWith(color: GenesisColors.darkInputPlaceholder),
+        ),
         extensions: [
           ...base.extensions.values.where(
             (extension) => extension is! GenesisUiTheme,

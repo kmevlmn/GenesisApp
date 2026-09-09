@@ -3,6 +3,7 @@ export 'components/genesis_asterisk_icon.dart';
 export 'components/genesis_bottom_navigation.dart';
 export 'components/genesis_character_avatar.dart';
 export 'components/genesis_dark_close_button.dart';
+export 'components/genesis_delete_button.dart';
 export 'components/genesis_edge_swipe_back.dart';
 export 'components/genesis_fixed_underline_indicator.dart';
 export 'components/genesis_list_image.dart';

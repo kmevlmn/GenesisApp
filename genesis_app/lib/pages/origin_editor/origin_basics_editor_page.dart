@@ -183,7 +183,7 @@ class _OriginBasicsEditorPageState extends State<OriginBasicsEditorPage> {
   }
 
   void _showError(String message) {
-    showGenesisToast(context, message);
+    showGenesisToast(context, message, brightness: Brightness.dark);
   }
 
   void _loadSimulationSettings({
@@ -391,10 +391,26 @@ class _OriginBasicsEditorPageState extends State<OriginBasicsEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: CreateFormTheme(child: _buildPage(context)),
+      ),
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: Colors.white,
-      appBar: const GenesisBackAppBar(pageName: 'Basics'),
+      backgroundColor: GenesisColors.darkBackground,
+      appBar: const GenesisBackAppBar(
+        pageName: 'Basics',
+        backgroundColor: GenesisColors.darkBackground,
+        foregroundColor: GenesisColors.darkTextPrimary,
+        systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+      ),
       body: CreateKeyboardDismissArea(
         child: SafeArea(
           top: false,
@@ -418,7 +434,7 @@ class _OriginBasicsEditorPageState extends State<OriginBasicsEditorPage> {
                         prefix: const Text(
                           '#',
                           style: TextStyle(
-                            color: createFormText,
+                            color: GenesisColors.darkTextPrimary,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
@@ -445,7 +461,7 @@ class _OriginBasicsEditorPageState extends State<OriginBasicsEditorPage> {
                       const Text(
                         'Cover Image *',
                         style: TextStyle(
-                          color: createFormText,
+                          color: GenesisColors.darkTextPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           height: 1.2,
@@ -458,8 +474,13 @@ class _OriginBasicsEditorPageState extends State<OriginBasicsEditorPage> {
                           CreateUploadBox(
                             controller: _coverImageController,
                             label: 'Upload',
+                            emptyBackgroundColor: GenesisColors.darkFaintFill,
+                            emptyBorderColor: GenesisColors.darkTextTertiary,
+                            emptyIconColor: GenesisColors.createAdd,
+                            emptyLabelColor: GenesisColors.darkTextSecondary,
                             width: 170,
                             height: 230,
+                            borderRadius: 8,
                             iconSize: 42,
                             cropSize: const Size(800, 1200),
                             emptyLabelFontSize: 14,
@@ -496,7 +517,7 @@ class _OriginBasicsEditorPageState extends State<OriginBasicsEditorPage> {
                       const Text(
                         'Worldo Time (Optional)',
                         style: TextStyle(
-                          color: createFormText,
+                          color: GenesisColors.darkTextPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           height: 1.2,
@@ -542,7 +563,7 @@ class _OriginBasicsEditorPageState extends State<OriginBasicsEditorPage> {
                         prefix: const Text(
                           'Custom',
                           style: TextStyle(
-                            color: createFormText,
+                            color: GenesisColors.darkTextPrimary,
                             fontSize: 12,
                             fontWeight: FontWeight.w400,
                           ),
@@ -553,7 +574,7 @@ class _OriginBasicsEditorPageState extends State<OriginBasicsEditorPage> {
                       const Text(
                         'Worldo Metric (Optional)',
                         style: TextStyle(
-                          color: createFormText,
+                          color: GenesisColors.darkTextPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           height: 1.2,
@@ -660,6 +681,10 @@ class _OriginBasicsEditorPageState extends State<OriginBasicsEditorPage> {
               _KeyboardHiddenBottomAction(
                 child: GenesisPrimaryButton(
                   label: _isSaving ? 'Saving...' : 'Save',
+                  backgroundColor: GenesisColors.redPrimary,
+                  foregroundColor: GenesisColors.darkTextPrimary,
+                  disabledBackgroundColor: GenesisColors.redSecondary,
+                  disabledForegroundColor: GenesisColors.darkTextPrimary,
                   width: _primaryActionButtonWidth(context),
                   onPressed: _canUseSaveButton ? _onSave : null,
                   onDisabledPressed: () => _showError(_saveDisabledReason),
@@ -680,20 +705,20 @@ class _AdvancedSettingsDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Row(
       children: [
-        Expanded(child: Divider(height: 1, color: createFormBorder)),
+        Expanded(child: Divider(height: 1, color: GenesisColors.darkFaintFill)),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 12),
           child: Text(
             'Advanced Settings (Optional)',
             style: TextStyle(
-              color: createFormMuted,
+              color: GenesisColors.darkTextSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
               height: 1.2,
             ),
           ),
         ),
-        Expanded(child: Divider(height: 1, color: createFormBorder)),
+        Expanded(child: Divider(height: 1, color: GenesisColors.darkFaintFill)),
       ],
     );
   }
@@ -709,8 +734,9 @@ class _SimulationFieldLabel extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        color: Color(0xFF111111),
+        color: GenesisColors.darkTextSecondary,
         fontSize: 12,
+        fontWeight: FontWeight.w600,
         height: 1.2,
       ),
     );
@@ -768,8 +794,8 @@ class _TimeProgressOption extends StatelessWidget {
     return Material(
       key: ValueKey('time-progress-option-$label'),
       color: selected
-          ? GenesisColors.brand.withValues(alpha: 0.10)
-          : createFormFieldFill,
+          ? GenesisColors.darkTextPrimary
+          : GenesisColors.darkFaintFill,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -780,7 +806,9 @@ class _TimeProgressOption extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: selected ? createFormGreen : createFormMuted,
+              color: selected
+                  ? GenesisColors.darkBackground
+                  : GenesisColors.darkTextSecondary,
               fontSize: 12,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
               height: 1.2,

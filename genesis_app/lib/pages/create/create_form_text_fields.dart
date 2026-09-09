@@ -172,7 +172,7 @@ class CreateTextFieldBlock extends StatefulWidget {
     this.labelSize = 14,
     this.labelFontWeight = FontWeight.w600,
     this.labelInputGap = 10,
-    this.inputLineHeight = 1.42,
+    this.inputLineHeight,
     this.textInputAction,
     this.onEditingComplete,
     this.onSubmitted,
@@ -203,7 +203,7 @@ class CreateTextFieldBlock extends StatefulWidget {
   final double labelSize;
   final FontWeight labelFontWeight;
   final double labelInputGap;
-  final double inputLineHeight;
+  final double? inputLineHeight;
   final TextInputAction? textInputAction;
   final VoidCallback? onEditingComplete;
   final ValueChanged<String>? onSubmitted;
@@ -297,7 +297,11 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
             Text(
               widget.label,
               style: TextStyle(
-                color: createFormText,
+                color: CreateFormTheme.colorOf(
+                  context,
+                  createFormText,
+                  GenesisColors.darkTextPrimary,
+                ),
                 fontSize: widget.labelSize,
                 fontWeight: widget.labelFontWeight,
                 height: 1.2,
@@ -307,13 +311,25 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
             SizedBox(height: widget.labelInputGap),
           ],
           Container(
+            constraints: CreateFormTheme.isDarkOf(context)
+                ? const BoxConstraints(minHeight: 40)
+                : null,
             decoration: BoxDecoration(
-              color: widget.fillColor ?? createFormFieldFill,
+              color:
+                  widget.fillColor ??
+                  CreateFormTheme.colorOf(
+                    context,
+                    createFormFieldFill,
+                    GenesisColors.darkFaintFill,
+                  ),
               borderRadius: BorderRadius.circular(8),
             ),
             padding:
                 widget.contentPadding ??
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                EdgeInsets.symmetric(
+                  horizontal: CreateFormTheme.isDarkOf(context) ? 14 : 10,
+                  vertical: 10,
+                ),
             alignment: _isSingleLine ? Alignment.center : Alignment.topCenter,
             child: Row(
               crossAxisAlignment: _isSingleLine
@@ -335,7 +351,13 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
                       child: TextField(
                         controller: widget.controller,
                         focusNode: focusNode,
-                        cursorColor: widget.textColor ?? createFormText,
+                        cursorColor:
+                            widget.textColor ??
+                            CreateFormTheme.colorOf(
+                              context,
+                              createFormText,
+                              GenesisColors.darkTextPrimary,
+                            ),
                         scrollPadding:
                             widget.scrollPadding ??
                             const EdgeInsets.fromLTRB(
@@ -363,9 +385,19 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
                         maxLines: widget.maxLines,
                         style: GenesisTypography.withFallback(
                           TextStyle(
-                            color: widget.textColor ?? createFormText,
+                            color:
+                                widget.textColor ??
+                                CreateFormTheme.colorOf(
+                                  context,
+                                  createFormText,
+                                  GenesisColors.darkTextPrimary,
+                                ),
                             fontSize: 14,
-                            height: widget.inputLineHeight,
+                            height:
+                                widget.inputLineHeight ??
+                                (CreateFormTheme.isDarkOf(context)
+                                    ? 1.4
+                                    : 1.42),
                           ),
                         ),
                         decoration: InputDecoration(
@@ -376,10 +408,20 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
                           contentPadding: EdgeInsets.zero,
                           hintStyle: GenesisTypography.withFallback(
                             TextStyle(
-                              color: widget.hintColor ?? createFormHint,
+                              color:
+                                  widget.hintColor ??
+                                  CreateFormTheme.colorOf(
+                                    context,
+                                    createFormHint,
+                                    GenesisColors.darkInputPlaceholder,
+                                  ),
                               fontSize: 14,
                               letterSpacing: 0,
-                              height: widget.inputLineHeight,
+                              height:
+                                  widget.inputLineHeight ??
+                                  (CreateFormTheme.isDarkOf(context)
+                                      ? 1.4
+                                      : 1.42),
                             ),
                           ),
                         ),
@@ -514,8 +556,12 @@ class CreateFormNote extends StatelessWidget {
             createFormInfoIconAsset,
             width: 16,
             height: 16,
-            colorFilter: const ColorFilter.mode(
-              createFormNote,
+            colorFilter: ColorFilter.mode(
+              CreateFormTheme.colorOf(
+                context,
+                createFormNote,
+                GenesisColors.darkTextTertiary,
+              ),
               BlendMode.srcIn,
             ),
           ),
@@ -538,7 +584,13 @@ class _CreateFormNoteText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final baseStyle = GenesisTypography.withFallback(
-      createFormSupportTextStyle.copyWith(color: createFormNote),
+      createFormSupportTextStyle.copyWith(
+        color: CreateFormTheme.colorOf(
+          context,
+          createFormNote,
+          GenesisColors.darkTextTertiary,
+        ),
+      ),
     );
     if (!markdown) {
       return Text(note, softWrap: true, style: baseStyle);
@@ -548,12 +600,16 @@ class _CreateFormNoteText extends StatelessWidget {
     return RichText(
       text: TextSpan(
         style: baseStyle,
-        children: _markdownSpans(note, platform),
+        children: _markdownSpans(note, platform, baseStyle),
       ),
     );
   }
 
-  List<InlineSpan> _markdownSpans(String value, TargetPlatform platform) {
+  List<InlineSpan> _markdownSpans(
+    String value,
+    TargetPlatform platform,
+    TextStyle baseStyle,
+  ) {
     final spans = <InlineSpan>[];
     var index = 0;
     while (index < value.length) {
@@ -588,7 +644,11 @@ class _CreateFormNoteText extends StatelessWidget {
           break;
         }
         spans.addAll(
-          _inlineEmphasisSpans(value.substring(nextStart + 1, end), platform),
+          _inlineEmphasisSpans(
+            value.substring(nextStart + 1, end),
+            platform,
+            baseStyle,
+          ),
         );
         index = end + 1;
       }
@@ -608,11 +668,12 @@ class _CreateFormNoteText extends StatelessWidget {
   }
 }
 
-List<InlineSpan> _inlineEmphasisSpans(String text, TargetPlatform platform) {
-  final style = GenesisTypography.inlineEmphasis(
-    const TextStyle(),
-    platform: platform,
-  );
+List<InlineSpan> _inlineEmphasisSpans(
+  String text,
+  TargetPlatform platform,
+  TextStyle baseStyle,
+) {
+  final style = GenesisTypography.inlineEmphasis(baseStyle, platform: platform);
   if (platform != TargetPlatform.iOS ||
       !GenesisTypography.useIosSoftItalicSkew) {
     return <InlineSpan>[TextSpan(text: text, style: style)];
@@ -674,7 +735,13 @@ class _CreateFieldCounter extends StatelessWidget {
     return Text(
       counter,
       textAlign: TextAlign.right,
-      style: createFormSupportTextStyle.copyWith(color: createFormMuted),
+      style: createFormSupportTextStyle.copyWith(
+        color: CreateFormTheme.colorOf(
+          context,
+          createFormMuted,
+          GenesisColors.darkTextTertiary,
+        ),
+      ),
     );
   }
 }

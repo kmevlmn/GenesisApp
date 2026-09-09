@@ -15,72 +15,6 @@ class CreateKeyboardDismissArea extends StatelessWidget {
   }
 }
 
-class CreateFormDeleteButton extends StatelessWidget {
-  const CreateFormDeleteButton({
-    super.key,
-    required this.onPressed,
-    this.buttonKey,
-    this.decorationKey,
-    this.size = 24,
-    this.iconSize = 14,
-    this.enabled = true,
-    this.onDisabledPressed,
-  });
-
-  final VoidCallback onPressed;
-  final Key? buttonKey;
-  final Key? decorationKey;
-  final double size;
-  final double iconSize;
-  final bool enabled;
-  final VoidCallback? onDisabledPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: enabled ? null : onDisabledPressed,
-      child: Opacity(
-        opacity: enabled ? 1 : 0.45,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Container(
-                key: decorationKey,
-                decoration: BoxDecoration(
-                  color: const Color(0xE6F4F4F6),
-                  border: Border.all(color: const Color(0xFFD8D8DE)),
-                  borderRadius: BorderRadius.circular(size / 4),
-                ),
-              ),
-              IconButton(
-                key: buttonKey,
-                onPressed: enabled ? onPressed : null,
-                padding: EdgeInsets.all((size - iconSize) / 2),
-                constraints: BoxConstraints.tightFor(width: size, height: size),
-                icon: SvgPicture.asset(
-                  createFormDeleteIconAsset,
-                  width: iconSize,
-                  height: iconSize,
-                  colorFilter: const ColorFilter.mode(
-                    Color(0xFF666666),
-                    BlendMode.srcIn,
-                  ),
-                ),
-                splashRadius: size / 2,
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class CreateFormCard extends StatelessWidget {
   const CreateFormCard({
     super.key,
@@ -146,7 +80,7 @@ class CreateFormCard extends StatelessWidget {
                   ),
                 ),
               ),
-              CreateFormDeleteButton(
+              GenesisDeleteButton(
                 onPressed: onDelete,
                 enabled: deleteEnabled,
                 onDisabledPressed: onDeleteDisabled,

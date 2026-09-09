@@ -1053,7 +1053,7 @@ class _OriginSetupRoleInlineEditor extends StatelessWidget {
                     emptyLabelFontWeight: FontWeight.w600,
                     emptyLabelFontSize: 1,
                     emptyIconLabelGap: 0,
-                    emptyBackgroundColor: originWorldDetailSheetBackgroundColor,
+                    emptyBackgroundColor: GenesisColors.darkFaintFill,
                     emptyBorderColor: originWorldDetailSheetTertiaryTextColor,
                     emptyIconColor: GenesisColors.createAdd,
                     emptyLabelColor: originWorldDetailSheetTertiaryTextColor,
