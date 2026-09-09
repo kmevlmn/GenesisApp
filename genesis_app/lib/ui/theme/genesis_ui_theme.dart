@@ -77,11 +77,11 @@ class GenesisUiTheme extends ThemeExtension<GenesisUiTheme> {
       // Use the input radius token for the search field.
       searchBorderRadius: GenesisRadii.input,
       // Bottom navigation background color.
-      bottomNavigationBackgroundColor: GenesisColors.surfaceMuted,
+      bottomNavigationBackgroundColor: GenesisColors.darkBackground,
       // Bottom navigation selected-state color.
-      bottomNavigationSelectedColor: GenesisColors.tabSelected,
+      bottomNavigationSelectedColor: GenesisColors.darkTextPrimary,
       // Bottom navigation unselected-state color.
-      bottomNavigationUnselectedColor: GenesisColors.tabUnselected,
+      bottomNavigationUnselectedColor: GenesisColors.darkTextSecondary,
       // Bottom navigation prominent-item color, such as Create.
       bottomNavigationProminentColor: GenesisColors.create,
       // Secondary tab selected color.

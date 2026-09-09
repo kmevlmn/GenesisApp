@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/components/common/genesis_action_box.dart';
@@ -987,19 +988,41 @@ void main() {
     );
     expect(navSizedBoxes.any((box) => box.height == 49), isTrue);
 
-    final decoration = tester
-        .widgetList<DecoratedBox>(
-          find.descendant(
-            of: find.byType(GenesisBottomNavigation),
-            matching: find.byType(DecoratedBox),
-          ),
-        )
-        .map((box) => box.decoration)
-        .whereType<BoxDecoration>()
-        .singleWhere((decoration) => decoration.boxShadow != null);
-    expect(decoration.color, Colors.white);
-    expect(decoration.boxShadow, isNotNull);
-    expect(decoration.boxShadow!.single.offset.dy, lessThan(0));
+    final surfaces = tester.widgetList<ColoredBox>(
+      find.descendant(
+        of: find.byType(GenesisBottomNavigation),
+        matching: find.byType(ColoredBox),
+      ),
+    );
+    expect(surfaces.first.color, GenesisColors.darkBackground);
+    expect(
+      surfaces.any((box) => box.color == GenesisColors.darkFaintFill),
+      isTrue,
+    );
+    expect(find.byType(BackdropFilter), findsNothing);
+
+    // Preserve the white SVG cutouts when the selected silhouette turns white.
+    final selectedMapper =
+        (icons[1].bytesLoader as SvgAssetLoader).colorMapper!;
+    expect(
+      selectedMapper.substitute(null, 'path', 'fill', const Color(0xFF333333)),
+      GenesisColors.darkTextPrimary,
+    );
+    expect(
+      selectedMapper.substitute(null, 'polyline', 'stroke', Colors.white),
+      GenesisColors.darkBackground,
+    );
+    final unselectedMapper =
+        (icons[0].bytesLoader as SvgAssetLoader).colorMapper!;
+    expect(
+      unselectedMapper.substitute(
+        null,
+        'path',
+        'fill',
+        const Color(0xFF666666),
+      ),
+      GenesisColors.darkTextSecondary,
+    );
 
     final badgePosition = tester.widget<Positioned>(
       find.ancestor(
@@ -1070,7 +1093,7 @@ void main() {
 
     final createIcon = tester.widget<Icon>(find.byIcon(Icons.add_rounded));
     expect(createIcon.size, 26);
-    expect(createIcon.color, Colors.white);
+    expect(createIcon.color, GenesisColors.darkTextPrimary);
     expect(createIcon.shadows, hasLength(4));
 
     final decoration = tester
@@ -1185,7 +1208,7 @@ void main() {
     tester,
   ) async {
     MediaQueryData? innerMediaQuery;
-    const systemBarColor = Color(0xFFEDF3EF);
+    const systemBarColor = GenesisColors.darkBackground;
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(scaffoldBackgroundColor: systemBarColor),
@@ -1213,6 +1236,24 @@ void main() {
           ),
         ),
       ),
+    );
+
+    // The shared system-bar style is published after the first frame.
+    await tester.pump();
+
+    final systemOverlay = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find
+          .ancestor(
+            of: find.byKey(
+              const ValueKey('genesis-bottom-system-bar-opaque-overlay'),
+            ),
+            matching: find.byType(AnnotatedRegion<SystemUiOverlayStyle>),
+          )
+          .first,
+    );
+    expect(
+      systemOverlay.value.systemNavigationBarIconBrightness,
+      Brightness.light,
     );
 
     expect(
@@ -1268,6 +1309,9 @@ void main() {
         ),
       ),
     );
+
+    // The shared system-bar style is published after the first frame.
+    await tester.pump();
 
     expect(
       tester.getSize(find.byKey(const ValueKey('gesture-content'))).height,

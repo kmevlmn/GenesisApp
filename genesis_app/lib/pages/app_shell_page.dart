@@ -631,7 +631,7 @@ class _AppShellPageState extends State<AppShellPage>
               _selectedIndex == 1 ||
               _selectedIndex == 3 ||
               _selectedIndex == 4
-          ? kGenesisLightStatusIconsSystemUiOverlayStyle
+          ? kGenesisLightSystemUiOverlayStyle
           : kGenesisDefaultSystemUiOverlayStyle,
       child: Scaffold(
         backgroundColor:

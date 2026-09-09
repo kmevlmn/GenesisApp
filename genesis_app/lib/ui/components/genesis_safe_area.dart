@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 enum GenesisSystemNavigationMode { gesture, threeButton }
 
@@ -252,11 +253,22 @@ class GenesisBottomSystemBarBoundary extends StatelessWidget {
                   bottom: 0,
                   height: bottomInset,
                   child: IgnorePointer(
-                    child: ColoredBox(
-                      key: const ValueKey<String>(
-                        'genesis-bottom-system-bar-opaque-overlay',
+                    child: AnnotatedRegion<SystemUiOverlayStyle>(
+                      value: SystemUiOverlayStyle(
+                        systemNavigationBarIconBrightness:
+                            ThemeData.estimateBrightnessForColor(
+                                  resolvedBackgroundColor,
+                                ) ==
+                                Brightness.dark
+                            ? Brightness.light
+                            : Brightness.dark,
                       ),
-                      color: resolvedBackgroundColor,
+                      child: ColoredBox(
+                        key: const ValueKey<String>(
+                          'genesis-bottom-system-bar-opaque-overlay',
+                        ),
+                        color: resolvedBackgroundColor,
+                      ),
                     ),
                   ),
                 ),
