@@ -1,6 +1,6 @@
 part of 'origin_editor_pages.dart';
 
-const Color _openingDialogueAddColor = Color(0xFF666666);
+const Color _openingDialogueAddColor = GenesisColors.darkTextSecondary;
 
 class _OpeningDialogueEditor extends StatelessWidget {
   const _OpeningDialogueEditor({
@@ -142,7 +142,7 @@ class _OpeningBestRoleSelector extends StatelessWidget {
           const Text(
             'Suggest a role for user',
             style: TextStyle(
-              color: createFormText,
+              color: GenesisColors.darkTextPrimary,
               fontSize: 16,
               fontWeight: FontWeight.w600,
               height: 1.2,
@@ -153,7 +153,7 @@ class _OpeningBestRoleSelector extends StatelessWidget {
             const Text(
               'No characters available.',
               style: TextStyle(
-                color: createFormMuted,
+                color: GenesisColors.darkTextTertiary,
                 fontSize: 13,
                 height: 1.2,
               ),
@@ -236,7 +236,7 @@ class _OpeningBestRoleOption extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: createFormText,
+                  color: GenesisColors.darkTextPrimary,
                   fontSize: 12,
                   height: 1.1,
                   fontWeight: FontWeight.w600,
@@ -309,7 +309,9 @@ class _OpeningNarratorEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = style.systemMessageTextStyle.color ?? Colors.white;
+    final narratorTextStyle = chatNarratorMessageTextStyle(style);
+    final iconColor =
+        chatNarratorMessageIconColor(style) ?? narratorTextStyle.color!;
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -323,7 +325,10 @@ class _OpeningNarratorEditor extends StatelessWidget {
             width: double.infinity,
             padding: style.systemMessagePadding,
             decoration: BoxDecoration(
-              color: style.systemMessageBackgroundColor,
+              color: chatNarratorMessageBackgroundColor(style),
+              border: Border.all(
+                color: GenesisColors.darkFaintFill.withValues(alpha: 0.06),
+              ),
               borderRadius: BorderRadius.circular(
                 style.systemMessageBorderRadius,
               ),
@@ -335,13 +340,13 @@ class _OpeningNarratorEditor extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 3),
                   child: SvgPicture.asset(
                     paragraphIconAsset,
-                    width: 14,
-                    height: 14,
+                    width: 13,
+                    height: 13,
                     fit: BoxFit.contain,
-                    colorFilter: ColorFilter.mode(textColor, BlendMode.srcIn),
+                    colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 9),
                 Expanded(
                   child: _OpeningDialogueTextField(
                     key: ValueKey<String>(
@@ -349,9 +354,10 @@ class _OpeningNarratorEditor extends StatelessWidget {
                     ),
                     item: item,
                     hintText: 'Enter narrator dialogue',
-                    style: style.systemMessageTextStyle,
-                    insertTextColor: const Color(0xFFF4F4F6),
-                    insertBackgroundColor: textColor.withValues(alpha: 0.08),
+                    style: narratorTextStyle,
+                    softItalic: true,
+                    insertTextColor: GenesisColors.darkTextSecondary,
+                    insertBackgroundColor: GenesisColors.darkFaintFill,
                     onChanged: onChanged,
                     focusNode: focusNode,
                   ),
@@ -418,7 +424,6 @@ class _OpeningCharacterEditor extends StatelessWidget {
               imageUrl: character.avatarUrl,
               colors: style.otherAvatarColors,
               seed: name,
-              borderColor: createFormBorder,
               style: style,
             ),
             SizedBox(width: style.avatarBubbleGap),
@@ -434,7 +439,11 @@ class _OpeningCharacterEditor extends StatelessWidget {
                   children: [
                     SizedBox(
                       key: ValueKey<String>('${item.id}-name-row'),
-                      height: 16,
+                      height:
+                          MediaQuery.textScalerOf(
+                            context,
+                          ).scale(style.senderNameTextStyle.fontSize ?? 11) *
+                          (style.senderNameTextStyle.height ?? 1),
                       child: Padding(
                         padding: const EdgeInsets.only(right: 12),
                         child: Align(
@@ -443,12 +452,7 @@ class _OpeningCharacterEditor extends StatelessWidget {
                             name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: style.senderNameTextStyle.copyWith(
-                              color: createFormText,
-                              fontSize: 11,
-                              height: 1.1,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: style.senderNameTextStyle,
                           ),
                         ),
                       ),
@@ -460,15 +464,7 @@ class _OpeningCharacterEditor extends StatelessWidget {
                       padding: style.bubblePadding,
                       decoration: BoxDecoration(
                         color: style.otherBubbleColor,
-                        border: Border.all(color: createFormBorder),
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(2),
-                          topRight: Radius.circular(style.bubbleBorderRadius),
-                          bottomRight: Radius.circular(
-                            style.bubbleBorderRadius,
-                          ),
-                          bottomLeft: Radius.circular(style.bubbleBorderRadius),
-                        ),
+                        borderRadius: kChatScenePlateAiBubbleBorderRadius,
                       ),
                       child: _OpeningDialogueTextField(
                         key: ValueKey<String>(
@@ -477,8 +473,8 @@ class _OpeningCharacterEditor extends StatelessWidget {
                         item: item,
                         hintText: 'Enter $name dialogue',
                         style: style.bubbleTextStyle,
-                        insertTextColor: const Color(0xFF666666),
-                        insertBackgroundColor: const Color(0xFFF4F4F6),
+                        insertTextColor: GenesisColors.darkTextSecondary,
+                        insertBackgroundColor: GenesisColors.darkFaintFill,
                         showAsteriskInsert: true,
                         onChanged: onChanged,
                         focusNode: focusNode,
@@ -514,6 +510,7 @@ class _OpeningDialogueTextField extends StatelessWidget {
     required this.insertTextColor,
     required this.insertBackgroundColor,
     this.showAsteriskInsert = false,
+    this.softItalic = false,
     required this.onChanged,
     required this.focusNode,
   });
@@ -524,6 +521,7 @@ class _OpeningDialogueTextField extends StatelessWidget {
   final Color insertTextColor;
   final Color insertBackgroundColor;
   final bool showAsteriskInsert;
+  final bool softItalic;
   final VoidCallback onChanged;
   final FocusNode focusNode;
 
@@ -566,38 +564,46 @@ class _OpeningDialogueTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final platform = Theme.of(context).platform;
+    final textStyle = softItalic
+        ? genesisSoftItalicStyle(style, platform: platform)
+        : style;
     return ListenableBuilder(
       listenable: Listenable.merge(<Listenable>[focusNode, item.controller]),
       builder: (context, child) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            key: ValueKey<String>('${item.id}-field'),
-            controller: item.controller,
-            focusNode: focusNode,
-            cursorColor: style.color ?? createFormText,
-            keyboardType: TextInputType.multiline,
-            textInputAction: TextInputAction.newline,
-            scrollPadding: const EdgeInsets.fromLTRB(
-              20,
-              20,
-              20,
-              kMinInteractiveDimension,
-            ),
-            minLines: 3,
-            maxLines: null,
-            maxLength: _maxCharacterCount,
-            style: style,
-            onChanged: (_) => onChanged(),
-            decoration: InputDecoration(
-              isDense: true,
-              border: InputBorder.none,
-              counterText: '',
-              contentPadding: EdgeInsets.zero,
-              hintText: hintText,
-              hintStyle: style.copyWith(
-                color: (style.color ?? createFormHint).withValues(alpha: 0.55),
+          genesisSoftItalicForPlatform(
+            platform: platform,
+            useIosSkew: softItalic && GenesisTypography.useIosSoftItalicSkew,
+            child: TextField(
+              key: ValueKey<String>('${item.id}-field'),
+              controller: item.controller,
+              focusNode: focusNode,
+              cursorColor: GenesisColors.darkTextPrimary,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              scrollPadding: const EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                kMinInteractiveDimension,
+              ),
+              minLines: 3,
+              maxLines: null,
+              maxLength: _maxCharacterCount,
+              style: textStyle,
+              onChanged: (_) => onChanged(),
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                counterText: '',
+                contentPadding: EdgeInsets.zero,
+                hintText: hintText,
+                hintStyle: textStyle.copyWith(
+                  color: GenesisColors.darkInputPlaceholder,
+                ),
               ),
             ),
           ),
@@ -648,7 +654,7 @@ class _OpeningDialogueTextField extends StatelessWidget {
                 maxLines: 1,
                 softWrap: false,
                 style: TextStyle(
-                  color: insertTextColor,
+                  color: GenesisColors.darkTextTertiary,
                   fontSize: 12,
                   fontWeight: FontWeight.w400,
                   height: 1,
@@ -765,6 +771,11 @@ class _OpeningImageEditor extends StatelessWidget {
                   key: ValueKey<String>('${item.id}-image'),
                   controller: item.controller,
                   label: 'UPLOAD IMAGE',
+                  emptyBackgroundColor: GenesisColors.darkFaintFill,
+                  emptyBorderColor: GenesisColors.darkTextTertiary,
+                  emptyIconColor: GenesisColors.createAdd,
+                  emptyLabelColor: GenesisColors.darkTextSecondary,
+                  borderRadius: 8,
                   width: width,
                   height: width,
                   uploadOriginalImage: true,
@@ -807,7 +818,7 @@ class _OpeningDialogueAddButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: createFormFieldFill,
+      color: GenesisColors.darkFaintFill,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -815,10 +826,7 @@ class _OpeningDialogueAddButton extends StatelessWidget {
         child: Container(
           height: 34,
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            border: Border.all(color: createFormBorder),
-            borderRadius: BorderRadius.circular(8),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

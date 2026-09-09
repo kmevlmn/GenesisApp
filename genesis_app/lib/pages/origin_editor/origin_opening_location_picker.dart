@@ -39,7 +39,10 @@ class _OpeningLocationPickerSheetState
                 ? const Center(
                     child: Text(
                       'No saved locations',
-                      style: TextStyle(color: createFormMuted, fontSize: 14),
+                      style: TextStyle(
+                        color: GenesisColors.darkTextTertiary,
+                        fontSize: 14,
+                      ),
                     ),
                   )
                 : ListView.separated(
@@ -48,7 +51,7 @@ class _OpeningLocationPickerSheetState
                     separatorBuilder: (_, _) => const Divider(
                       height: 1,
                       thickness: 1,
-                      color: Color(0xFFEAEAEA),
+                      color: GenesisColors.darkFaintFill,
                     ),
                     itemBuilder: (context, index) {
                       final option = widget.options[index];
@@ -68,9 +71,8 @@ class _OpeningLocationPickerSheetState
                 child: GenesisPrimaryButton(
                   label: 'Cancel',
                   onPressed: () => Navigator.of(context).pop(),
-                  backgroundColor: Colors.white,
-                  foregroundColor: createFormText,
-                  side: const BorderSide(color: createFormBorder),
+                  backgroundColor: GenesisColors.darkFaintFill,
+                  foregroundColor: GenesisColors.darkTextPrimary,
                 ),
               ),
               const SizedBox(width: 18),
@@ -82,8 +84,10 @@ class _OpeningLocationPickerSheetState
                       : () => Navigator.of(context).pop(_selection),
                   onDisabledPressed: () =>
                       showGenesisToast(context, 'Select a location first.'),
-                  backgroundColor: createFormGreen,
-                  foregroundColor: Colors.white,
+                  backgroundColor: GenesisColors.redPrimary,
+                  disabledBackgroundColor: GenesisColors.redSecondary,
+                  disabledForegroundColor: GenesisColors.darkTextPrimary,
+                  foregroundColor: GenesisColors.darkTextPrimary,
                 ),
               ),
             ],
@@ -120,7 +124,7 @@ class _OpeningLocationOptionRow extends StatelessWidget {
               child: Icon(
                 Icons.place_outlined,
                 size: 16,
-                color: createFormText,
+                color: GenesisColors.darkTextPrimary,
               ),
             ),
             const SizedBox(width: 8),
@@ -133,7 +137,7 @@ class _OpeningLocationOptionRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: createFormText,
+                      color: GenesisColors.darkTextPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       height: 1.2,
@@ -148,7 +152,7 @@ class _OpeningLocationOptionRow extends StatelessWidget {
                           width: 14,
                           height: 14,
                           colorFilter: const ColorFilter.mode(
-                            Color(0xFF666666),
+                            GenesisColors.darkTextSecondary,
                             BlendMode.srcIn,
                           ),
                         ),
@@ -161,8 +165,10 @@ class _OpeningLocationOptionRow extends StatelessWidget {
                               : option.characterNames,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF666666),
+                          style: TextStyle(
+                            color: option.characterNames.isEmpty
+                                ? GenesisColors.darkTextTertiary
+                                : GenesisColors.darkTextSecondary,
                             fontSize: 13,
                             height: 1.2,
                           ),
@@ -179,14 +185,22 @@ class _OpeningLocationOptionRow extends StatelessWidget {
               height: 22,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: selected ? createFormGreen : Colors.transparent,
+                color: selected
+                    ? GenesisColors.darkTextPrimary
+                    : GenesisColors.darkFaintFill,
                 border: Border.all(
-                  color: selected ? createFormGreen : createFormBorder,
+                  color: selected
+                      ? GenesisColors.darkTextPrimary
+                      : GenesisColors.darkFaintFill,
                   width: 1.5,
                 ),
               ),
               child: selected
-                  ? const Icon(Icons.check, size: 15, color: Colors.white)
+                  ? const Icon(
+                      Icons.check,
+                      size: 15,
+                      color: GenesisColors.darkBackground,
+                    )
                   : null,
             ),
           ],

@@ -1,11 +1,31 @@
 part of 'chat_ui_library.dart';
 
-Color _chatNarratorMessageBackgroundColor(ChatUiStyleConfig style) {
+Color chatNarratorMessageBackgroundColor(ChatUiStyleConfig style) {
   if (!style.useScenePlateBubbleGeometry ||
       style.useConfiguredScenePlateSystemStyle) {
     return style.systemMessageBackgroundColor;
   }
   return const Color(0x80151517);
+}
+
+TextStyle chatNarratorMessageTextStyle(ChatUiStyleConfig style) {
+  if (style.useScenePlateBubbleGeometry &&
+      !style.useConfiguredScenePlateSystemStyle) {
+    return const TextStyle(
+      color: Color.fromRGBO(255, 255, 255, 0.73),
+      fontSize: 14,
+      height: 1.3,
+      fontWeight: FontWeight.w400,
+    );
+  }
+  return style.systemMessageTextStyle.copyWith(fontSize: 14);
+}
+
+Color? chatNarratorMessageIconColor(ChatUiStyleConfig style) {
+  if (!style.useScenePlateBubbleGeometry) return null;
+  return style.useConfiguredScenePlateSystemStyle
+      ? chatNarratorMessageTextStyle(style).color
+      : Colors.white.withValues(alpha: 0.60);
 }
 
 class ChatNarratorMessageBubble extends StatelessWidget {
@@ -23,28 +43,15 @@ class ChatNarratorMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final usesScenePlate = style.useScenePlateBubbleGeometry;
-    final usesConfiguredSystemStyle =
-        usesScenePlate && style.useConfiguredScenePlateSystemStyle;
-    final narratorTextStyle = usesScenePlate && !usesConfiguredSystemStyle
-        ? const TextStyle(
-            color: Color.fromRGBO(255, 255, 255, 0.73),
-            fontSize: 14,
-            height: 1.3,
-            fontWeight: FontWeight.w400,
-          )
-        : style.systemMessageTextStyle.copyWith(fontSize: 14);
+    final narratorTextStyle = chatNarratorMessageTextStyle(style);
     return ChatSystemMessage(
       text: message.text,
       fullWidth: true,
       textAlign: TextAlign.left,
       leadingIconAsset: paragraphIconAsset,
-      backgroundColor: _chatNarratorMessageBackgroundColor(style),
+      backgroundColor: chatNarratorMessageBackgroundColor(style),
       textStyle: narratorTextStyle,
-      leadingIconColor: usesScenePlate
-          ? usesConfiguredSystemStyle
-                ? narratorTextStyle.color
-                : Colors.white.withValues(alpha: 0.60)
-          : null,
+      leadingIconColor: chatNarratorMessageIconColor(style),
       softItalic: usesScenePlate,
       markdownEmphasisColor: narratorTextStyle.color ?? Colors.white,
       style: style,

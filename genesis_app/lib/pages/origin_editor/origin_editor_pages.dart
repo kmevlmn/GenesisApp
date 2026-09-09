@@ -11,6 +11,8 @@ import '../../components/common/genesis_bottom_sheet_panel.dart';
 import '../../components/common/genesis_center_toast.dart';
 import '../../components/common/genesis_modal_routes.dart';
 import '../../components/chat/shared/chat_ui.dart';
+import '../../components/chat/shared/chat_scene_plate_tokens.dart';
+import '../../ui/components/genesis_soft_italic_text.dart';
 import '../../components/origin/origin_character_form.dart';
 import '../../components/origin/origin_role_recommendation.dart';
 import '../../components/origin/origin_role_selection_mark.dart';
@@ -648,6 +650,7 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
                                       widget.openingPageBuilder!(
                                         widget.repository,
                                       ),
+                                      dark: true,
                                     ),
                                   ),
                                 _SectionRow(

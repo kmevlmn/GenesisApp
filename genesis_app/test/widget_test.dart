@@ -18604,7 +18604,7 @@ void main() {
             )
             .style
             ?.color,
-        const Color(0xFF666666),
+        GenesisColors.darkTextSecondary,
       );
       final emptyLocationOption = find.byKey(
         const ValueKey<String>('opening-location-option-location_opening_2'),
@@ -18768,7 +18768,10 @@ void main() {
       );
       final narratorColor =
           (narratorContainer.decoration as BoxDecoration).color!;
-      expect(narratorColor, kOpeningDialogueStyle.systemMessageBackgroundColor);
+      expect(
+        narratorColor,
+        chatNarratorMessageBackgroundColor(kLocationChatStyle),
+      );
       expect(
         find.byKey(const ValueKey<String>('opening-dialogue-0-delete')),
         findsOneWidget,
@@ -18917,6 +18920,22 @@ void main() {
         const ValueKey<String>('opening-dialogue-1-field'),
       );
       expect(tester.widget<TextField>(characterField).readOnly, isFalse);
+      final characterInput = tester.widget<TextField>(characterField);
+      expect(characterInput.style, kLocationChatStyle.bubbleTextStyle);
+      expect(characterInput.cursorColor, GenesisColors.darkTextPrimary);
+      expect(
+        characterInput.decoration?.hintStyle?.color,
+        GenesisColors.darkInputPlaceholder,
+      );
+      final characterBubble = tester.widget<Container>(
+        find.byKey(const ValueKey<String>('opening-dialogue-1-bubble')),
+      );
+      final characterDecoration = characterBubble.decoration as BoxDecoration;
+      expect(characterDecoration.color, kLocationChatStyle.otherBubbleColor);
+      expect(characterDecoration.border, isNull);
+      expect(characterBubble.padding, kLocationChatStyle.bubblePadding);
+      expect(find.byType(BackdropFilter), findsNothing);
+
       expect(
         find.byKey(const ValueKey<String>('opening-dialogue-1-delete')),
         findsOneWidget,
@@ -18952,7 +18971,7 @@ void main() {
       final characterNameRow = find.byKey(
         const ValueKey<String>('opening-dialogue-1-name-row'),
       );
-      expect(tester.getSize(characterNameRow).height, 16);
+      expect(tester.getSize(characterNameRow).height, 11);
       expect(
         tester
             .getTopLeft(
@@ -19361,7 +19380,7 @@ void main() {
               as BoxDecoration;
       expect(
         tester.widget<Text>(narratorUserLabel).style?.color,
-        const Color(0xFFF4F4F6),
+        GenesisColors.darkTextSecondary,
       );
       expect(tester.widget<Text>(narratorUserLabel).style?.fontSize, 13);
       expect(
@@ -19472,14 +19491,14 @@ void main() {
               as BoxDecoration;
       expect(
         tester.widget<Text>(characterUserLabel).style?.color,
-        const Color(0xFF666666),
+        GenesisColors.darkTextSecondary,
       );
       expect(tester.widget<Text>(characterUserLabel).style?.fontSize, 13);
       expect(
         tester.widget<Text>(characterUserLabel).style?.fontWeight,
         FontWeight.w400,
       );
-      expect(characterButtonDecoration.color, const Color(0xFFF4F4F6));
+      expect(characterButtonDecoration.color, GenesisColors.darkFaintFill);
       expect(characterButtonDecoration.border, isNull);
 
       final characterController = tester
@@ -23437,7 +23456,13 @@ void main() {
 
     expect(find.text('Select Location'), findsOneWidget);
     expect(find.text('Archive'), findsOneWidget);
-    expect(find.text('Mira'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(GenesisBottomSheetPanel),
+        matching: find.text('Mira'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('edit flow loads origin detail and posts update after changes', (

@@ -215,26 +215,6 @@ ChatUiStyleConfig get kLocationChatStyle => ChatUiStyleConfig.standard.copyWith(
   ),
 );
 
-ChatUiStyleConfig get kOpeningDialogueStyle => kLocationChatStyle.copyWith(
-  headerTitleTextStyle: kLocationChatStyle.headerTitleTextStyle.copyWith(
-    color: const Color(0xFF111111),
-  ),
-  headerTitleIconColor: const Color(0xFF111111),
-  senderNameTextStyle: kLocationChatStyle.senderNameTextStyle.copyWith(
-    color: const Color(0xFF111111),
-  ),
-  selfBubbleColor: const Color(0xFFC41F2E),
-  otherBubbleColor: Colors.white,
-  bubbleTextStyle: kLocationChatStyle.bubbleTextStyle.copyWith(
-    color: Colors.black,
-  ),
-  bubbleBackdropBlurSigma: 0,
-  useConfiguredScenePlateSystemStyle: true,
-  systemMessageBackgroundColor: const Color(0xE6111111),
-  systemMessageTextStyle: const TextStyle(
-    color: Color(0xBAFFFFFF),
-    fontSize: 13,
-    height: 1.3,
-    fontWeight: FontWeight.w400,
-  ),
-);
+// Opening uses the chat palette on a flat surface, so no backdrop blur is needed.
+ChatUiStyleConfig get kOpeningDialogueStyle =>
+    kLocationChatStyle.copyWith(bubbleBackdropBlurSigma: 0);
