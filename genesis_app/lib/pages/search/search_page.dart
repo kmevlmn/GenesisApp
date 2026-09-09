@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';
@@ -17,6 +18,10 @@ import '../../network/models/search_v2.dart';
 import '../../platform/session/session_revision_subscription.dart';
 import '../../routers/app_router.dart';
 import '../../ui/components/genesis_avatar.dart';
+import '../../ui/components/genesis_refresh_indicator.dart';
+import '../../ui/components/genesis_safe_area.dart';
+import '../../ui/system/genesis_system_ui.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 import '../../ui/components/genesis_list_image.dart';
 import '../../ui/components/genesis_origin_list_card_layout.dart';
 import '../../ui/components/genesis_world_list_card_layout.dart';
@@ -390,81 +395,96 @@ class _SearchPageState extends State<SearchPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                height: kGenesisTopBarHeight,
-                child: Transform.translate(
-                  offset: const Offset(0, 5),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: SearchBarPlaceholder(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          onChanged: _onQueryChanged,
-                          onClear: () {
-                            _controller.clear();
-                            _onQueryChanged('');
-                            setState(() {});
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => Navigator.of(context).pop(),
-                        child: const SizedBox(
-                          height: 28,
-                          child: Center(
-                            child: Text(
-                              'Cancel',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF222222),
-                                fontWeight: FontWeight.w400,
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: kGenesisLightSystemUiOverlayStyle,
+          child: Scaffold(
+            backgroundColor: GenesisColors.darkBackground,
+            body: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      height: kGenesisTopBarHeight,
+                      child: Transform.translate(
+                        offset: const Offset(0, 5),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: SearchBarPlaceholder(
+                                backgroundColor: GenesisColors.darkFaintFill,
+                                borderColor: null,
+                                controller: _controller,
+                                focusNode: _focusNode,
+                                onChanged: _onQueryChanged,
+                                onClear: () {
+                                  _controller.clear();
+                                  _onQueryChanged('');
+                                  setState(() {});
+                                },
                               ),
                             ),
-                          ),
+                            const SizedBox(width: 14),
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => Navigator.of(context).pop(),
+                              child: const SizedBox(
+                                height: 28,
+                                child: Center(
+                                  child: Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: GenesisColors.darkTextPrimary,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            if (_hasInput)
-              SecendTabs(
-                controller: _tabController,
-                labels: [for (final tab in _SearchTab.values) tab.label],
-                labelWidgets: [
-                  for (final tab in _SearchTab.values)
-                    _SearchTabLabel(
-                      key: ValueKey<String>('search-tab-${tab.name}'),
-                      tab: tab,
-                      total: _tabTotals[tab],
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (_hasInput)
+                    SecendTabs(
+                      labelColor: GenesisColors.darkTextPrimary,
+                      unselectedLabelColor: GenesisColors.darkTextSecondary,
+                      indicatorColor: GenesisColors.redPrimary,
+                      controller: _tabController,
+                      labels: [for (final tab in _SearchTab.values) tab.label],
+                      labelWidgets: [
+                        for (final tab in _SearchTab.values)
+                          _SearchTabLabel(
+                            key: ValueKey<String>('search-tab-${tab.name}'),
+                            tab: tab,
+                            total: _tabTotals[tab],
+                          ),
+                      ],
+                      horizontalPadding: 16,
+                      labelPadding: const EdgeInsets.only(right: 42),
+                      verticalPadding: 0,
+                    ),
+                  Expanded(
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (_) => _dismissKeyboard(),
+                      child: _buildBody(),
+                    ),
+                  ),
                 ],
-                horizontalPadding: 16,
-                labelPadding: const EdgeInsets.only(right: 42),
-                verticalPadding: 0,
-              ),
-            Expanded(
-              child: Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerDown: (_) => _dismissKeyboard(),
-                child: _buildBody(),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

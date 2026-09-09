@@ -27,7 +27,7 @@ import '../network/chatroom/chatroom_connection_controller.dart';
 import '../network/chatroom/world_chatroom_service.dart';
 import '../network/models/world.dart';
 import '../components/discuss/origin_discuss_list.dart';
-import '../components/discuss/discuss_dark_style.dart';
+import '../ui/tokens/genesis_colors.dart';
 import '../components/chat/shared/chat_ui.dart';
 
 sealed class RouteNames {
@@ -549,13 +549,13 @@ sealed class AppRouter {
         );
       case RouteNames.discuss:
         final args = _DiscussRouteArgs.from(settings.arguments);
-        return _DiscussPageRoute(
+        return _DarkPageRoute(
           settings: settings,
           builder: (_) => DiscussPage(oid: args.oid, originId: args.originId),
         );
       case RouteNames.postDetail:
         final args = _PostDetailRouteArgs.from(settings.arguments);
-        return _DiscussPageRoute(
+        return _DarkPageRoute(
           settings: settings,
           builder: (_) => PostDetailPage(item: args.item),
         );
@@ -606,7 +606,7 @@ sealed class AppRouter {
           ),
         );
       case RouteNames.search:
-        return MaterialPageRoute<void>(
+        return _DarkPageRoute(
           settings: settings,
           builder: (_) => const SearchPage(),
         );
@@ -715,8 +715,8 @@ sealed class AppRouter {
   }
 }
 
-class _DiscussPageRoute extends MaterialPageRoute<void> {
-  _DiscussPageRoute({required super.builder, required super.settings});
+class _DarkPageRoute extends MaterialPageRoute<void> {
+  _DarkPageRoute({required super.builder, required super.settings});
 
   @override
   DelegatedTransitionBuilder? get delegatedTransition =>
@@ -732,7 +732,7 @@ class _DiscussPageRoute extends MaterialPageRoute<void> {
     if (Theme.of(context).platform == TargetPlatform.android) {
       // The outgoing route also paints a background while fading away.
       return const FadeForwardsPageTransitionsBuilder(
-        backgroundColor: DiscussDarkColors.background,
+        backgroundColor: GenesisColors.darkBackground,
       ).delegatedTransition!(
         context,
         animation,
@@ -763,7 +763,7 @@ class _DiscussPageRoute extends MaterialPageRoute<void> {
     // dark fallback explicitly so Android never paints the app's light surface.
     if (Theme.of(context).platform == TargetPlatform.android) {
       return const PredictiveBackPageTransitionsBuilder(
-        fallbackColor: DiscussDarkColors.background,
+        fallbackColor: GenesisColors.darkBackground,
       ).buildTransitions(this, context, animation, secondaryAnimation, child);
     }
     return super.buildTransitions(

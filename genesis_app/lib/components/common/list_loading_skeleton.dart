@@ -97,9 +97,9 @@ class GenesisSearchResultLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _SkeletonShimmer(
-      child: _SearchResultSkeletonList(type: type, itemCount: itemCount),
-    );
+    final list = _SearchResultSkeletonList(type: type, itemCount: itemCount);
+    if (Theme.of(context).brightness == Brightness.dark) return list;
+    return _SkeletonShimmer(child: list);
   }
 }
 

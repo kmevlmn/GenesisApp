@@ -142,7 +142,9 @@ class GenesisSearchField extends StatelessWidget {
                   child: Icon(
                     Icons.close,
                     size: 18,
-                    color: iconColor ?? uiTheme.searchIconColor,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? GenesisColors.darkTextTertiary
+                        : iconColor ?? uiTheme.searchIconColor,
                   ),
                 ),
               ),

@@ -70,9 +70,19 @@ class _SearchResultListState extends State<_SearchResultList>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Search failed'),
+            const Text(
+              'Search failed',
+              style: TextStyle(color: GenesisColors.darkTextSecondary),
+            ),
             const SizedBox(height: 10),
-            FilledButton(onPressed: widget.onRetry, child: const Text('Retry')),
+            FilledButton(
+              onPressed: widget.onRetry,
+              style: FilledButton.styleFrom(
+                backgroundColor: GenesisColors.redPrimary,
+                foregroundColor: GenesisColors.darkTextPrimary,
+              ),
+              child: const Text('Retry'),
+            ),
           ],
         ),
       );
@@ -88,7 +98,7 @@ class _SearchResultListState extends State<_SearchResultList>
           'No results.',
           style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF8D8D8D),
+            color: GenesisColors.darkTextSecondary,
             fontWeight: FontWeight.w400,
           ),
         ),
@@ -114,7 +124,7 @@ class _SearchResultListState extends State<_SearchResultList>
             child: Center(
               child: SizedBox.square(
                 dimension: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: GenesisLoadingIndicator(strokeWidth: 2),
               ),
             ),
           );

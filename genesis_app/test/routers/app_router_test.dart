@@ -159,7 +159,11 @@ void main() {
     expect(find.text('Page not found.'), findsOneWidget);
   });
 
-  for (final name in [RouteNames.discuss, RouteNames.postDetail]) {
+  for (final name in [
+    RouteNames.discuss,
+    RouteNames.postDetail,
+    RouteNames.search,
+  ]) {
     testWidgets(
       '$name keeps outgoing Android transition dark under a light app theme',
       (tester) async {
