@@ -20125,11 +20125,11 @@ void main() {
               matching: find.byType(CreateTextFieldBlock),
             ),
           )
-          .every((field) => field.labelFontWeight == FontWeight.w400),
+          .every((field) => field.labelFontWeight == FontWeight.w600),
       isTrue,
     );
     final addCharacterText = tester.widget<Text>(find.text('+ Add Character'));
-    expect(addCharacterText.style?.color, GenesisColors.createAdd);
+    expect(addCharacterText.style?.color, GenesisColors.redSecondary);
     expect(addCharacterText.style?.fontSize, 16);
     expect(addCharacterText.style?.fontWeight, FontWeight.w600);
     expect(
@@ -20298,7 +20298,7 @@ void main() {
     expect(
       tester
           .widgetList<CreateTextFieldBlock>(find.byType(CreateTextFieldBlock))
-          .every((field) => field.labelFontWeight == FontWeight.w400),
+          .every((field) => field.labelFontWeight == FontWeight.w600),
       isTrue,
     );
 

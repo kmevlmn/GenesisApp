@@ -84,7 +84,11 @@ class CreateInlineAddButton extends StatelessWidget {
         ],
       ),
       style: TextStyle(
-        color: GenesisColors.createAdd,
+        color: CreateFormTheme.colorOf(
+          context,
+          GenesisColors.createAdd,
+          GenesisColors.redSecondary,
+        ),
         fontSize: fontSize,
         fontWeight: FontWeight.w600,
         height: 1.2,

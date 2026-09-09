@@ -45,10 +45,21 @@ class CreateFormCard extends StatelessWidget {
           ? const EdgeInsets.fromLTRB(18, 6, 18, 22)
           : const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: CreateFormTheme.colorOf(
+          context,
+          Colors.white,
+          GenesisColors.darkBackground,
+        ),
         borderRadius: BorderRadius.circular(8),
         border: showBorder
-            ? Border.all(color: createFormBorder, width: 1.2)
+            ? Border.all(
+                color: CreateFormTheme.colorOf(
+                  context,
+                  createFormBorder,
+                  GenesisColors.darkFaintFill,
+                ),
+                width: 1.2,
+              )
             : null,
       ),
       child: Column(
@@ -64,8 +75,12 @@ class CreateFormCard extends StatelessWidget {
                       if (titleSuffix?.trim().isNotEmpty == true)
                         TextSpan(
                           text: ' ${titleSuffix!.trim()}',
-                          style: const TextStyle(
-                            color: Color(0xFFA8A8AD),
+                          style: TextStyle(
+                            color: CreateFormTheme.colorOf(
+                              context,
+                              const Color(0xFFA8A8AD),
+                              GenesisColors.darkTextTertiary,
+                            ),
                             fontSize: 12,
                             fontWeight: FontWeight.w400,
                           ),
@@ -73,7 +88,11 @@ class CreateFormCard extends StatelessWidget {
                     ],
                   ),
                   style: TextStyle(
-                    color: createFormText,
+                    color: CreateFormTheme.colorOf(
+                      context,
+                      createFormText,
+                      GenesisColors.darkTextPrimary,
+                    ),
                     fontSize: titleFontSize,
                     fontWeight: FontWeight.w600,
                     height: 1.1,

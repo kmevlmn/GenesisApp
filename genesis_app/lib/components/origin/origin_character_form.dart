@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../pages/create/create_form_widgets.dart';
 import '../../ui/tokens/genesis_avatar_radii.dart';
+import '../../ui/tokens/genesis_colors.dart';
 
 const int originCharacterNameMaxLength = 30;
 const int originCharacterIdentityMaxLength = 100;
@@ -208,6 +209,22 @@ class OriginCharacterFormFields extends StatelessWidget {
             CreateUploadBox(
               controller: form.avatarUrl,
               label: 'AVATAR\n(Optional)',
+              emptyBackgroundColor: CreateFormTheme.colorOf(
+                context,
+                const Color(0x6BF4F4F6),
+                GenesisColors.darkFaintFill,
+              ),
+              emptyBorderColor: CreateFormTheme.colorOf(
+                context,
+                createFormUploadBorder,
+                GenesisColors.darkTextTertiary,
+              ),
+              emptyIconColor: GenesisColors.createAdd,
+              emptyLabelColor: CreateFormTheme.colorOf(
+                context,
+                createFormMuted,
+                GenesisColors.darkTextSecondary,
+              ),
               width: avatarWidth,
               height: avatarHeight,
               iconSize: avatarIconSize,

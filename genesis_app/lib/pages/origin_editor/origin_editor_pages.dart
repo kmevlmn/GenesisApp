@@ -620,6 +620,7 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
                                     widget.charactersPageBuilder(
                                       widget.repository,
                                     ),
+                                    dark: true,
                                   ),
                                 ),
                                 _SectionRow(
