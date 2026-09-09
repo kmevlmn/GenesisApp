@@ -392,6 +392,160 @@ class ChatroomSession {
     );
   }
 
+  /// Start a new round without a user message. The ID correlates the receipt;
+  /// it is NOT a business idempotency key. An uncertain result is never retried.
+  Future<ChatroomGoOnReceipt> goOn({
+    required String locationId,
+    required int sourceConversationRoundId,
+    required String clientMsgId,
+  }) async {
+    _throwIfClosed();
+    if (protocolVersion != ChatroomProtocolVersion.v2) {
+      throw const ChatroomProtocolException('Go on requires a V2 connection');
+    }
+    final location = locationId.trim();
+    if (location.isEmpty ||
+        sourceConversationRoundId <= 0 ||
+        clientMsgId.trim().isEmpty) {
+      throw ArgumentError(
+        'Go on requires location, positive source round and request ID',
+      );
+    }
+    if (_joined?.locationId != location) {
+      throw const ChatroomProtocolException(
+        'Go on requires the joined location',
+      );
+    }
+    if (_pendingAcks.containsKey(clientMsgId)) {
+      throw StateError('clientMsgId is already in flight');
+    }
+    final ack = await _sendAckedClientMessage(
+      'go_on',
+      {
+        'payload': {
+          'location_id': location,
+          'source_conversation_round_id': sourceConversationRoundId,
+        },
+      },
+      clientMsgId: clientMsgId,
+      maxAttempts: 1,
+    );
+    final round = ack.receiptConversationRoundId;
+    if (ack.worldId != worldId ||
+        ack.locationId != location ||
+        round == null ||
+        round <= 0 ||
+        round == sourceConversationRoundId) {
+      throw const ChatroomProtocolException(
+        'Missing or mismatched Go on receipt',
+      );
+    }
+    return ChatroomGoOnReceipt(
+      worldId: worldId,
+      locationId: location,
+      sourceConversationRoundId: sourceConversationRoundId,
+      conversationRoundId: round,
+      clientMsgId: ack.clientMsgId,
+      billing: ack.billing,
+    );
+  }
+
+  /// Request a private candidate over V2. The caller supplies an idempotency ID;
+  /// no request, polling, stream replay or formal-history mutation is automatic.
+  Future<ChatroomCardRegeneration> regenerateLlmCard({
+    required String locationId,
+    required int conversationRoundId,
+    required String clientMsgId,
+  }) async {
+    _validateCardCommand(locationId, conversationRoundId, clientMsgId);
+    if (_joined?.locationId != locationId.trim()) {
+      throw const ChatroomProtocolException(
+        'Regeneration requires the joined location',
+      );
+    }
+    final ack = await _sendAckedClientMessage(
+      'regenerate_llm_card',
+      {
+        'conversation_round_id': conversationRoundId,
+        'payload': {'location_id': locationId.trim()},
+      },
+      clientMsgId: clientMsgId,
+      maxAttempts: 1,
+    );
+    _validateCardAck(ack, locationId, conversationRoundId);
+    final result = ack.regeneration;
+    if (result == null || result.conversationRoundId != conversationRoundId) {
+      throw const ChatroomProtocolException(
+        'Missing or mismatched regeneration receipt',
+      );
+    }
+    return result;
+  }
+
+  /// Final selection may target a previously joined location. Only return its
+  /// receipt; business code decides when to confirm and when to refresh.
+  Future<ChatroomCardSelection> selectLlmCard({
+    required String locationId,
+    required int conversationRoundId,
+    required int cardId,
+    required String clientMsgId,
+  }) async {
+    _validateCardCommand(
+      locationId,
+      conversationRoundId,
+      clientMsgId,
+      cardId: cardId,
+    );
+    final ack = await _sendAckedClientMessage(
+      'select_llm_card',
+      {
+        'conversation_round_id': conversationRoundId,
+        'payload': {'location_id': locationId.trim(), 'card_id': cardId},
+      },
+      clientMsgId: clientMsgId,
+      maxAttempts: 1,
+    );
+    _validateCardAck(ack, locationId, conversationRoundId);
+    final result = ack.selection;
+    if (result == null ||
+        result.conversationRoundId != conversationRoundId ||
+        result.selectedCardId != cardId) {
+      throw const ChatroomProtocolException(
+        'Missing or mismatched selection receipt',
+      );
+    }
+    return result;
+  }
+
+  void _validateCardCommand(
+    String location,
+    int round,
+    String requestId, {
+    int? cardId,
+  }) {
+    _throwIfClosed();
+    if (protocolVersion != ChatroomProtocolVersion.v2) {
+      throw const ChatroomProtocolException('Cards require a V2 connection');
+    }
+    if (location.trim().isEmpty) throw ArgumentError('locationId is required');
+    validateLlmCardRequest(
+      conversationRoundId: round,
+      cardId: cardId,
+      clientMsgId: requestId,
+    );
+    if (_pendingAcks.containsKey(requestId)) {
+      throw StateError('clientMsgId is already in flight');
+    }
+  }
+
+  void _validateCardAck(ChatroomAck ack, String location, int round) {
+    if (ack.worldId != worldId ||
+        ack.locationId != location.trim() ||
+        ack.cardConversationRoundId != round) {
+      throw const ChatroomProtocolException('Card receipt identity mismatch');
+    }
+  }
+
   Future<ChatroomAck> _sendAckedClientMessage(
     String type,
     Map<String, Object?> fields, {
@@ -516,6 +670,23 @@ class ChatroomSession {
   Future<void> _sendClientMessage(String type, Map<String, Object?> fields) {
     _throwIfClosed();
     if (protocolVersion == ChatroomProtocolVersion.v2) {
+      if (type == 'go_on') {
+        return _sendClientJson({
+          'type': type,
+          'world_id': worldId,
+          'client_msg_id': fields['client_msg_id'],
+          'payload': fields['payload'],
+        });
+      }
+      if (type == 'regenerate_llm_card' || type == 'select_llm_card') {
+        return _sendClientJson({
+          'type': type,
+          'world_id': worldId,
+          'conversation_round_id': fields['conversation_round_id'],
+          'client_msg_id': fields['client_msg_id'],
+          'payload': fields['payload'],
+        });
+      }
       final requestedClientMsgId = '${fields['client_msg_id'] ?? ''}'.trim();
       final clientMsgId = requestedClientMsgId.isEmpty
           ? _newClientMessageId()
@@ -674,6 +845,14 @@ class ChatroomSession {
   }
 
   void _dispatchEvent(ChatroomEvent event) {
+    if (event is ChatroomLlmCardStream &&
+        (event.worldId != worldId || event.userId != userId)) {
+      return;
+    }
+    if (event is ChatroomLlmCardGenerationEnd &&
+        (event.worldId != worldId || event.userId != userId)) {
+      return;
+    }
     if (event is ChatroomJoined) {
       if (event.ok) {
         _joined = event;
@@ -739,6 +918,26 @@ class ChatroomSession {
         sourceType: event.streamType,
       );
       stream?.complete(event);
+    } else if (event is ChatroomLlmCardStream && event.errNo != 0) {
+      _emitFailure(
+        ChatroomFailureEvent(
+          code: event.errNo.toString(),
+          message: event.errMsg,
+          sourceType: 'llm_card_stream',
+          requestType: 'regenerate_llm_card',
+          cause: event,
+        ),
+      );
+    } else if (event is ChatroomLlmCardGenerationEnd && event.errNo != 0) {
+      _emitFailure(
+        ChatroomFailureEvent(
+          code: event.errNo.toString(),
+          message: event.errMsg,
+          sourceType: 'llm_card_generation_end',
+          requestType: 'regenerate_llm_card',
+          cause: event,
+        ),
+      );
     } else if (event is ChatroomErrorEvent) {
       _emitError(event);
       _emitFailure(ChatroomFailureEvent.fromError(event));
@@ -753,7 +952,9 @@ class ChatroomSession {
   }
 
   MapEntry<String, _PendingAck>? _removePendingAckFor(ChatroomAck event) {
-    final clientMsgId = event.clientMsgId.trim();
+    final clientMsgId = _pendingAcks.containsKey(event.clientMsgId)
+        ? event.clientMsgId
+        : event.clientMsgId.trim();
     if (clientMsgId.isNotEmpty) {
       final pending = _pendingAcks.remove(clientMsgId);
       return pending == null ? null : MapEntry(clientMsgId, pending);
@@ -864,6 +1065,8 @@ class ChatroomSession {
     if (error.conversationRoundId.isEmpty && error.senderId.isEmpty) return;
     final matches = _matchingStreams(
       ChatroomStreamIdentity(
+        worldId: error.worldId,
+        locationId: error.locationId,
         conversationRoundId: error.conversationRoundId,
         senderId: error.senderId,
       ),
@@ -876,6 +1079,8 @@ class ChatroomSession {
       _emitStreamAmbiguity(
         sourceType: error.sourceType,
         identity: ChatroomStreamIdentity(
+          worldId: error.worldId,
+          locationId: error.locationId,
           conversationRoundId: error.conversationRoundId,
           senderId: error.senderId,
         ),

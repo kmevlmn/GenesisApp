@@ -20,6 +20,7 @@ abstract class _GenesisApiContext {
     GatewayRequestInterceptor? gatewayRequestInterceptor,
     Future<void> Function(String message)? onSessionExpired,
     Future<void> Function(String message)? onPageNotFound,
+    void Function(String message)? onChatroomMessageMutationError,
   }) {
     final resolvedPlatformConfig =
         platformConfig ?? const DefaultPlatformConfig();
@@ -32,6 +33,7 @@ abstract class _GenesisApiContext {
         appHeaderProvider ?? AppRequestHeaderProvider().headers;
     _onSessionExpired = onSessionExpired;
     _onPageNotFound = onPageNotFound;
+    _onChatroomMessageMutationError = onChatroomMessageMutationError;
     final resolvedTransport = _resolveTransport(
       transport: transport,
       useMock: useMock,
@@ -105,6 +107,7 @@ abstract class _GenesisApiContext {
   late final RequestHeaderProvider _appHeaderProvider;
   late final Future<void> Function(String message)? _onSessionExpired;
   late final Future<void> Function(String message)? _onPageNotFound;
+  late final void Function(String message)? _onChatroomMessageMutationError;
 
   Future<Map<String, String>> _runtimeRequestHeaders() async {
     final headers = <String, String>{...await _safeAppHeaders()};
@@ -145,8 +148,36 @@ abstract class _GenesisApiContext {
   Object? _processGenesisResponse(ApiResponse response) {
     final data = _defaultGenesisProcessor(response);
     _throwIfSessionExpired(response);
+    if (_isChatroomReplyActionResponse(response.uri)) {
+      final envelope = response.data;
+      if (envelope is Map &&
+          envelope['err_no'] is int &&
+          envelope['err_no'] != 0) {
+        // Session expiry has already taken the global sign-out path above.
+        // Keep the envelope intact so ChatroomHttpApi still throws its business
+        // exception, allowing the service to refresh history for 2011 / 2013.
+        _onChatroomMessageMutationError?.call(asString(envelope['err_msg']));
+      }
+      return data;
+    }
     _throwIfPageNotFound(response);
     return data;
+  }
+
+  bool _isChatroomReplyActionResponse(Uri uri) {
+    final segments = uri.pathSegments;
+    if (segments.length < 8 ||
+        segments[0] != 'aitown-chat' ||
+        segments[1] != 'api' ||
+        segments[2] != 'v1' ||
+        segments[3] != 'worlds' ||
+        segments[5] != 'locations') {
+      return false;
+    }
+    if (segments.length == 8 && segments[7] == 'inspiration') return true;
+    return segments.length == 9 &&
+        segments[7] == 'llm-messages' &&
+        const {'batch', 'cards', 'select'}.contains(segments[8]);
   }
 
   void _throwIfSessionExpired(ApiResponse response) {

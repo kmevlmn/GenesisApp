@@ -71,6 +71,9 @@ class WorldChatroomState {
     this.streamMessagesByKey = const <String, WorldChatroomMessage>{},
     this.conversationRoundStatesByLocation =
         const <String, ConversationRoundState>{},
+    this.historyGenerationByLocation = const <String, int>{},
+    this.newestLocationMessageIds = const <String, int>{},
+    this.historyHasMoreByLocation = const <String, bool>{},
     this.lastMessageId = 0,
     this.connected = false,
     this.joining = false,
@@ -107,6 +110,9 @@ class WorldChatroomState {
           if (entry.value.conversationRoundId.trim().isNotEmpty)
             entry.key: entry.value.conversationRoundId,
       });
+  final Map<String, int> historyGenerationByLocation;
+  final Map<String, int> newestLocationMessageIds;
+  final Map<String, bool> historyHasMoreByLocation;
   final int lastMessageId;
   final bool connected;
   final bool joining;
@@ -134,6 +140,9 @@ class WorldChatroomState {
     Map<String, List<WorldChatroomMessage>>? messagesByLocation,
     Map<String, WorldChatroomMessage>? streamMessagesByKey,
     Map<String, ConversationRoundState>? conversationRoundStatesByLocation,
+    Map<String, int>? historyGenerationByLocation,
+    Map<String, int>? newestLocationMessageIds,
+    Map<String, bool>? historyHasMoreByLocation,
     int? lastMessageId,
     bool? connected,
     bool? joining,
@@ -164,6 +173,12 @@ class WorldChatroomState {
       conversationRoundStatesByLocation:
           conversationRoundStatesByLocation ??
           this.conversationRoundStatesByLocation,
+      historyGenerationByLocation:
+          historyGenerationByLocation ?? this.historyGenerationByLocation,
+      newestLocationMessageIds:
+          newestLocationMessageIds ?? this.newestLocationMessageIds,
+      historyHasMoreByLocation:
+          historyHasMoreByLocation ?? this.historyHasMoreByLocation,
       lastMessageId: lastMessageId ?? this.lastMessageId,
       connected: connected ?? this.connected,
       joining: joining ?? this.joining,

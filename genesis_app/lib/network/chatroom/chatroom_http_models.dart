@@ -1,3 +1,6 @@
+export 'chatroom_llm_cards.dart';
+export 'chatroom_message_batch.dart';
+
 import '../json_utils.dart';
 import 'chatroom_message_type.dart';
 import 'chatroom_models.dart';

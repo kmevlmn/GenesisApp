@@ -94,6 +94,45 @@ void main() {
     });
   });
 
+  test(
+    'recording can resume on the same connection after being disabled',
+    () async {
+      final profiles = <HttpClientRequestProfile>[];
+      final recorder = DevToolsWebSocketProfile(
+        Uri.parse('wss://api.worldo.ai/aitown-chat/ws'),
+        profileFactory:
+            ({
+              required requestStartTime,
+              required requestMethod,
+              required requestUri,
+            }) {
+              final profile = HttpClientRequestProfile.profile(
+                requestStartTime: requestStartTime,
+                requestMethod: requestMethod,
+                requestUri: requestUri,
+              )!;
+              profiles.add(profile);
+              return profile;
+            },
+      );
+      HttpClientRequestProfile.profilingEnabled = false;
+      for (var i = 0; i < 1005; i++) {
+        await recorder.recordFrame(
+          direction: '<=',
+          message: '{"type":"llm_card_stream"}',
+        );
+      }
+      expect(profiles, isEmpty);
+      HttpClientRequestProfile.profilingEnabled = true;
+      await recorder.recordFrame(
+        direction: '<=',
+        message: '{"type":"llm_card_stream"}',
+      );
+      expect(profiles, hasLength(1));
+      expect(profiles.single.requestUri, contains('type=llm_card_stream'));
+    },
+  );
+
   test('records incoming JSON in the synthetic response body', () async {
     late HttpClientRequestProfile capturedProfile;
     final recorder = DevToolsWebSocketProfile(
@@ -213,7 +252,7 @@ void main() {
     );
   });
 
-  test('increments frame sequence and omits oversized payloads', () async {
+  test('increments frame sequence and truncates oversized payloads', () async {
     final capturedProfiles = <HttpClientRequestProfile>[];
     final recorder = DevToolsWebSocketProfile(
       Uri.parse('wss://api.worldo.ai/aitown-chat/ws'),
@@ -253,16 +292,133 @@ void main() {
       body.length,
       lessThanOrEqualTo(kDevToolsWebSocketProfileMaxBodyBytes),
     );
-    expect(utf8.decode(body), contains('[websocket frame omitted:'));
+    expect(utf8.decode(body), contains('...[truncated'));
     expect(
       capturedProfiles[1].responseData.headers,
       containsPair('content-type', ['text/plain; charset=utf-8']),
     );
   });
 
-  test('checks UTF-8 bytes before decoding an oversized JSON frame', () async {
-    late HttpClientRequestProfile capturedProfile;
-    final recorder = DevToolsWebSocketProfile(
+  test(
+    'retains stream metadata and redacts oversized JSON before truncation',
+    () async {
+      late HttpClientRequestProfile capturedProfile;
+      final recorder = DevToolsWebSocketProfile(
+        Uri.parse('wss://api.worldo.ai/aitown-chat/ws'),
+        profileFactory:
+            ({
+              required requestStartTime,
+              required requestMethod,
+              required requestUri,
+            }) {
+              capturedProfile = HttpClientRequestProfile.profile(
+                requestStartTime: requestStartTime,
+                requestMethod: requestMethod,
+                requestUri: requestUri,
+              )!;
+              return capturedProfile;
+            },
+      );
+
+      await recorder.recordFrame(
+        direction: '<=',
+        message: jsonEncode({
+          'token': 'secret-before-content',
+          'payload': {'content': '你' * 22000},
+          'type': 'llm_card_generation_end',
+          'global_message_id': 9007199254740993,
+        }),
+      );
+
+      expect(
+        utf8.decode(capturedProfile.responseData.bodyBytes),
+        contains('...[truncated'),
+      );
+      expect(
+        Uri.parse(capturedProfile.requestUri).fragment,
+        contains('type=llm_card_generation_end'),
+      );
+      expect(
+        Uri.parse(capturedProfile.requestUri).fragment,
+        contains('global_msg_id=9007199254740993'),
+      );
+      final body = utf8.decode(capturedProfile.responseData.bodyBytes);
+      expect(body, contains('你'));
+      expect(body, isNot(contains('secret-before-content')));
+      expect(
+        capturedProfile.responseData.bodyBytes.length,
+        lessThanOrEqualTo(kDevToolsWebSocketProfileMaxBodyBytes),
+      );
+      expect(
+        capturedProfile.responseData.headers,
+        containsPair('content-type', ['text/plain; charset=utf-8']),
+      );
+    },
+  );
+
+  test(
+    'skips sent and received heartbeats but retains business frames',
+    () async {
+      final profiles = <HttpClientRequestProfile>[];
+      final recorder = DevToolsWebSocketProfile(
+        Uri.parse('wss://api.worldo.ai/aitown-chat/ws'),
+        profileFactory:
+            ({
+              required requestStartTime,
+              required requestMethod,
+              required requestUri,
+            }) {
+              final profile = HttpClientRequestProfile.profile(
+                requestStartTime: requestStartTime,
+                requestMethod: requestMethod,
+                requestUri: requestUri,
+              )!;
+              profiles.add(profile);
+              return profile;
+            },
+      );
+
+      for (var index = 0; index < 1005; index += 1) {
+        await recorder.recordFrame(
+          direction: index.isEven ? '=>' : '<=',
+          message: '{"type":"heartbeat"}',
+        );
+      }
+      expect(profiles, isEmpty);
+      for (final type in [
+        'regenerate_llm_card',
+        'llm_card_stream',
+        'llm_card_generation_end',
+      ]) {
+        await recorder.recordFrame(
+          direction: type == 'regenerate_llm_card' ? '=>' : '<=',
+          message: jsonEncode({
+            'type': type,
+            'payload': {'content': '新正文', 'type': 'heartbeat'},
+          }),
+        );
+      }
+      expect(profiles, hasLength(3));
+      expect(
+        Uri.splitQueryString(
+          Uri.parse(profiles.first.requestUri).fragment,
+        )['frame'],
+        '1',
+      );
+      expect(
+        profiles.last.requestUri,
+        contains('type=llm_card_generation_end'),
+      );
+      expect(
+        utf8.decode(profiles.last.responseData.bodyBytes),
+        contains('新正文'),
+      );
+    },
+  );
+
+  test('filters ACKs by connection-local heartbeat client_msg_id', () async {
+    final profiles = <HttpClientRequestProfile>[];
+    DevToolsWebSocketProfile createRecorder() => DevToolsWebSocketProfile(
       Uri.parse('wss://api.worldo.ai/aitown-chat/ws'),
       profileFactory:
           ({
@@ -270,56 +426,48 @@ void main() {
             required requestMethod,
             required requestUri,
           }) {
-            capturedProfile = HttpClientRequestProfile.profile(
+            final profile = HttpClientRequestProfile.profile(
               requestStartTime: requestStartTime,
               requestMethod: requestMethod,
               requestUri: requestUri,
             )!;
-            return capturedProfile;
+            profiles.add(profile);
+            return profile;
           },
     );
-
+    final recorder = createRecorder();
+    HttpClientRequestProfile.profilingEnabled = false;
     await recorder.recordFrame(
-      direction: '<=',
-      message: '{"type":"ack","content":"${'你' * 22000}"}',
+      direction: '=>',
+      message: '{"type":"heartbeat","client_msg_id":"hb-1"}',
     );
-
-    expect(
-      utf8.decode(capturedProfile.responseData.bodyBytes),
-      contains('[websocket frame omitted:'),
+    HttpClientRequestProfile.profilingEnabled = true;
+    await recorder.recordFrame(
+      direction: '=>',
+      message: '{"type":"heartbeat","client_msg_id":"hb-2"}',
     );
-    expect(
-      Uri.parse(capturedProfile.requestUri).fragment,
-      isNot(contains('type=ack')),
-    );
-  });
-
-  test('retains at most 1000 synthetic profiles per connection', () async {
-    var profileFactoryCalls = 0;
-    final recorder = DevToolsWebSocketProfile(
-      Uri.parse('wss://api.worldo.ai/aitown-chat/ws'),
-      profileFactory:
-          ({
-            required requestStartTime,
-            required requestMethod,
-            required requestUri,
-          }) {
-            profileFactoryCalls += 1;
-            return null;
-          },
-    );
-
-    for (
-      var index = 0;
-      index < kDevToolsWebSocketProfileMaxFramesPerConnection + 5;
-      index += 1
-    ) {
-      await recorder.recordFrame(direction: '<=', message: '{}');
+    const heartbeatAck = '{"type":"ack","client_msg_id":"hb-1"}';
+    for (final message in [
+      heartbeatAck,
+      heartbeatAck,
+      '{"type":"ack","payload":{"client_msg_id":"hb-2"}}',
+    ]) {
+      await recorder.recordFrame(direction: '<=', message: message);
     }
+    expect(profiles, isEmpty);
 
-    expect(
-      profileFactoryCalls,
-      kDevToolsWebSocketProfileMaxFramesPerConnection,
-    );
+    // Business ACKs, missing IDs and non-ACK frames must still be visible.
+    for (final message in [
+      '{"type":"ack","client_msg_id":"business-1"}',
+      '{"type":"ack"}',
+      '{"type":"ack","client_msg_id":"business-2",'
+          '"payload":{"client_msg_id":"hb-1"}}',
+      '{"type":"user","client_msg_id":"hb-1"}',
+    ]) {
+      await recorder.recordFrame(direction: '<=', message: message);
+    }
+    expect(profiles, hasLength(4));
+    await createRecorder().recordFrame(direction: '<=', message: heartbeatAck);
+    expect(profiles, hasLength(5));
   });
 }

@@ -201,13 +201,21 @@ extension _WorldChatroomWorldProjection on WorldChatroomService {
         message.messageId <= 0) {
       return;
     }
-    await _messageStorage.upsertMessage(
-      ownerUid: ownerUid,
-      worldId: _worldId,
-      locationId: locationId,
-      message: _storageJsonFromWorldMessage(message),
-      maxMessagesPerLocation: _maxMessagesPerLocation,
-    );
+    final ticket = _historyTicket(locationId);
+    await _withLocationWrite(locationId, () async {
+      if (!_historyIsCurrent(locationId, ticket) ||
+          _deletedMessageIds[locationId]?.contains(message.globalMessageId) ==
+              true) {
+        return;
+      }
+      await _messageStorage.upsertMessage(
+        ownerUid: ownerUid,
+        worldId: ticket.world,
+        locationId: locationId,
+        message: _storageJsonFromWorldMessage(message),
+        maxMessagesPerLocation: _maxMessagesPerLocation,
+      );
+    });
     if (LocationChatDebugSlice.enabled) {
       LocationChatDebugSlice.recordEvent(
         source: 'service',
@@ -335,9 +343,18 @@ extension _WorldChatroomWorldProjection on WorldChatroomService {
     return worldMessage.copyWith(locationId: fallbackLocationId);
   }
 
-  void _setState(WorldChatroomState state) {
+  void _setState(
+    WorldChatroomState state, {
+    String? inspirationReplacementLocation,
+  }) {
     if (_disposed) return;
     _state = state;
+    _inspirationReplacementLocation = inspirationReplacementLocation;
+    try {
+      _observeReplyHistory();
+    } finally {
+      _inspirationReplacementLocation = null;
+    }
     if (!_states.isClosed) _states.add(state);
   }
 

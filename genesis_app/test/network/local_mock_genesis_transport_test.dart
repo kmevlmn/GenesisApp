@@ -1,3 +1,4 @@
+import 'package:genesis_flutter_android/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_http_models.dart';
@@ -290,6 +291,323 @@ void main() {
     expect(olderPage.hasMore, isFalse);
     expect(olderPage.newestMessageId, newestPage.newestMessageId);
   });
+
+  test(
+    'local mock edits and deletes replies with closed range history',
+    () async {
+      const world = 'w_mock_mutations';
+      const location = 'loc_mock_mutations';
+      final api = GenesisApi(useMock: true);
+      await api.chatroomHttp.writeNarrator(
+        worldId: world,
+        tickId: 'tick_mock_mutations',
+        locationGroups: const [
+          ChatroomNarratorLocationGroup(
+            locationId: location,
+            locationName: 'Mutation fixture',
+            locationSummary: '',
+            characters: [],
+            initialDialogue: [
+              ChatroomNarratorDialogueLine(
+                charId: 'nar',
+                charName: 'Narrator',
+                content: 'Original',
+              ),
+            ],
+          ),
+        ],
+      );
+      final initial = await api.chatroomHttp.getMessages(
+        worldId: world,
+        locationId: location,
+      );
+      final target = initial.messages.single;
+      expect(
+        await api.chatroomHttp.batchMutateLlmMessages(
+          worldId: world,
+          locationId: location,
+          conversationRoundId: target.conversationRoundId,
+          operations: [
+            ChatroomLlmMessageOperation.edit(
+              globalMessageId: target.globalMessageId,
+              content: '  Edited reply  ',
+            ),
+          ],
+        ),
+        isA<ChatroomMessageMutationResult>(),
+      );
+      final edited = await api.chatroomHttp.getMessages(
+        worldId: world,
+        locationId: location,
+        startConversationRoundId: target.conversationRoundId,
+        endConversationRoundId: target.conversationRoundId,
+      );
+      expect(edited.messages.single.payload['content'], '  Edited reply  ');
+      final outside = await api.chatroomHttp.getMessages(
+        worldId: world,
+        locationId: location,
+        startConversationRoundId: target.conversationRoundId + 1,
+        endConversationRoundId: target.conversationRoundId + 1,
+      );
+      expect(outside.messages, isEmpty);
+      expect(outside.hasMore, isFalse);
+      expect(outside.newestMessageId, initial.newestMessageId);
+      expect(
+        await api.chatroomHttp.batchMutateLlmMessages(
+          worldId: world,
+          locationId: location,
+          conversationRoundId: target.conversationRoundId,
+          operations: [
+            ChatroomLlmMessageOperation.delete(
+              globalMessageId: target.globalMessageId,
+            ),
+          ],
+        ),
+        isA<ChatroomMessageMutationResult>(),
+      );
+      final deleted = await api.chatroomHttp.getMessages(
+        worldId: world,
+        locationId: location,
+        startConversationRoundId: target.conversationRoundId,
+        endConversationRoundId: target.conversationRoundId,
+      );
+      expect(deleted.messages, isEmpty);
+      expect(deleted.newestMessageId, 0);
+      await expectLater(
+        api.chatroomHttp.batchMutateLlmMessages(
+          worldId: world,
+          locationId: location,
+          conversationRoundId: target.conversationRoundId,
+          operations: [
+            ChatroomLlmMessageOperation.edit(
+              globalMessageId: target.globalMessageId,
+              content: 'Late edit',
+            ),
+          ],
+        ),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 2013)),
+      );
+    },
+  );
+
+  test(
+    'local mock batch validation is atomic and mixed deletion expands range',
+    () async {
+      const world = 'w_batch_atomic';
+      const location = 'loc_batch_atomic';
+      final api = GenesisApi(useMock: true);
+      Future<void> seed(List<String> contents) async {
+        await api.chatroomHttp.writeNarrator(
+          worldId: world,
+          tickId: 'tick',
+          locationGroups: [
+            ChatroomNarratorLocationGroup(
+              locationId: location,
+              locationName: '',
+              locationSummary: '',
+              characters: const [],
+              initialDialogue: contents
+                  .map(
+                    (text) => ChatroomNarratorDialogueLine(
+                      charId: 'nar',
+                      charName: 'Narrator',
+                      content: text,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        );
+      }
+
+      await seed(['one', 'two', 'three']);
+      final initial = await api.chatroomHttp.getMessages(
+        worldId: world,
+        locationId: location,
+      );
+      final rows = initial.messages.reversed.toList();
+      final round = rows.first.conversationRoundId;
+      await seed(['later']);
+      final before = await api.chatroomHttp.getMessages(
+        worldId: world,
+        locationId: location,
+      );
+      final later = before.messages.first;
+      final client = ApiClient(
+        baseUrl: 'https://mock.test/',
+        transport: LocalMockGenesisTransport.instance,
+      );
+      final path =
+          'aitown-chat/api/v1/worlds/$world/locations/$location/llm-messages/batch';
+      final edit = {
+        'action': 'edit',
+        'global_message_id': rows[0].globalMessageId,
+        'content': 'changed',
+      };
+      for (final (operations, code) in <(List<Object?>, int)>[
+        ([], 1001),
+        ([edit, edit], 1001),
+        (
+          [
+            edit,
+            {'action': 'invalid', 'global_message_id': rows[1].globalMessageId},
+          ],
+          1001,
+        ),
+        (
+          [
+            edit,
+            {
+              'action': 'edit',
+              'global_message_id': rows[1].globalMessageId,
+              'content': ' ',
+            },
+          ],
+          1009,
+        ),
+        (
+          [
+            edit,
+            {
+              'action': 'delete',
+              'global_message_id': rows[1].globalMessageId,
+              'content': null,
+            },
+          ],
+          1001,
+        ),
+        (
+          [
+            edit,
+            {'action': 'delete', 'global_message_id': later.globalMessageId},
+          ],
+          2011,
+        ),
+        (
+          [
+            edit,
+            {'action': 'delete', 'global_message_id': 9223372036854775000},
+          ],
+          2011,
+        ),
+      ]) {
+        final response = await client.post<Map>(
+          path,
+          body: {'conversation_round_id': round, 'operations': operations},
+        );
+        expect(response['err_no'], code);
+        final after = await api.chatroomHttp.getMessages(
+          worldId: world,
+          locationId: location,
+        );
+        expect(
+          after.messages.map((m) => m.content),
+          before.messages.map((m) => m.content),
+        );
+        expect(after.newestMessageId, before.newestMessageId);
+      }
+      final edited = await api.chatroomHttp.batchMutateLlmMessages(
+        worldId: world,
+        locationId: location,
+        conversationRoundId: round,
+        operations: [
+          for (final row in rows)
+            ChatroomLlmMessageOperation.edit(
+              globalMessageId: row.globalMessageId,
+              content: '  ${row.content} edited  ',
+            ),
+        ],
+      );
+      expect(edited.startConversationRoundId, round);
+      expect(edited.endConversationRoundId, round);
+      expect(edited.newestMessageId, before.newestMessageId);
+      final mixed = await api.chatroomHttp.batchMutateLlmMessages(
+        worldId: world,
+        locationId: location,
+        conversationRoundId: round,
+        operations: [
+          ChatroomLlmMessageOperation.delete(
+            globalMessageId: rows[2].globalMessageId,
+          ),
+          ChatroomLlmMessageOperation.edit(
+            globalMessageId: rows[0].globalMessageId,
+            content: '  preserved  ',
+          ),
+          ChatroomLlmMessageOperation.delete(
+            globalMessageId: rows[1].globalMessageId,
+          ),
+        ],
+      );
+      expect(mixed.startConversationRoundId, round);
+      expect(mixed.endConversationRoundId, later.conversationRoundId);
+      expect(mixed.newestMessageId, before.newestMessageId - 2);
+      final after = await api.chatroomHttp.getMessages(
+        worldId: world,
+        locationId: location,
+      );
+      expect(after.messages.map((m) => m.globalMessageId), [
+        later.globalMessageId,
+        rows.first.globalMessageId,
+      ]);
+      expect(after.messages.last.content, '  preserved  ');
+      await expectLater(
+        client.request<Object?>(
+          'PATCH',
+          path.replaceFirst('/batch', '/${rows.first.globalMessageId}'),
+          body: {'content': 'old route'},
+        ),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 404)),
+      );
+      await expectLater(
+        client.delete<Object?>(
+          path.replaceFirst('/batch', '/${rows.first.globalMessageId}'),
+        ),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 404)),
+      );
+    },
+  );
+
+  test(
+    'local mock cards lookup is read only and does not simulate selection',
+    () async {
+      final api = GenesisApi(useMock: true);
+      for (var i = 0; i < 2; i++) {
+        final cards = await api.chatroomHttp.getLlmCards(
+          worldId: 'w_cards_contract',
+          locationId: 'l_cards_contract',
+          conversationRoundId: 9007199254740993,
+        );
+        expect(cards.list, isEmpty);
+        expect(cards.total, 0);
+        expect(cards.conversationRoundId, 9007199254740993);
+        expect(cards.originalCardId, 0);
+      }
+      await expectLater(
+        api.chatroomHttp.batchMutateLlmCardMessages(
+          worldId: 'w_cards_contract',
+          locationId: 'l_cards_contract',
+          conversationRoundId: 9007199254740993,
+          cardId: 9007199254740994,
+          operations: const [
+            ChatroomLlmMessageOperation.delete(
+              globalMessageId: 9007199254740995,
+            ),
+          ],
+        ),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 501)),
+      );
+      await expectLater(
+        api.chatroomHttp.selectLlmCard(
+          worldId: 'w_cards_contract',
+          locationId: 'l_cards_contract',
+          conversationRoundId: 9007199254740993,
+          cardId: 9007199254740994,
+          clientMsgId: 'selection',
+        ),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 501)),
+      );
+    },
+  );
 
   test('local mock persists Gem model selection per world', () async {
     final api = GenesisApi(useMock: true);

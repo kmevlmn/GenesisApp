@@ -51,13 +51,19 @@ extension _WorldChatroomMessageReducer on WorldChatroomService {
     bool emitLatestFetched = true,
   }) async {
     if (_worldId.isEmpty) return const <WorldChatroomMessage>[];
+    _requireHistoryAvailable(locationId);
+    final ticket = _historyTicket(locationId);
     final response = await _api.chatroomHttp.getMessages(
       worldId: _worldId,
       locationId: locationId,
       since: 0,
       limit: limit,
     );
-    final messages = await _mergeFetchedMessages(locationId, response.messages);
+    final messages = await _mergeFetchedMessages(
+      locationId,
+      response.messages,
+      ticket: ticket,
+    );
     if (emitLatestFetched &&
         messages.isNotEmpty &&
         !_latestFetchedMessages.isClosed) {
@@ -268,8 +274,12 @@ extension _WorldChatroomMessageReducer on WorldChatroomService {
 
   Future<List<WorldChatroomMessage>> _mergeFetchedMessages(
     String locationId,
-    List<ChatroomHttpMessage> messages,
-  ) async {
+    List<ChatroomHttpMessage> messages, {
+    required _HistoryTicket ticket,
+  }) async {
+    if (!_historyIsCurrent(locationId, ticket)) {
+      return const <WorldChatroomMessage>[];
+    }
     final worldMessages = messages
         .map(
           (message) => _worldMessageFromHttpMessage(
@@ -278,24 +288,35 @@ extension _WorldChatroomMessageReducer on WorldChatroomService {
           ),
         )
         .toList(growable: false);
-    final ownerUid = _storageOwnerUid;
-    if (ownerUid.isNotEmpty && _worldId.isNotEmpty) {
-      await _messageStorage.mergeMessages(
-        ownerUid: ownerUid,
-        worldId: _worldId,
-        locationId: locationId,
-        messages: messages
-            .map(
-              (message) => _storageJsonFromHttpMessage(
-                message,
-                fallbackLocationId: locationId,
-              ),
-            )
-            .toList(growable: false),
-        maxMessagesPerLocation: _maxMessagesPerLocation,
-      );
+    await _withLocationWrite(locationId, () async {
+      if (!_historyIsCurrent(locationId, ticket)) return;
+      if (ticket.owner.isNotEmpty && ticket.world.isNotEmpty) {
+        await _messageStorage.mergeMessages(
+          ownerUid: ticket.owner,
+          worldId: ticket.world,
+          locationId: locationId,
+          messages: messages
+              .map(
+                (m) => _storageJsonFromHttpMessage(
+                  m,
+                  fallbackLocationId: locationId,
+                ),
+              )
+              .toList(),
+          maxMessagesPerLocation: _maxMessagesPerLocation,
+        );
+      }
+      if (_historyIsCurrent(locationId, ticket)) {
+        _upsertMessages(worldMessages, persist: false);
+      }
+    });
+    if (!_historyIsCurrent(locationId, ticket)) {
+      return const <WorldChatroomMessage>[];
     }
-    _upsertMessages(worldMessages, persist: false);
+    await _loadReplyCardsForHistory(locationId, worldMessages, ticket);
+    if (!_historyIsCurrent(locationId, ticket)) {
+      return const <WorldChatroomMessage>[];
+    }
     if (LocationChatDebugSlice.enabled) {
       LocationChatDebugSlice.recordEvent(
         source: 'service',
@@ -631,10 +652,21 @@ extension _WorldChatroomMessageReducer on WorldChatroomService {
     final resolvedMessages = <WorldChatroomMessage>[];
     var lastMessageId = _state.lastMessageId;
     for (final incoming in messages) {
+      if (_deletedMessageIds[incoming.locationId]?.contains(
+            incoming.globalMessageId,
+          ) ==
+          true) {
+        continue;
+      }
       _completeCanonicalEcho(incoming);
       _bindCanonicalConversationRound(incoming);
       final message = _mergeWithExistingMessage(worldMessages, incoming);
       resolvedMessages.add(message);
+      if (persist && !message.streaming && message.globalMessageId > 0) {
+        _historyRefreshes[message.locationId]?.liveMessages[message
+                .globalMessageId] =
+            message;
+      }
       worldMessages = _upsertIntoList(worldMessages, message);
       if (_shouldStoreMessageInLocationQueue(message)) {
         byLocation[message.locationId] = _trimMessageList(
@@ -701,6 +733,11 @@ extension _WorldChatroomMessageReducer on WorldChatroomService {
         );
       }
     }
+    if (persist) {
+      for (final locationId in changedLocationIds) {
+        _restartPendingHistory(locationId);
+      }
+    }
   }
 
   void _completeCanonicalEcho(WorldChatroomMessage message) {
@@ -749,6 +786,9 @@ extension _WorldChatroomMessageReducer on WorldChatroomService {
     WorldChatroomMessage existing,
     WorldChatroomMessage incoming,
   ) {
+    if (existing.rawPayload['status'] == 20 && incoming.isLlmStreamMessage) {
+      return existing;
+    }
     final existingIsAuthoritativeStreamEnd =
         existing.isLlmStreamMessage && !existing.streaming;
     final incomingIsCanonicalFinal =
@@ -811,6 +851,13 @@ extension _WorldChatroomMessageReducer on WorldChatroomService {
   }
 
   bool _sameMessage(WorldChatroomMessage a, WorldChatroomMessage b) {
+    if (a.locationId == b.locationId &&
+        a.globalMessageId > 0 &&
+        b.globalMessageId > 0) {
+      return a.globalMessageId == b.globalMessageId ||
+          (a.locationMessageId > 0 &&
+              a.locationMessageId == b.locationMessageId);
+    }
     final aClientMsgId = a.clientMsgId.trim();
     final bClientMsgId = b.clientMsgId.trim();
     if (aClientMsgId.isNotEmpty && bClientMsgId.isNotEmpty) {

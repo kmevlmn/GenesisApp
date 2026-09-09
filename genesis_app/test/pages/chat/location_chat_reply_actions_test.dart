@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:genesis_flutter_android/components/chat/shared/chat_ui.dart';
 import 'package:genesis_flutter_android/pages/chat/location_chat_reply_actions.dart';
 import 'package:genesis_flutter_android/pages/chat/location_chat_scroll_coordinator.dart';
@@ -7,65 +8,163 @@ import 'package:genesis_flutter_android/components/gems/purchase_options_sheet.d
 import 'package:genesis_flutter_android/components/common/genesis_bottom_sheet_panel.dart';
 import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
 
+const _inspirationReplies = [
+  'Good job!',
+  "You're right to ask for a plan. Give me a little time to listen, and I'll come back with something we can actually build together.",
+  "I don't have every answer yet, but I came back for a reason. Let's talk to the people who still believe in this town, hear what they need, and give them a reason to walk through these doors again.",
+];
+
 void main() {
-  testWidgets('Edit shows free uses below icons and opens Subscription', (
+  testWidgets('all four actions are available without membership', (
     tester,
   ) async {
-    var editorOpened = false;
+    var calls = 0;
     await tester.pumpWidget(
       MaterialApp(
-        scrollBehavior: const GenesisScrollBehavior(),
         home: Scaffold(
-          body: SizedBox(
-            width: 390,
-            child: LocationChatReplyActions(
-              style: kLocationChatStyle,
-              onEditReply: () => editorOpened = true,
-            ),
+          body: LocationChatReplyActions(
+            style: kLocationChatStyle,
+            isMember: false,
+            inspirationMessages: _inspirationReplies,
+            onRegenerate: () => calls++,
+            onGoOn: () => calls++,
+            onEditReply: () => calls++,
           ),
         ),
       ),
     );
-    final prompt = find.byKey(const ValueKey('edit-subscription-prompt'));
-    expect(prompt, findsNothing);
-    await tester.tap(find.bySemanticsLabel('Edit'));
-    await tester.pumpAndSettle();
-    expect(editorOpened, isTrue);
-    expect(prompt, findsOneWidget);
-    final label = tester.widget<Text>(
-      find.descendant(of: prompt, matching: find.byType(Text)),
-    );
+    for (final action in ['Regenerate', 'Go on', 'Edit', 'Inspiration']) {
+      await tester.tap(find.bySemanticsLabel(action));
+      await tester.pumpAndSettle();
+    }
+    expect(calls, 3);
     expect(
-      label.textSpan!.toPlainText(),
-      'Free Edition uses left: "3"\nGet more >',
+      find.byKey(const ValueKey('edit-subscription-prompt')),
+      findsNothing,
     );
-    expect(label.maxLines, isNull);
-    expect(label.softWrap, isTrue);
-    expect(label.style!.fontSize, 13);
-    final icons = find.byKey(
-      const ValueKey('location-chat-reply-actions-four-icons'),
-    );
-    expect(
-      tester.getTopLeft(prompt).dy,
-      greaterThan(tester.getBottomRight(icons).dy),
-    );
-    await tester.tap(prompt);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('pro-tier-title')), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('gem-purchase-sheet-close')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Edit'));
-    await tester.pumpAndSettle();
-    expect(prompt, findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('Inspiration'));
-    await tester.pumpAndSettle();
-    expect(prompt, findsNothing);
     expect(
       find.byKey(const ValueKey('inspiration-replies-carousel')),
       findsOneWidget,
     );
-    expect(editorOpened, isTrue);
+    expect(find.byKey(const ValueKey('inspiration-get-more')), findsNothing);
   });
+
+  testWidgets('default members invoke actions with independent availability', (
+    tester,
+  ) async {
+    final calls = <String>[];
+    Widget host({bool busy = false}) => MaterialApp(
+      home: Scaffold(
+        body: LocationChatReplyActions(
+          inspirationMessages: _inspirationReplies,
+          style: kLocationChatStyle,
+          onRegenerate: () => calls.add('regenerate'),
+          onGoOn: () => calls.add('goOn'),
+          onEditReply: () => calls.add('edit'),
+          regenerateBusy: busy,
+          goOnEnabled: !busy,
+        ),
+      ),
+    );
+    await tester.pumpWidget(host());
+    for (final action in ['Regenerate', 'Go on', 'Edit', 'Inspiration']) {
+      expect(find.byTooltip(action), findsOneWidget);
+      expect(tester.getSize(find.bySemanticsLabel(action)), const Size(32, 32));
+    }
+    for (final action in ['Regenerate', 'Go on', 'Edit']) {
+      await tester.tap(find.bySemanticsLabel(action));
+      await tester.pump();
+    }
+    expect(calls, ['regenerate', 'goOn', 'edit']);
+    expect(
+      find.byKey(const ValueKey('edit-subscription-prompt')),
+      findsNothing,
+    );
+    await tester.pumpWidget(host(busy: true));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(SvgPicture), findsNWidgets(4));
+    expect(
+      tester
+          .widget<Semantics>(find.bySemanticsLabel('Regenerate'))
+          .properties
+          .value,
+      isNull,
+    );
+    for (final action in ['Regenerate', 'Go on', 'Edit']) {
+      await tester.tap(find.bySemanticsLabel(action));
+      await tester.pump();
+    }
+    expect(calls, ['regenerate', 'goOn', 'edit', 'edit']);
+    await tester.pumpWidget(host());
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Regenerate'));
+    await tester.pump();
+    expect(calls.last, 'regenerate');
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'reply pagination exposes actual positions and boundary actions',
+    (tester) async {
+      var page = 0;
+      late StateSetter setHostState;
+      var confirmed = false;
+      var count = 3;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                setHostState = setState;
+                return LocationChatReplyActions(
+                  inspirationMessages: _inspirationReplies,
+                  style: kLocationChatStyle,
+                  cardIndex: page,
+                  cardCount: count,
+                  cardsConfirmed: confirmed,
+                  onPreviousCard: () => setState(() => page--),
+                  onNextCard: () => setState(() => page++),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      final previous = find.byKey(
+        const ValueKey('location-chat-reply-previous-card'),
+      );
+      final next = find.byKey(const ValueKey('location-chat-reply-next-card'));
+      expect(find.text('1 / 3'), findsOneWidget);
+      expect(find.bySemanticsLabel('Reply 1 of 3'), findsOneWidget);
+      expect(tester.widget<IconButton>(previous).onPressed, isNull);
+      await tester.tap(next);
+      await tester.pump();
+      expect(find.text('2 / 3'), findsOneWidget);
+      await tester.tap(next);
+      await tester.pump();
+      expect(find.text('3 / 3'), findsOneWidget);
+      expect(tester.widget<IconButton>(next).onPressed, isNull);
+      await tester.tap(previous);
+      await tester.pump();
+      expect(find.text('2 / 3'), findsOneWidget);
+      setHostState(() => confirmed = true);
+      await tester.pump();
+      expect(previous, findsNothing);
+      setHostState(() {
+        confirmed = false;
+        count = 1;
+        page = 0;
+      });
+      await tester.pump();
+      expect(previous, findsNothing);
+      setHostState(() => count = 0);
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('location-chat-reply-page-indicator')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets(
     'inspiration swipes through three previews matching the user bubble',
@@ -99,6 +198,7 @@ void main() {
                           maxWidthCap: 230,
                         ),
                         LocationChatReplyActions(
+                          inspirationMessages: _inspirationReplies,
                           style: style,
                           selfMessageBubbleMaxWidthCap: 230,
                         ),
@@ -124,23 +224,7 @@ void main() {
       final carousel = find.byKey(
         const ValueKey('inspiration-replies-carousel'),
       );
-      final footer = find.byKey(const ValueKey('inspiration-get-more'));
-      final footerSurface = tester.widget<ChatStableBackdropSurface>(
-        find.descendant(
-          of: footer,
-          matching: find.byType(ChatStableBackdropSurface),
-        ),
-      );
-      expect(footerSurface.sigma, style.bubbleBackdropBlurSigma);
-      final footerContainer = tester.widget<Container>(
-        find.descendant(of: footer, matching: find.byType(Container)),
-      );
-      expect(
-        (footerContainer.decoration! as BoxDecoration).color,
-        chatNarratorMessageBackgroundColor(
-          style,
-        ).withValues(alpha: style.selfBubbleColor.a),
-      );
+      expect(find.byKey(const ValueKey('inspiration-get-more')), findsNothing);
       for (var index = 0; index < 3; index++) {
         if (index > 0) {
           await tester.drag(carousel, const Offset(-230, 0));
@@ -213,6 +297,7 @@ void main() {
             child: SizedBox(
               width: 390,
               child: LocationChatReplyActions(
+                inspirationMessages: _inspirationReplies,
                 style: kLocationChatStyle,
                 onInspirationSend: sent.add,
                 onInspirationEdit: edited.add,
@@ -310,6 +395,7 @@ void main() {
           width: 390,
           height: 600,
           child: LocationChatAnchoredMessageList(
+            inspirationMessages: _inspirationReplies,
             coordinator: coordinator,
             active: active,
             messages: messages,
@@ -378,6 +464,7 @@ void main() {
               width: 390,
               height: 600,
               child: LocationChatAnchoredMessageList(
+                inspirationMessages: _inspirationReplies,
                 coordinator: coordinator,
                 messages: messages,
                 topTitle: '',
@@ -411,22 +498,26 @@ void main() {
   });
 
   testWidgets(
-    'guest Get more opens only Subscription and cannot swipe to Gems',
+    'guest subscription prompt opens only Subscription and cannot swipe to Gems',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           scrollBehavior: const GenesisScrollBehavior(),
           home: Scaffold(
             body: SingleChildScrollView(
-              child: LocationChatReplyActions(style: kLocationChatStyle),
+              child: LocationChatSubscriptionPrompt(
+                style: kLocationChatStyle,
+                promptKey: const ValueKey('guest-subscription-prompt'),
+                semanticsLabel: 'Get more',
+                message: const TextSpan(text: 'Subscription'),
+                actionLabel: 'Get more >',
+              ),
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Inspiration'));
-      await tester.pumpAndSettle();
-      final getMore = find.byKey(const ValueKey('inspiration-get-more'));
+      final getMore = find.byKey(const ValueKey('guest-subscription-prompt'));
       await tester.ensureVisible(getMore);
       await tester.tap(getMore);
       await tester.pumpAndSettle();
@@ -512,6 +603,7 @@ void main() {
               child: NotificationListener<ScrollNotification>(
                 onNotification: coordinator.handleScrollNotification,
                 child: LocationChatAnchoredMessageList(
+                  inspirationMessages: _inspirationReplies,
                   coordinator: coordinator,
                   messages: messages,
                   topTitle: '',
@@ -532,7 +624,7 @@ void main() {
       expect(coordinator.isAtBottom, isTrue);
       final viewport = tester.getRect(find.byKey(viewportKey));
       final footer = tester.getRect(
-        find.byKey(const ValueKey('inspiration-get-more')),
+        find.byKey(const ValueKey('inspiration-replies-carousel')),
       );
       expect(footer.bottom, lessThanOrEqualTo(viewport.bottom));
       await tester.drag(
@@ -552,4 +644,229 @@ void main() {
       expect(coordinator.controller.offset, closeTo(collapsedOffset, 1));
     }
   });
+  testWidgets(
+    'round controls exist without candidate messages and retain state',
+    (tester) async {
+      final coordinator = LocationChatScrollCoordinator();
+      addTearDown(coordinator.dispose);
+      final user = ChatMessageVm(
+        localId: 'user',
+        senderId: 'user',
+        senderName: 'User',
+        text: 'Hello',
+        isMe: true,
+        status: 'sent',
+      );
+      Widget host(
+        List<ChatMessageVm> messages, {
+        String status = 'Generating…',
+      }) => MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 390,
+            height: 600,
+            child: LocationChatAnchoredMessageList(
+              inspirationMessages: _inspirationReplies,
+              coordinator: coordinator,
+              messages: messages,
+              topTitle: '',
+              replyActionsIdentity: 'world/location/round',
+              replyActionsAnchorIndex: messages.length,
+              replyStatus: Text(status),
+              replyCardIndex: 1,
+              replyCardCount: 2,
+              regenerateEnabled: false,
+              goOnEnabled: false,
+              editEnabled: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(host([user]));
+      await tester.pumpAndSettle();
+      final controls = find.byKey(
+        const ValueKey('reply-actions-world/location/round'),
+      );
+      expect(controls, findsOneWidget);
+      expect(find.text('Generating…'), findsOneWidget);
+      final state = tester.state(controls);
+      final candidate = ChatMessageVm(
+        localId: 'candidate-100',
+        senderId: 'role',
+        senderName: 'Role',
+        text: 'A candidate reply',
+        isMe: false,
+        status: 'streaming',
+      );
+      await tester.pumpWidget(host([user, candidate]));
+      await tester.pumpAndSettle();
+      expect(tester.state(controls), same(state));
+      await tester.pumpWidget(host([user], status: 'Generation failed'));
+      await tester.pumpAndSettle();
+      expect(tester.state(controls), same(state));
+      expect(find.text('Generation failed'), findsOneWidget);
+      final list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(list.messages, [user]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'explicit card switches keep the round controls in the viewport',
+    (tester) async {
+      final coordinator = LocationChatScrollCoordinator();
+      addTearDown(coordinator.dispose);
+      final messages = List.generate(
+        15,
+        (index) => ChatMessageVm(
+          localId: 'history-$index',
+          senderId: 'role',
+          senderName: 'Role',
+          text: 'Previous history. ' * 10,
+          isMe: false,
+          status: 'sent',
+        ),
+      );
+      Widget host(int revision, int lines, {bool loading = false}) =>
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 500,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: coordinator.handleScrollNotification,
+                  child: LocationChatAnchoredMessageList(
+                    inspirationMessages: _inspirationReplies,
+                    coordinator: coordinator,
+                    topTitle: '',
+                    oldestEdgeLoading: loading,
+                    messages: [
+                      ...messages,
+                      ChatMessageVm(
+                        localId: 'candidate-$revision',
+                        senderId: 'role',
+                        senderName: 'Role',
+                        text: List.filled(
+                          lines,
+                          'Candidate reply line',
+                        ).join('\n'),
+                        isMe: false,
+                        status: 'sent',
+                      ),
+                    ],
+                    replyActionsIdentity: 'world/location/round',
+                    replyActionsAnchorIndex: messages.length + 1,
+                    replyPresentationRevision: revision,
+                    replyCardIndex: revision,
+                    replyCardCount: 3,
+                  ),
+                ),
+              ),
+            ),
+          );
+      final controls = find.byKey(
+        const ValueKey('reply-actions-world/location/round'),
+      );
+      await tester.pumpWidget(host(0, 5));
+      await tester.pumpAndSettle();
+      final top = tester.getTopLeft(controls).dy;
+      await tester.pumpWidget(host(1, 20));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(controls).dy, closeTo(top, 1));
+      expect(coordinator.shouldFollowLatest, isTrue);
+      // A concurrent history request must not hold a user-selected candidate.
+      await tester.pumpWidget(host(1, 20, loading: true));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpWidget(host(2, 3, loading: true));
+      await tester.pump();
+      expect(find.text('3 / 3'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('chat-message-bubble-candidate-2')),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(host(2, 3));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'candidate chunks follow only while the reader is at the bottom',
+    (tester) async {
+      final coordinator = LocationChatScrollCoordinator();
+      addTearDown(coordinator.dispose);
+      final history = List.generate(
+        20,
+        (index) => ChatMessageVm(
+          localId: 'past-$index',
+          senderId: 'role',
+          senderName: 'Role',
+          text: 'Earlier messages in this conversation. ' * 5,
+          isMe: false,
+          status: 'sent',
+        ),
+      );
+      Widget host(int lines, {bool loading = false}) => MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 390,
+            height: 500,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: coordinator.handleScrollNotification,
+              child: LocationChatAnchoredMessageList(
+                inspirationMessages: _inspirationReplies,
+                coordinator: coordinator,
+                topTitle: '',
+                oldestEdgeLoading: loading,
+                messages: [
+                  ...history,
+                  ChatMessageVm(
+                    localId: 'live-candidate',
+                    senderId: 'role',
+                    senderName: 'Role',
+                    text: List.filled(lines, 'Streaming line').join('\n'),
+                    isMe: false,
+                    status: 'streaming',
+                  ),
+                ],
+                replyActionsIdentity: 'world/location/round',
+                replyActionsAnchorIndex: history.length + 1,
+                replyPresentationRevision: 1,
+                replyCardIndex: 1,
+                replyCardCount: 2,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(host(2));
+      await tester.pumpAndSettle();
+      final previousOffset = coordinator.controller.offset;
+      await tester.pumpWidget(host(8));
+      await tester.pumpAndSettle();
+      expect(coordinator.controller.offset, greaterThan(previousOffset));
+      expect(coordinator.isAtBottom, isTrue);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 200));
+      await tester.pumpAndSettle();
+      expect(coordinator.isDetached, isTrue);
+      final detachedOffset = coordinator.controller.offset;
+      await tester.pumpWidget(host(18));
+      await tester.pumpAndSettle();
+      expect(coordinator.controller.offset, closeTo(detachedOffset, 0.1));
+      // A history loader does not buffer new candidate text.
+      await tester.pumpWidget(host(18, loading: true));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpWidget(host(20, loading: true));
+      await tester.pump();
+      final candidateRow = tester.widget<ChatMessageRow>(
+        find.byKey(const ValueKey('live-candidate')),
+      );
+      expect(candidateRow.message.text.split('\n'), hasLength(20));
+      await tester.pumpWidget(host(20));
+      await tester.pumpAndSettle();
+      expect(coordinator.isDetached, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

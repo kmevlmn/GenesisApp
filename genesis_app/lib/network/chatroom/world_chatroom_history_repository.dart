@@ -1,6 +1,37 @@
 part of 'world_chatroom_service.dart';
 
 extension _WorldChatroomHistoryRepository on WorldChatroomService {
+  Future<void> _loadReplyCardsForHistory(
+    String locationId,
+    Iterable<WorldChatroomMessage> messages,
+    _HistoryTicket ticket,
+  ) async {
+    bool current() => _historyIsCurrent(locationId, ticket);
+    if (!current()) return;
+    final rounds = messages
+        .map((message) => message.conversationRoundNumber)
+        .where((round) => round > 0)
+        .toSet();
+    if (rounds.isEmpty) return;
+    try {
+      await replyActions?.loadHistoryCards(
+        locationId,
+        roundIds: rounds,
+        isCurrent: current,
+      );
+    } catch (error) {
+      if (!current()) return;
+      _recordFailure(
+        ChatroomFailureEvent(
+          code: 'card_history_failed',
+          message: 'Failed to refresh reply cards',
+          sourceType: 'history',
+          cause: error,
+        ),
+      );
+    }
+  }
+
   Future<void> _initializeLeafLocationQueue({
     required String locationId,
     required int latestLimit,
@@ -8,6 +39,8 @@ extension _WorldChatroomHistoryRepository on WorldChatroomService {
     final resolvedLocationId = locationId.trim();
     if (resolvedLocationId.isEmpty || _worldId.isEmpty) return;
     try {
+      _requireHistoryAvailable(resolvedLocationId);
+      final ticket = _historyTicket(resolvedLocationId);
       _recordServiceQueueDebug(
         action: 'leafQueueInitLocationStart',
         locationId: resolvedLocationId,
@@ -19,7 +52,12 @@ extension _WorldChatroomHistoryRepository on WorldChatroomService {
         since: 0,
         limit: latestLimit,
       );
-      await _mergeFetchedMessages(resolvedLocationId, response.messages);
+      await _mergeFetchedMessages(
+        resolvedLocationId,
+        response.messages,
+        ticket: ticket,
+      );
+      if (!_historyIsCurrent(resolvedLocationId, ticket)) return;
       await _repairLocationMessageGaps(resolvedLocationId);
       _recordServiceQueueDebug(
         action: 'leafQueueInitLocationDone',
@@ -39,8 +77,13 @@ extension _WorldChatroomHistoryRepository on WorldChatroomService {
   }
 
   Future<void> _repairLocationMessageGaps(String locationId) async {
+    final ticket = _historyTicket(locationId);
     final unresolvedGapKeys = <String>{};
     for (var pass = 0; pass < _maxMessagesPerLocation; pass += 1) {
+      if (!_historyIsCurrent(locationId, ticket) ||
+          _historyRefreshes.containsKey(locationId)) {
+        return;
+      }
       final gap = _firstLocationMessageGap(
         _state.messagesByLocation[locationId] ?? const <WorldChatroomMessage>[],
         ignoredKeys: unresolvedGapKeys,
@@ -70,6 +113,8 @@ extension _WorldChatroomHistoryRepository on WorldChatroomService {
     required String locationId,
     required _LocationMessageGap gap,
   }) async {
+    if (_historyRefreshes.containsKey(locationId)) return false;
+    final ticket = _historyTicket(locationId);
     final limit = math.min(100, gap.missingCount + 1);
     for (
       var attempt = 1;
@@ -77,6 +122,7 @@ extension _WorldChatroomHistoryRepository on WorldChatroomService {
       attempt += 1
     ) {
       try {
+        if (!_historyIsCurrent(locationId, ticket)) return false;
         _recordServiceQueueDebug(
           action: 'gapFillStart',
           locationId: locationId,
@@ -94,7 +140,12 @@ extension _WorldChatroomHistoryRepository on WorldChatroomService {
           since: gap.upper,
           limit: limit,
         );
-        await _mergeFetchedMessages(locationId, response.messages);
+        await _mergeFetchedMessages(
+          locationId,
+          response.messages,
+          ticket: ticket,
+        );
+        if (!_historyIsCurrent(locationId, ticket)) return false;
         if (_isLocationMessageGapFilled(
           _state.messagesByLocation[locationId] ??
               const <WorldChatroomMessage>[],
@@ -147,16 +198,22 @@ extension _WorldChatroomHistoryRepository on WorldChatroomService {
       _state.messagesByLocation[locationId] ?? const <WorldChatroomMessage>[],
       maxLocationMessageId,
     );
+    final ticket = _historyTicket(locationId);
+    if (_historyRefreshes.containsKey(locationId)) return;
     final ownerUid = _storageOwnerUid;
     if (ownerUid.isNotEmpty && _worldId.isNotEmpty) {
-      await _messageStorage.deleteMessagesAtOrBefore(
-        ownerUid: ownerUid,
-        worldId: _worldId,
-        locationId: locationId,
-        maxLocationMessageId: maxLocationMessageId,
-        maxWorldMessageId: maxWorldMessageId,
-      );
+      await _withLocationWrite(locationId, () async {
+        if (!_historyIsCurrent(locationId, ticket)) return;
+        await _messageStorage.deleteMessagesAtOrBefore(
+          ownerUid: ownerUid,
+          worldId: _worldId,
+          locationId: locationId,
+          maxLocationMessageId: maxLocationMessageId,
+          maxWorldMessageId: maxWorldMessageId,
+        );
+      });
     }
+    if (!_historyIsCurrent(locationId, ticket)) return;
     final byLocation = Map<String, List<WorldChatroomMessage>>.from(
       _state.messagesByLocation,
     );

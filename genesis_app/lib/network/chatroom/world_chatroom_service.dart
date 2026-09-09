@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../app/debug/location_chat_debug_slice.dart';
 import '../genesis_api.dart';
+import '../api_exception.dart';
+import '../http_transport.dart';
 import '../json_utils.dart';
 import '../models/location_tree.dart';
 import '../models/world.dart';
@@ -15,10 +17,17 @@ import 'chatroom_http_models.dart';
 import 'chatroom_message_type.dart';
 import 'chatroom_message_storage.dart';
 import 'chatroom_models.dart';
+import 'chatroom_reply_actions_controller.dart';
+import 'chatroom_reply_action_storage.dart';
+import 'chatroom_inspiration_controller.dart';
+import 'chatroom_inspiration_storage.dart';
+
+export 'chatroom_reply_actions_controller.dart';
 import 'chatroom_timeline_payload.dart';
 
 part 'world_chatroom_connection.dart';
 part 'world_chatroom_history_repository.dart';
+part 'world_chatroom_message_mutations.dart';
 part 'world_chatroom_event_projection.dart';
 part 'world_chatroom_message_reducer.dart';
 part 'world_chatroom_world_projection.dart';
@@ -151,13 +160,176 @@ class WorldChatroomService {
     Duration reconnectInterval = const Duration(seconds: 5),
     Duration conversationRoundTimeout = conversationRoundFallbackTimeout,
     bool refreshInitialSnapshotOnConnect = true,
+    ChatroomReplyActionStorage? replyActionStorage,
+    ChatroomInspirationStorage? inspirationStorage,
   }) : _api = api,
        _client = client,
+       _replyActionStorage = replyActionStorage,
+       _inspirationStorage = inspirationStorage,
        _messageStorage = messageStorage,
        _heartbeatInterval = heartbeatInterval,
        _reconnectInterval = reconnectInterval,
        _conversationRoundTimeout = conversationRoundTimeout,
        _refreshInitialSnapshotOnConnect = refreshInitialSnapshotOnConnect;
+
+  final ChatroomReplyActionStorage? _replyActionStorage;
+  ChatroomReplyActionsController? _replyActionsController;
+  final ChatroomInspirationStorage? _inspirationStorage;
+  ChatroomInspirationController? _inspirations;
+  final _inspirationValidatedLocations = <String>{};
+  int _inspirationConnectionGeneration = 0;
+  String? _inspirationReplacementLocation;
+
+  ChatroomInspirationController? get inspirations {
+    if (replyActions == null) return null;
+    return _inspirations ??= ChatroomInspirationController(
+      ownerUid: _storageOwnerUid,
+      worldId: _worldId,
+      httpApi: _api.chatroomHttp,
+      storage: _inspirationStorage,
+    );
+  }
+
+  Future<void> ensureInspirationHistory(String locationId) async {
+    if (_inspirationValidatedLocations.contains(locationId)) return;
+    final generation = _inspirationConnectionGeneration;
+    await _fetchLatestLocationMessages(
+      locationId: locationId,
+      limit: 20,
+      emitLatestFetched: false,
+    );
+    if (_disposed || generation != _inspirationConnectionGeneration) {
+      throw StateError('The active chat changed');
+    }
+    _inspirationValidatedLocations.add(locationId);
+    _syncInspirationContexts();
+  }
+
+  void _syncInspirationContexts() {
+    final controller = _inspirations;
+    final replies = _replyActionsController;
+    if (controller == null || replies == null) return;
+    for (final location in replies.locationIds) {
+      if (!_inspirationValidatedLocations.contains(location)) continue;
+      final round = replies.stateFor(location)!;
+      controller.observe(
+        location,
+        roundId: round.roundId,
+        tailMessageId: round.inspirationTailMessageId,
+        replacing: _inspirationReplacementLocation == location,
+      );
+    }
+  }
+
+  void _suspendInspirations() {
+    _inspirationConnectionGeneration++;
+    _inspirationValidatedLocations.clear();
+    _inspirations?.suspend();
+  }
+
+  final _completedReplyRounds = <String>{};
+  Future<void> Function()? _replyWalletRefresher;
+
+  void setReplyWalletRefresher(Future<void> Function() refresh) {
+    _replyWalletRefresher = refresh;
+  }
+
+  /// Lazily owns candidate state; ordinary history never stores candidates.
+  ChatroomReplyActionsController? get replyActions {
+    if (_disposed || _worldId.isEmpty || _storageOwnerUid.isEmpty) return null;
+    final existing = _replyActionsController;
+    if (existing != null) return existing;
+    final controller = ChatroomReplyActionsController(
+      worldId: _worldId,
+      ownerUid: _storageOwnerUid,
+      httpApi: _api.chatroomHttp,
+      session: () => _session,
+      isReady: (location) =>
+          !_disposed && _state.connected && _state.joinedLocationId == location,
+      isTickLocked: () => _state.inputBlocked,
+      refreshFormalRange: (location, start, end) => _requestHistoryReplacement(
+        locationId: location,
+        start: start,
+        end: end,
+        requireCurrent: true,
+      ),
+      replaceCompletedRound: _replaceCompletedReplyRound,
+      onGoOnAccepted: (location, round) => _bindWaitingConversationRound(
+        locationId: location,
+        conversationRoundId: '$round',
+      ),
+      refreshLatestHistory: (location) =>
+          refreshLocationHistory(locationId: location),
+      refreshWallet: () async {
+        await _replyWalletRefresher?.call();
+      },
+      storage: _replyActionStorage,
+    );
+    _replyActionsController = controller;
+    controller.addListener(_syncInspirationContexts);
+    _observeReplyHistory();
+    return controller;
+  }
+
+  Future<void> _replaceCompletedReplyRound(String location, int round) async {
+    final world = _worldId;
+    final owner = _storageOwnerUid;
+    _completedReplyRounds.add('$location:$round');
+    // Events already queued before the round end must settle before replacement.
+    await _eventQueue;
+    if (_disposed || world != _worldId || owner != _storageOwnerUid) {
+      throw StateError('The active chat changed during reply recovery');
+    }
+    bool inRound(WorldChatroomMessage message) =>
+        message.locationId == location &&
+        message.conversationRoundNumber == round;
+    _streamAccumulators.removeWhere((_, value) => inRound(value.message));
+    _setState(
+      _state.copyWith(
+        streamMessagesByKey: {
+          for (final entry in _state.streamMessagesByKey.entries)
+            if (!inRound(entry.value)) entry.key: entry.value,
+        },
+        messagesByLocation: {
+          ..._state.messagesByLocation,
+          location: [
+            for (final message
+                in _state.messagesByLocation[location] ??
+                    const <WorldChatroomMessage>[])
+              if (!inRound(message) || !message.streaming) message,
+          ],
+        },
+        worldMessages: [
+          for (final message in _state.worldMessages)
+            if (!inRound(message) || !message.streaming) message,
+        ],
+      ),
+    );
+    await _requestHistoryReplacement(
+      locationId: location,
+      start: round,
+      end: round,
+      requireCurrent: true,
+    );
+  }
+
+  void _observeReplyHistory() {
+    final controller = _replyActionsController;
+    if (controller == null) return;
+    for (final entry in _state.messagesByLocation.entries) {
+      final round = int.tryParse(
+        _state
+                .conversationRoundStatesByLocation[entry.key]
+                ?.conversationRoundId ??
+            '',
+      );
+      controller.observeMessages(
+        entry.key,
+        entry.value,
+        activeRoundIds: {if (round != null && round > 0) round},
+      );
+    }
+  }
 
   final GenesisApi _api;
   final ChatroomClient _client;
@@ -207,6 +379,12 @@ class WorldChatroomService {
   _latestMessageFetchFutures = <String, Future<List<WorldChatroomMessage>>>{};
   final Map<String, Completer<WorldChatroomMessage>> _canonicalEchoCompleters =
       <String, Completer<WorldChatroomMessage>>{};
+  int _historySessionGeneration = 0;
+  final _pendingMessageMutationKeys = <String>{};
+  final _historyRefreshes = <String, _LocationHistoryRefresh>{};
+  final _locationWrites = <String, Future<void>>{};
+  final _deletedMessageIds = <String, Set<int>>{};
+
   final Map<String, _ChatroomStreamAccumulator> _streamAccumulators =
       <String, _ChatroomStreamAccumulator>{};
   int _sendClientMessageSequence = 0;
@@ -548,7 +726,16 @@ class WorldChatroomService {
   }) async {
     _throwIfDisposed();
     final nextWorldId = worldId.trim();
-    if (_worldId != nextWorldId) {
+    if (_worldId != nextWorldId ||
+        (_identity != null && _identity!.userId != identity.userId)) {
+      _replyActionsController?.dispose();
+      _replyActionsController = null;
+      _inspirations?.dispose();
+      _inspirations = null;
+      _suspendInspirations();
+      _completedReplyRounds.clear();
+      _cancelHistoryRefreshes();
+      _deletedMessageIds.clear();
       _publishedContentUpdateOccurrences.clear();
     }
     _worldId = nextWorldId;
@@ -673,6 +860,10 @@ class WorldChatroomService {
         : _storageOwnerUid;
     if (resolvedOwnerUid.isEmpty) return const <WorldChatroomMessage>[];
 
+    if (_historyRefreshes.containsKey(resolvedLocationId)) {
+      return const <WorldChatroomMessage>[];
+    }
+    final ticket = _historyTicket(resolvedLocationId);
     final storageLocationIds = _orderedNonEmpty([
       ...locationAliases,
       resolvedLocationId,
@@ -685,6 +876,9 @@ class WorldChatroomService {
         locationId: storageLocationId,
         limit: limit,
       );
+      if (!_historyIsCurrent(resolvedLocationId, ticket)) {
+        return const <WorldChatroomMessage>[];
+      }
       for (final json in localMessages) {
         final message = WorldChatroomMessage.fromStorageJson(json);
         messages = _trimMessageList(
@@ -720,6 +914,33 @@ class WorldChatroomService {
     return messages;
   }
 
+  /// Rebuild the bounded location cache after reconnect or a suspected missed broadcast.
+  Future<void> refreshLocationHistory({required String locationId}) {
+    _throwIfDisposed();
+    return _requestHistoryReplacement(locationId: locationId);
+  }
+
+  /// Successful writes stay successful even if the subsequent range refresh fails.
+  Future<ChatroomMessageMutationResult> batchMutateLlmMessages({
+    required String locationId,
+    required int conversationRoundId,
+    required List<ChatroomLlmMessageOperation> operations,
+  }) {
+    _throwIfDisposed();
+    return _mutateLlmReplies(
+      locationId: locationId,
+      conversationRoundId: conversationRoundId,
+      operations: List.unmodifiable(operations),
+    );
+  }
+
+  bool isMutatingLlmMessages({
+    required String locationId,
+    required int conversationRoundId,
+  }) => _pendingMessageMutationKeys.contains(
+    _messageMutationKey(locationId.trim(), conversationRoundId),
+  );
+
   Future<List<WorldChatroomMessage>> refreshLatestMessages({
     required String locationId,
     int limit = 20,
@@ -753,7 +974,9 @@ class WorldChatroomService {
     try {
       return await fetch;
     } finally {
-      _latestMessageFetchFutures.remove(fetchKey);
+      if (identical(_latestMessageFetchFutures[fetchKey], fetch)) {
+        _latestMessageFetchFutures.remove(fetchKey);
+      }
     }
   }
 
@@ -841,6 +1064,8 @@ class WorldChatroomService {
   }
 
   Future<void> disconnect() async {
+    _suspendInspirations();
+    _cancelHistoryRefreshes();
     _userDisconnected = true;
     _userLocationsRefreshGeneration += 1;
     _userLocationsRefreshPending = false;
@@ -985,6 +1210,14 @@ class WorldChatroomService {
         hasMore: false,
       );
     }
+    _requireHistoryAvailable(resolvedLocationId);
+    final ticket = _historyTicket(resolvedLocationId);
+    void checkCurrent() {
+      if (!_historyIsCurrent(resolvedLocationId, ticket)) {
+        throw const ChatroomProtocolException('History cursor invalidated');
+      }
+    }
+
     final loadedMessageKeys = <String>{};
     final currentLocationMessages =
         _state.messagesByLocation[resolvedLocationId] ??
@@ -1029,6 +1262,7 @@ class WorldChatroomService {
         beforeWorldMessageId: beforeWorldMessageId,
         limit: limit,
       );
+      checkCurrent();
       final localMessages = <WorldChatroomMessage>[];
       for (final json in localMessageJson) {
         final message = WorldChatroomMessage.fromStorageJson(json);
@@ -1052,7 +1286,12 @@ class WorldChatroomService {
       since: beforeMessageId,
       limit: limit,
     );
-    await _mergeFetchedMessages(resolvedLocationId, response.messages);
+    await _mergeFetchedMessages(
+      resolvedLocationId,
+      response.messages,
+      ticket: ticket,
+    );
+    checkCurrent();
     for (final message in response.messages) {
       final key = loadedMessageKey(
         senderType: message.senderType,
@@ -1106,7 +1345,10 @@ class WorldChatroomService {
     _throwIfDisposed();
     final ownerUid = _storageOwnerUid;
     if (ownerUid.isEmpty) return;
+    _cancelHistoryRefreshes();
+    await Future.wait(_locationWrites.values.toList());
     await _messageStorage.clearCache(ownerUid);
+    _deletedMessageIds.clear();
     _localMessageCacheGeneration += 1;
     _localHydratedMessageKeys.clear();
     _localHydratingMessageFutures.clear();
@@ -1133,6 +1375,10 @@ class WorldChatroomService {
     if (_disposed) return;
     _clearAllConversationRounds();
     _disposed = true;
+    _replyActionsController?.dispose();
+    _replyActionsController = null;
+    _inspirations?.dispose();
+    _inspirations = null;
     final disposeFailure = const ChatroomFailureEvent(
       code: 'service_disposed',
       message: 'Chatroom service was disposed',

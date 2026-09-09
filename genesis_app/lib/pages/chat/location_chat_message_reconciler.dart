@@ -268,12 +268,21 @@ extension _LocationChatMessageReconciler on _LocationChatPanelState {
     required String key,
     required _LocationChatMessageGap gap,
   }) async {
+    final location = widget.locationId;
+    final generation = service.state.historyGenerationByLocation[location] ?? 0;
+    bool current() =>
+        mounted &&
+        identical(service, _service) &&
+        widget.locationId == location &&
+        generation ==
+            (service.state.historyGenerationByLocation[location] ?? 0);
     try {
       for (
         var attempt = 1;
         attempt <= _locationChatMessageGapMaxAttempts;
         attempt += 1
       ) {
+        if (!current()) return;
         _messageGapFillAttempts[key] = attempt;
         try {
           if (_isLocationChatMessageGapFilled(
@@ -290,6 +299,7 @@ extension _LocationChatMessageReconciler on _LocationChatPanelState {
             beforeMessageId: gap.upperLocationMessageId,
             limit: math.min(100, gap.missingCount + 1),
           );
+          if (!current()) return;
           if (_isLocationChatMessageGapFilled(
             service.state.messagesByLocation[widget.locationId] ??
                 const <WorldChatroomMessage>[],
@@ -318,10 +328,13 @@ extension _LocationChatMessageReconciler on _LocationChatPanelState {
         }
       }
     } finally {
-      _messageGapFillBeforeLocationMessageIds.remove(
-        gap.upperLocationMessageId,
-      );
+      if (current()) {
+        _messageGapFillBeforeLocationMessageIds.remove(
+          gap.upperLocationMessageId,
+        );
+      }
     }
+    if (!current()) return;
     _releasedMessageGapKeys.add(key);
     _messageGapFillKeys.remove(key);
     _messageGapFillAttempts.remove(key);
@@ -437,6 +450,10 @@ extension _LocationChatMessageReconciler on _LocationChatPanelState {
   }) {
     final world = (identityState ?? _chatroomState).world;
     return _locationChatMessageBelongsToCurrentRole(
+      messageBusinessType:
+          message.hasExplicitBusinessType || message.isLlmStreamMessage
+          ? locationChatBusinessType(message)
+          : '',
       messageUserId: message.userId,
       messageSenderId: message.senderId,
       currentUserIds: _myUserIdKeys,

@@ -33915,6 +33915,28 @@ class _FakeChatroomSession implements ChatroomSession {
   final sentClientMsgIds = <String>[];
   final sentUserEnterLocationIds = <String>[];
   final pendingSendAcks = <String, Completer<ChatroomAck>>{};
+  @override
+  Future<ChatroomGoOnReceipt> goOn({
+    required String locationId,
+    required int sourceConversationRoundId,
+    required String clientMsgId,
+  }) async => throw const ChatroomProtocolException('Go on requires V2');
+
+  @override
+  Future<ChatroomCardRegeneration> regenerateLlmCard({
+    required String locationId,
+    required int conversationRoundId,
+    required String clientMsgId,
+  }) async => throw const ChatroomProtocolException('Regeneration requires V2');
+
+  @override
+  Future<ChatroomCardSelection> selectLlmCard({
+    required String locationId,
+    required int conversationRoundId,
+    required int cardId,
+    required String clientMsgId,
+  }) async => throw const ChatroomProtocolException('Selection requires V2');
+
   String? joinLocationId;
   int joinCount = 0;
   int leaveCount = 0;

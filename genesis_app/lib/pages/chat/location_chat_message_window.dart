@@ -68,6 +68,9 @@ extension _LocationChatMessageWindow on _LocationChatPanelState {
     if (_loadingOlderMessages) return;
     final service = _service;
     if (service == null) return;
+    final historyGeneration =
+        service.state.historyGenerationByLocation[widget.locationId] ?? 0;
+    final locationId = widget.locationId;
     final beforeLocationMessageId = _earliestLoadedLocationMessageId();
     if (beforeLocationMessageId <= 0) {
       _setLocationChatState(() {
@@ -90,6 +93,18 @@ extension _LocationChatMessageWindow on _LocationChatPanelState {
         beforeMessageId: beforeLocationMessageId,
         limit: 20,
       );
+      if (!mounted ||
+          !identical(service, _service) ||
+          widget.locationId != locationId ||
+          historyGeneration !=
+              (service.state.historyGenerationByLocation[locationId] ?? 0)) {
+        if (mounted) {
+          _setLocationChatState(_finishOlderMessagesLoading);
+        } else {
+          _finishOlderMessagesLoading();
+        }
+        return;
+      }
       _olderMessagesExhaustedByRemote = !page.hasMore;
       _hasMoreOlderMessages = page.hasMore;
       if (page.loadedCount > 0 && mounted) {

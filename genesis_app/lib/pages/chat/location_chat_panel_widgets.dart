@@ -413,6 +413,7 @@ String _chatroomIdentityKey(String? value) {
 
 @visibleForTesting
 bool locationChatMessageBelongsToCurrentRoleForTesting({
+  String messageBusinessType = '',
   required String messageUserId,
   required String messageSenderId,
   required Iterable<String> currentUserIds,
@@ -421,6 +422,7 @@ bool locationChatMessageBelongsToCurrentRoleForTesting({
   required Iterable<Map<String, dynamic>> characterPositions,
 }) {
   return _locationChatMessageBelongsToCurrentRole(
+    messageBusinessType: messageBusinessType,
     messageUserId: messageUserId,
     messageSenderId: messageSenderId,
     currentUserIds: currentUserIds,
@@ -431,6 +433,7 @@ bool locationChatMessageBelongsToCurrentRoleForTesting({
 }
 
 bool _locationChatMessageBelongsToCurrentRole({
+  String messageBusinessType = '',
   required String messageUserId,
   required String messageSenderId,
   required Iterable<String> currentUserIds,
@@ -438,6 +441,15 @@ bool _locationChatMessageBelongsToCurrentRole({
   required Iterable<Map<String, dynamic>> characters,
   required Iterable<Map<String, dynamic>> characterPositions,
 }) {
+  // V2 AI replies carry the initiating user's ID, not the speaker's account.
+  if (const {
+    'character',
+    'narrator',
+    'ai',
+    'llm',
+  }.contains(messageBusinessType.trim().toLowerCase())) {
+    return false;
+  }
   final identityKeys = <String>{
     ...currentUserIds.map(_chatroomIdentityKey),
     ...currentSenderIds.map(_chatroomIdentityKey),

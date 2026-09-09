@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../network/api_exception.dart';
 import '../../network/chatroom/chatroom_models.dart';
 import '../common/genesis_center_toast.dart';
 
@@ -9,6 +10,47 @@ const Set<String> _userInitiatedChatroomRequestTypes = <String>{
   'join',
   'leave',
   'send_message',
+};
+
+const Set<String> _replyActionRequestTypes = <String>{
+  'regenerate_llm_card',
+  'go_on',
+  'select_llm_card',
+  'send_message', // Sending an inspiration uses the normal send request.
+  'end_conversation_round',
+  'llm_card_stream',
+  'llm_card_generation_end',
+};
+
+bool _isReplyActionBusinessFailure(ChatroomFailureEvent failure) {
+  final code = int.tryParse(failure.code.trim());
+  return code != null &&
+      code != 0 &&
+      (_replyActionRequestTypes.contains(failure.requestType.trim()) ||
+          _replyActionRequestTypes.contains(failure.sourceType.trim()) ||
+          failure.sourceType == 'error');
+}
+
+/// These errors are already presented by the HTTP interceptor or WS listener.
+/// Request futures and controller notifications must not present them again.
+bool isChatroomErrorPresentedGlobally(Object? error) => switch (error) {
+  ApiException e => e.kind == ApiExceptionKind.business,
+  ChatroomFailureEvent() || ChatroomErrorEvent() => true,
+  ChatroomPayloadEvent e => !e.ok,
+  ChatroomLlmCardGenerationEnd e => e.errNo != 0,
+  ChatroomLlmCardStream e => e.errNo != 0,
+  _ => false,
+};
+
+String chatroomOperationErrorMessage(Object error) => switch (error) {
+  ApiException e => e.message,
+  ChatroomFailureEvent e => e.message,
+  ChatroomErrorEvent e => e.message,
+  ChatroomPayloadEvent e => e.codeMsg,
+  ChatroomLlmCardGenerationEnd e => e.errMsg,
+  ChatroomLlmCardStream e => e.errMsg,
+  StateError e => e.message,
+  _ => error.toString(),
 };
 
 const Set<String> _passiveChatroomFailureCodes = <String>{
@@ -39,6 +81,7 @@ bool isChatroomUnauthorizedFailure(ChatroomFailureEvent failure) {
 }
 
 bool shouldShowChatroomFailureToast(ChatroomFailureEvent failure) {
+  if (_isReplyActionBusinessFailure(failure)) return true;
   if (failure.code.trim() == '3001') return false;
 
   final requestType = failure.requestType.trim();
@@ -55,6 +98,11 @@ bool shouldShowChatroomFailureToast(ChatroomFailureEvent failure) {
 
 String chatroomFailureToastMessage(ChatroomFailureEvent failure) {
   final code = failure.code.trim();
+  if (code != '10001' &&
+      _isReplyActionBusinessFailure(failure) &&
+      failure.message.trim().isNotEmpty) {
+    return failure.message;
+  }
   if (code == '1002' || code == '1008') {
     return 'Message format error. Please edit and send again.';
   }
@@ -116,7 +164,14 @@ StreamSubscription<ChatroomFailureEvent> bindChatroomFailureToast(
   bool Function(ChatroomFailureEvent failure)? shouldShow,
   void Function(ChatroomFailureEvent failure)? onFailure,
 }) {
+  // A single WS event can reach the service through both events and failures.
+  // Deduplicate by event identity, while allowing identical text on a new try.
+  final seen = <Object>[];
   return failures.listen((failure) {
+    final identity = failure.cause is ChatroomEvent ? failure.cause! : failure;
+    if (seen.any((previous) => identical(previous, identity))) return;
+    seen.add(identity);
+    if (seen.length > 64) seen.removeAt(0);
     if (!shouldShowChatroomFailureToast(failure)) return;
     if (shouldShow != null && !shouldShow(failure)) return;
     if (context.mounted) {

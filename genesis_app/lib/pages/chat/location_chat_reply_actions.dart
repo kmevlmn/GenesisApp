@@ -6,10 +6,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../components/chat/shared/chat_ui.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../components/gems/gem_purchase_bottom_sheet.dart';
+import 'location_chat_loading_bubble.dart';
 import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_typography.dart';
 
-/// Reply actions with local inspiration suggestions and host-owned messaging.
+/// Reply actions with source-bound inspiration suggestions and host-owned messaging.
 class LocationChatReplyActions extends StatefulWidget {
   const LocationChatReplyActions({
     super.key,
@@ -17,12 +18,28 @@ class LocationChatReplyActions extends StatefulWidget {
     this.selfMessageBubbleMaxWidthCap,
     this.inspirationExpanded,
     this.onInspirationExpandedChanged,
-    this.freeInspirationUsesLeft = 3,
+    this.inspirationMessages = const [],
+    this.inspirationLoading = false,
+    this.inspirationEnabled = true,
     this.inspirationPage,
     this.onInspirationPageChanged,
     this.onInspirationSend,
     this.onInspirationEdit,
     this.onEditReply,
+    this.onRegenerate,
+    this.onGoOn,
+    this.isMember = true,
+    this.regenerateEnabled = true,
+    this.goOnEnabled = true,
+    this.editEnabled = true,
+    this.regenerateBusy = false,
+    this.goOnBusy = false,
+    this.editBusy = false,
+    this.cardIndex = 0,
+    this.cardCount = 0,
+    this.cardsConfirmed = false,
+    this.onPreviousCard,
+    this.onNextCard,
     this.editPromptExpanded,
     this.onEditPromptExpandedChanged,
   });
@@ -30,12 +47,29 @@ class LocationChatReplyActions extends StatefulWidget {
   final ValueChanged<String>? onInspirationSend;
   final ValueChanged<String>? onInspirationEdit;
   final VoidCallback? onEditReply;
+  final VoidCallback? onRegenerate;
+  final VoidCallback? onGoOn;
+  final bool isMember;
+  final bool regenerateEnabled;
+  final bool goOnEnabled;
+  final bool editEnabled;
+  final bool regenerateBusy;
+  final bool goOnBusy;
+  final bool editBusy;
+
+  /// Zero-based position in the full card list, including in-flight/failed cards.
+  final int cardIndex;
+  final int cardCount;
+  final bool cardsConfirmed;
+  final VoidCallback? onPreviousCard;
+  final VoidCallback? onNextCard;
   final bool? editPromptExpanded;
   final ValueChanged<bool>? onEditPromptExpandedChanged;
   final ChatUiStyleConfig style;
   final double? selfMessageBubbleMaxWidthCap;
-  // Demo value until the inspiration quota API is available.
-  final int freeInspirationUsesLeft;
+  final List<String> inspirationMessages;
+  final bool inspirationLoading;
+  final bool inspirationEnabled;
   final int? inspirationPage;
   final ValueChanged<int>? onInspirationPageChanged;
   final bool? inspirationExpanded;
@@ -54,9 +88,6 @@ class LocationChatReplyActions extends StatefulWidget {
 
 class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
   bool _localInspirationExpanded = false;
-  bool _localEditPromptExpanded = false;
-  bool get _editPromptExpanded =>
-      widget.editPromptExpanded ?? _localEditPromptExpanded;
   int _localInspirationPage = 0;
   bool get _inspirationExpanded =>
       widget.inspirationExpanded ?? _localInspirationExpanded;
@@ -64,8 +95,6 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
   void _setEditPromptExpanded(bool expanded) {
     if (widget.onEditPromptExpandedChanged case final onChanged?) {
       onChanged(expanded);
-    } else {
-      setState(() => _localEditPromptExpanded = expanded);
     }
   }
 
@@ -82,6 +111,14 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
     }
   }
 
+  VoidCallback? _memberAction(VoidCallback? action, {bool enabled = true}) {
+    if (!enabled || action == null) return null;
+    return () {
+      _setEditPromptExpanded(false);
+      action();
+    };
+  }
+
   ChatUiStyleConfig get style => widget.style;
 
   @override
@@ -90,18 +127,46 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          '<     1 / 2     >',
-          key: ValueKey('location-chat-reply-page-indicator'),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Color(0xFFF4F3F6),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            height: 1.4,
+        if (widget.cardCount > 1 && !widget.cardsConfirmed) ...[
+          Row(
+            key: const ValueKey('location-chat-reply-pagination'),
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                key: const ValueKey('location-chat-reply-previous-card'),
+                tooltip: 'Previous reply',
+                onPressed: widget.cardIndex > 0 ? widget.onPreviousCard : null,
+                icon: const Icon(Icons.chevron_left, size: 20),
+                color: const Color(0xF2FFFFFF),
+                disabledColor: const Color(0x73FFFFFF),
+              ),
+              Text(
+                '${widget.cardIndex + 1} / ${widget.cardCount}',
+                key: const ValueKey('location-chat-reply-page-indicator'),
+                semanticsLabel:
+                    'Reply ${widget.cardIndex + 1} of ${widget.cardCount}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xF2FFFFFF),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('location-chat-reply-next-card'),
+                tooltip: 'Next reply',
+                onPressed: widget.cardIndex < widget.cardCount - 1
+                    ? widget.onNextCard
+                    : null,
+                icon: const Icon(Icons.chevron_right, size: 20),
+                color: const Color(0xF2FFFFFF),
+                disabledColor: const Color(0x73FFFFFF),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
+        ],
         Padding(
           padding: EdgeInsets.only(
             left: style.avatarSize + style.avatarBubbleGap,
@@ -114,6 +179,10 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 key: const ValueKey(_ReplyActionIconType.regenerate),
                 label: 'Regenerate',
                 icon: _ReplyActionIconType.regenerate,
+                onTap: _memberAction(
+                  widget.onRegenerate,
+                  enabled: widget.regenerateEnabled && !widget.regenerateBusy,
+                ),
               ),
               const SizedBox(
                 width:
@@ -124,6 +193,10 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 key: const ValueKey(_ReplyActionIconType.goOn),
                 label: 'Go on',
                 icon: _ReplyActionIconType.goOn,
+                onTap: _memberAction(
+                  widget.onGoOn,
+                  enabled: widget.goOnEnabled && !widget.goOnBusy,
+                ),
               ),
               const SizedBox(
                 width:
@@ -134,11 +207,15 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 key: const ValueKey(_ReplyActionIconType.edit),
                 label: 'Edit',
                 icon: _ReplyActionIconType.edit,
-                onTap: () {
-                  _setInspirationExpanded(false);
-                  _setEditPromptExpanded(true);
-                  widget.onEditReply?.call();
-                },
+                onTap: _memberAction(
+                  widget.onEditReply == null
+                      ? null
+                      : () {
+                          _setInspirationExpanded(false);
+                          widget.onEditReply!();
+                        },
+                  enabled: widget.editEnabled && !widget.editBusy,
+                ),
               ),
               const SizedBox(
                 width:
@@ -150,52 +227,38 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 label: 'Inspiration',
                 icon: _ReplyActionIconType.inspiration,
                 expanded: _inspirationExpanded,
-                onTap: _toggleInspiration,
+                onTap: _memberAction(
+                  _toggleInspiration,
+                  enabled:
+                      widget.inspirationEnabled && !widget.inspirationLoading,
+                ),
               ),
             ],
           ),
         ),
-        if (_editPromptExpanded) ...[
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.center,
-            child: LocationChatSubscriptionPrompt(
-              style: style,
-              promptKey: const ValueKey('edit-subscription-prompt'),
-              semanticsLabel: 'Get more editions',
-              message: const TextSpan(
-                children: [
-                  TextSpan(text: 'Free Edition uses left: '),
-                  TextSpan(
-                    text: '"3"',
-                    style: TextStyle(color: GenesisColors.brand),
-                  ),
-                ],
-              ),
-              actionLabel: 'Get more >',
-            ),
-          ),
-        ],
         if (_inspirationExpanded) ...[
           const SizedBox(height: 12),
-          _InspirationReplies(
-            onSend: (text) {
-              _setInspirationExpanded(false);
-              widget.onInspirationSend?.call(text);
-            },
-            onEdit: (text) {
-              _setInspirationExpanded(false);
-              widget.onInspirationEdit?.call(text);
-            },
-            style: style,
-            maxWidthCap: widget.selfMessageBubbleMaxWidthCap,
-            freeUsesLeft: widget.freeInspirationUsesLeft,
-            initialPage: widget.inspirationPage ?? _localInspirationPage,
-            onPageChanged: (page) {
-              _localInspirationPage = page;
-              widget.onInspirationPageChanged?.call(page);
-            },
-          ),
+          if (widget.inspirationLoading)
+            LocationChatLoadingBubble(style: style)
+          else if (widget.inspirationMessages.isNotEmpty)
+            _InspirationReplies(
+              replies: widget.inspirationMessages,
+              onSend: (text) {
+                _setInspirationExpanded(false);
+                widget.onInspirationSend?.call(text);
+              },
+              onEdit: (text) {
+                _setInspirationExpanded(false);
+                widget.onInspirationEdit?.call(text);
+              },
+              style: style,
+              maxWidthCap: widget.selfMessageBubbleMaxWidthCap,
+              initialPage: widget.inspirationPage ?? _localInspirationPage,
+              onPageChanged: (page) {
+                _localInspirationPage = page;
+                widget.onInspirationPageChanged?.call(page);
+              },
+            ),
         ],
       ],
     );
@@ -206,7 +269,7 @@ class _InspirationReplies extends StatefulWidget {
   const _InspirationReplies({
     required this.style,
     required this.maxWidthCap,
-    required this.freeUsesLeft,
+    required this.replies,
     required this.initialPage,
     required this.onPageChanged,
     required this.onSend,
@@ -215,7 +278,7 @@ class _InspirationReplies extends StatefulWidget {
 
   final ChatUiStyleConfig style;
   final double? maxWidthCap;
-  final int freeUsesLeft;
+  final List<String> replies;
   final int initialPage;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<String> onSend;
@@ -228,7 +291,10 @@ class _InspirationReplies extends StatefulWidget {
 class _InspirationRepliesState extends State<_InspirationReplies> {
   PageController? _pageController;
   double _viewportFraction = 1;
-  late int _currentPage = widget.initialPage;
+  late int _currentPage = widget.initialPage.clamp(
+    0,
+    widget.replies.length - 1,
+  );
 
   static const double _editStripWidth = 27;
 
@@ -276,12 +342,7 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
     super.dispose();
   }
 
-  // Demo-only suggestions; let the bubble width determine line wrapping.
-  static const replies = [
-    'Good job!',
-    "You're right to ask for a plan. Give me a little time to listen, and I'll come back with something we can actually build together.",
-    "I don't have every answer yet, but I came back for a reason. Let's talk to the people who still believe in this town, hear what they need, and give them a reason to walk through these doors again.",
-  ];
+  List<String> get replies => widget.replies;
 
   @override
   Widget build(BuildContext context) {
@@ -380,8 +441,8 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
                                     style.bubbleBorderRadius,
                                   ),
                                   message: ChatMessageVm(
-                                    localId: 'inspiration-demo-$index',
-                                    senderId: 'inspiration-demo',
+                                    localId: 'inspiration-$index',
+                                    senderId: 'inspiration',
                                     senderName: '',
                                     text: replies[index],
                                     isMe: true,
@@ -425,34 +486,6 @@ class _InspirationRepliesState extends State<_InspirationReplies> {
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: EdgeInsets.zero,
-                child: Align(
-                  alignment: Alignment.center,
-                  child: SizedBox(
-                    width: width,
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: LocationChatSubscriptionPrompt(
-                        style: style,
-                        promptKey: const ValueKey('inspiration-get-more'),
-                        semanticsLabel: 'Get more inspiration',
-                        message: const TextSpan(
-                          children: [
-                            TextSpan(text: 'Free inspiration uses left: '),
-                            TextSpan(
-                              text: '"3"',
-                              style: TextStyle(color: GenesisColors.brand),
-                            ),
-                          ],
-                        ),
-                        actionLabel: 'Get more >',
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -547,28 +580,34 @@ class _ReplyActionIcon extends StatelessWidget {
     return Semantics(
       label: label,
       enabled: onTap != null,
-      button: onTap != null,
+      button: true,
       expanded: expanded,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: SizedBox.square(
-          dimension: LocationChatReplyActions.buttonSize,
-          child: Center(
-            child: SvgPicture.asset(
-              switch (icon) {
-                _ReplyActionIconType.regenerate => regenerateIconAsset,
-                _ReplyActionIconType.goOn => goOnIconAsset,
-                _ReplyActionIconType.edit => editSquareIconAsset,
-                _ReplyActionIconType.inspiration => inspirationIconAsset,
-              },
-              width: LocationChatReplyActions.iconSize,
-              height: LocationChatReplyActions.iconSize,
-              colorFilter: const ColorFilter.mode(
-                Color(0xFFF4F3F6),
-                BlendMode.srcIn,
+      child: Tooltip(
+        message: label,
+        excludeFromSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: SizedBox.square(
+            dimension: LocationChatReplyActions.buttonSize,
+            child: Center(
+              child: SvgPicture.asset(
+                switch (icon) {
+                  _ReplyActionIconType.regenerate => regenerateIconAsset,
+                  _ReplyActionIconType.goOn => goOnIconAsset,
+                  _ReplyActionIconType.edit => editSquareIconAsset,
+                  _ReplyActionIconType.inspiration => inspirationIconAsset,
+                },
+                width: LocationChatReplyActions.iconSize,
+                height: LocationChatReplyActions.iconSize,
+                colorFilter: ColorFilter.mode(
+                  onTap == null
+                      ? const Color(0x73FFFFFF)
+                      : const Color(0xF2FFFFFF),
+                  BlendMode.srcIn,
+                ),
+                excludeFromSemantics: true,
               ),
-              excludeFromSemantics: true,
             ),
           ),
         ),

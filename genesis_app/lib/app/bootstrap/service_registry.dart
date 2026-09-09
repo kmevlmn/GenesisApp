@@ -259,6 +259,10 @@ class ServiceRegistry {
       gatewayRequestInterceptor: gatewayRequestInterceptor,
       onSessionExpired: handleSessionExpired,
       onPageNotFound: handlePageNotFound,
+      onChatroomMessageMutationError: (message) {
+        final overlay = genesisNavigatorKey.currentState?.overlay;
+        if (overlay != null) showGenesisToastInOverlay(overlay, message);
+      },
     );
     final chatroom = ChatroomClient(
       wsBaseUrl: config.chatroomWsBaseUrl,

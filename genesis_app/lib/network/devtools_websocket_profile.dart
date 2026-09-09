@@ -1,12 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
 
 import 'package:http_profile/http_profile.dart';
 
 import 'devtools_http_profile.dart';
 
+part 'devtools_websocket_stream_profile.dart';
+
 const kDevToolsWebSocketProfileMaxBodyBytes = 64 * 1024;
-const kDevToolsWebSocketProfileMaxFramesPerConnection = 1000;
 
 const _redactedValue = '[REDACTED]';
 const _sensitiveFieldNames = <String>{
@@ -28,7 +29,9 @@ class DevToolsWebSocketProfile {
     this._uri, {
     GenesisHttpProfileFactory profileFactory = _createWebSocketProfile,
     String? connectionId,
+    Duration streamIdleTimeout = const Duration(minutes: 2),
   }) : _profileFactory = profileFactory,
+       _streamIdleTimeout = streamIdleTimeout,
        _connectionId = connectionId ?? 'ws-${_nextConnectionId++}';
 
   static int _nextConnectionId = 1;
@@ -36,37 +39,45 @@ class DevToolsWebSocketProfile {
   final Uri _uri;
   final GenesisHttpProfileFactory _profileFactory;
   final String _connectionId;
+  final Duration _streamIdleTimeout;
+  final List<_WebSocketStreamProfile> _streams = [];
+  bool _closed = false;
+  // Bound diagnostic state on long-lived connections, including missing ACKs.
+  final Set<String> _heartbeatClientMessageIds = <String>{};
+  static const _maxHeartbeatClientMessageIds = 1024;
   int _nextSequence = 1;
-  int _recordedFrameCount = 0;
-  int _droppedFrameCount = 0;
-  bool _dropSummaryRecorded = false;
 
   Future<void> recordFrame({
     required String direction,
     required String message,
   }) async {
-    if (const bool.fromEnvironment('dart.vm.product')) return;
-    if (_recordedFrameCount >=
-        kDevToolsWebSocketProfileMaxFramesPerConnection) {
-      _droppedFrameCount += 1;
-      if (!_dropSummaryRecorded) {
-        _dropSummaryRecorded = true;
-        developer.log(
-          'WebSocket synthetic profile limit reached; '
-          'droppedFrames=$_droppedFrameCount connection=$_connectionId',
-          name: 'DevToolsWebSocketProfile',
-        );
-      }
+    if (const bool.fromEnvironment('dart.vm.product') || _closed) return;
+    final isOutgoing = direction == '=>';
+    Object? decoded;
+    try {
+      decoded = jsonDecode(message);
+    } catch (_) {
+      // Malformed frames remain visible as individual raw records.
+    }
+    // Track heartbeats even while recording is paused so later ACKs stay hidden.
+    final skipFrame = _shouldSkipFrame(decoded, isOutgoing: isOutgoing);
+    // The Network recording toggle controls profiling. A lifetime frame quota
+    // would permanently hide later business traffic on long-lived sockets.
+    if (!HttpClientRequestProfile.profilingEnabled) {
+      await _closeStreams('DevTools recording paused');
       return;
     }
-    _recordedFrameCount += 1;
+    if (skipFrame) return;
 
-    final isOutgoing = direction == '=>';
-    final sequence = _nextSequence++;
     HttpClientRequestProfile? profile;
     try {
+      final streamFrame = !isOutgoing && decoded is Map
+          ? _WebSocketStreamFrame.parse(decoded)
+          : null;
+      if (streamFrame != null && await _recordStreamFrame(streamFrame)) return;
       final recordedAt = DateTime.now();
-      final payload = _profilePayload(message);
+      final payload = _profilePayload(message, decoded: decoded);
+      final sequence = _nextSequence++;
       final requestUri = _profileUri(
         _uri,
         connectionId: _connectionId,
@@ -161,6 +172,112 @@ class DevToolsWebSocketProfile {
       }
     }
   }
+
+  bool _shouldSkipFrame(Object? decoded, {required bool isOutgoing}) {
+    if (decoded is! Map) return false;
+    final type = _profileField(decoded, 'type');
+    final payload = decoded['payload'];
+    final clientMessageId = decoded.containsKey('client_msg_id')
+        ? _profileField(decoded, 'client_msg_id')
+        : payload is Map
+        ? _profileField(payload, 'client_msg_id')
+        : null;
+    if (type == 'heartbeat') {
+      if (isOutgoing && clientMessageId != null) {
+        _heartbeatClientMessageIds.add(clientMessageId);
+        if (_heartbeatClientMessageIds.length > _maxHeartbeatClientMessageIds) {
+          _heartbeatClientMessageIds.remove(_heartbeatClientMessageIds.first);
+        }
+      }
+      return true;
+    }
+    // Retain recent IDs after an ACK to suppress duplicate acknowledgements too.
+    return !isOutgoing &&
+        type == 'ack' &&
+        clientMessageId != null &&
+        _heartbeatClientMessageIds.contains(clientMessageId);
+  }
+
+  /// Completes partial diagnostic streams without changing socket delivery.
+  Future<void> close({String reason = 'WebSocket closed before stream end'}) {
+    _closed = true;
+    _heartbeatClientMessageIds.clear();
+    return _closeStreams(reason);
+  }
+
+  Future<void> _closeStreams(String reason) {
+    final pending = _streams.toList();
+    _streams.clear();
+    return Future.wait(
+      pending.map((stream) => stream.close(reason)),
+    ).then((_) {});
+  }
+
+  Future<bool> _recordStreamFrame(_WebSocketStreamFrame frame) async {
+    final candidates = <_WebSocketStreamProfile>[];
+    var bestScore = 0;
+    for (final stream in _streams) {
+      final score = frame.matchScore(stream.identity);
+      if (score > bestScore) {
+        candidates.clear();
+        bestScore = score;
+      }
+      if (score > 0 && score == bestScore) candidates.add(stream);
+    }
+    // Ambiguous frames stay visible individually instead of mixing replies.
+    if (candidates.length > 1) return false;
+    var stream = candidates.singleOrNull;
+    if (stream == null) {
+      if (!frame.hasStableIdentity) return false;
+      if (_streams.length >= 32) {
+        unawaited(_streams.removeAt(0).close('Active stream limit reached'));
+      }
+      final sequence = _nextSequence++;
+      final now = DateTime.now();
+      final profile = _profileFactory(
+        requestStartTime: now,
+        requestMethod: 'WS_RECV',
+        requestUri: _profileUri(
+          _uri,
+          connectionId: _connectionId,
+          sequence: sequence,
+          messageType: frame.family == 'card'
+              ? 'llm_card_stream'
+              : 'llm_stream',
+          globalMessageId: frame.identity['global_message_id'],
+          messageId: frame.identity['message_id'],
+          locationMessageId: frame.identity['location_message_id'],
+        ).toString(),
+      );
+      if (profile == null) return true;
+      stream = _WebSocketStreamProfile(profile, frame.identity, {
+        'x-genesis-devtools-synthetic': 'websocket-stream',
+        'x-genesis-websocket-connection-id': _connectionId,
+        'x-genesis-websocket-direction': 'receive',
+        'x-genesis-websocket-sequence': '$sequence',
+        'content-type': 'application/x-ndjson; charset=utf-8',
+      });
+      _streams.add(stream);
+    }
+    final active = stream;
+    try {
+      active.append(frame);
+      active.idleTimer?.cancel();
+      if (frame.isEnd || frame.hasError) {
+        _streams.remove(active);
+        await active.close(frame.hasError ? 'WebSocket stream error' : null);
+      } else {
+        active.idleTimer = Timer(_streamIdleTimeout, () {
+          _streams.remove(active);
+          unawaited(active.close('WebSocket stream timed out'));
+        });
+      }
+    } catch (_) {
+      _streams.remove(active);
+      await active.close('WebSocket stream profiling failed');
+    }
+    return true;
+  }
 }
 
 HttpClientRequestProfile? _createWebSocketProfile({
@@ -207,20 +324,9 @@ Uri _profileUri(
   );
 }
 
-_WebSocketProfilePayload _profilePayload(String message) {
-  if (devToolsWebSocketFrameExceedsBodyLimit(message)) {
-    return _WebSocketProfilePayload(
-      contentType: 'text/plain; charset=utf-8',
-      bodyBytes: utf8.encode(
-        '[websocket frame omitted: ${message.length} code units exceeds '
-        '$kDevToolsWebSocketProfileMaxBodyBytes-byte profile limit]',
-      ),
-      messageType: null,
-      globalMessageId: null,
-      messageId: null,
-      locationMessageId: null,
-    );
-  }
+_WebSocketProfilePayload _profilePayload(String message, {Object? decoded}) {
+  // Extract metadata and redact the complete JSON before limiting the stored
+  // preview, so large stream/end frames still match the Network type filter.
   String sanitized;
   var contentType = 'text/plain; charset=utf-8';
   String? messageType;
@@ -228,7 +334,7 @@ _WebSocketProfilePayload _profilePayload(String message) {
   String? messageId;
   String? locationMessageId;
   try {
-    final decoded = jsonDecode(message);
+    decoded ??= jsonDecode(message);
     if (decoded is Map) {
       messageType = _profileField(decoded, 'type');
       globalMessageId = _profileIdField(
@@ -253,7 +359,9 @@ _WebSocketProfilePayload _profilePayload(String message) {
     sanitized = _redactRawSecrets(message);
   }
   return _WebSocketProfilePayload(
-    contentType: contentType,
+    contentType: devToolsWebSocketFrameExceedsBodyLimit(sanitized)
+        ? 'text/plain; charset=utf-8'
+        : contentType,
     bodyBytes: _truncateUtf8(sanitized),
     messageType: messageType,
     globalMessageId: globalMessageId,
@@ -332,13 +440,16 @@ String _redactRawSecrets(String value) {
   );
 }
 
-List<int> _truncateUtf8(String value) {
+List<int> _truncateUtf8(
+  String value, {
+  int maxBytes = kDevToolsWebSocketProfileMaxBodyBytes,
+}) {
   final encoded = utf8.encode(value);
-  if (encoded.length <= kDevToolsWebSocketProfileMaxBodyBytes) return encoded;
+  if (encoded.length <= maxBytes) return encoded;
 
   final suffix = '\n...[truncated ${encoded.length} byte payload]';
   final suffixBytes = utf8.encode(suffix);
-  var prefixLength = kDevToolsWebSocketProfileMaxBodyBytes - suffixBytes.length;
+  var prefixLength = maxBytes - suffixBytes.length;
   var result = <int>[];
   while (prefixLength >= 0) {
     final prefix = utf8.decode(
@@ -346,10 +457,10 @@ List<int> _truncateUtf8(String value) {
       allowMalformed: true,
     );
     result = utf8.encode('$prefix$suffix');
-    if (result.length <= kDevToolsWebSocketProfileMaxBodyBytes) return result;
-    prefixLength -= result.length - kDevToolsWebSocketProfileMaxBodyBytes;
+    if (result.length <= maxBytes) return result;
+    prefixLength -= result.length - maxBytes;
   }
-  return suffixBytes.take(kDevToolsWebSocketProfileMaxBodyBytes).toList();
+  return suffixBytes.take(maxBytes).toList();
 }
 
 class _WebSocketProfilePayload {

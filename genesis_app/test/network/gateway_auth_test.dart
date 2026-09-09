@@ -1,3 +1,4 @@
+import 'package:genesis_flutter_android/network/chatroom/chatroom_http_models.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -5,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/app/telemetry/genesis_telemetry.dart';
 import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/network/api_client.dart';
+import 'package:genesis_flutter_android/network/chatroom/chatroom_http_api.dart';
 import 'package:genesis_flutter_android/network/gateway_auth.dart';
 import 'package:genesis_flutter_android/network/http_transport.dart';
 import 'package:genesis_flutter_android/platform/device/device_id_service.dart';
@@ -142,6 +144,88 @@ void main() {
       expect(
         isGatewaySignedRequest(Uri.parse('https://x.test/apix/v1/time')),
         false,
+      );
+    },
+  );
+
+  test(
+    'message batch and card selection pass Gateway signing with exact body hashes',
+    () async {
+      final keyStore = _FakeKeyStore();
+      final signedRequests = <TransportRequest>[];
+      final api = ChatroomHttpApi(
+        ApiClient(
+          baseUrl: 'https://gateway.test/',
+          requestHeaderProvider: () async => {
+            'Authorization': 'Bearer message-token',
+          },
+          requestInterceptor: (request, send) async {
+            expect(isGatewaySignedRequest(request.uri), isTrue);
+            final signed = await const GatewayRequestSigner().sign(
+              request,
+              GatewaySigningContext(
+                appId: 'app',
+                platform: 'android',
+                deviceId: 'device',
+                appVersion: '0.4.4',
+                keyId: 'key-1',
+                serverTimeOffsetMs: 0,
+                keyStore: keyStore,
+              ),
+            );
+            expect(keyStore.lastCanonical, contains(request.method));
+            signedRequests.add(signed);
+            return TransportResponse(
+              statusCode: 200,
+              headers: const {'content-type': 'application/json'},
+              body: request.uri.path.endsWith('/select')
+                  ? '{"err_no":0,"data":{"conversation_round_id":1,"selected_card_id":9007199254740993,"confirmed":true,"start_conversation_round_id":1,"end_conversation_round_id":1,"newest_message_id":0}}'
+                  : '{"err_no":0,"data":{"start_conversation_round_id":1,"end_conversation_round_id":1,"newest_message_id":0}}',
+            );
+          },
+        ),
+      );
+      await api.batchMutateLlmMessages(
+        worldId: 'world-1',
+        locationId: 'loc-1',
+        conversationRoundId: 1,
+        operations: [
+          ChatroomLlmMessageOperation.edit(
+            globalMessageId: 9007199254740993,
+            content: 'edited',
+          ),
+        ],
+      );
+      await api.batchMutateLlmMessages(
+        worldId: 'world-1',
+        locationId: 'loc-1',
+        conversationRoundId: 1,
+        operations: [
+          ChatroomLlmMessageOperation.delete(globalMessageId: 9007199254740993),
+        ],
+      );
+      await api.selectLlmCard(
+        worldId: 'world-1',
+        locationId: 'loc-1',
+        conversationRoundId: 1,
+        cardId: 9007199254740993,
+        clientMsgId: 'select-1',
+      );
+      for (final request in signedRequests) {
+        expect(request.headers['Authorization'], 'Bearer message-token');
+        expect(request.headers['X-App-Version'], '0.4.4');
+        expect(
+          request.headers['X-Body-SHA256'],
+          gatewayBodySha256(request.bodyBytes),
+        );
+        expect(request.headers['X-Signature'], 'fake-signature');
+      }
+      expect(signedRequests.map((r) => r.method), ['POST', 'POST', 'POST']);
+      expect(
+        jsonDecode(utf8.decode(signedRequests[1].bodyBytes!))['operations'],
+        [
+          {'action': 'delete', 'global_message_id': 9007199254740993},
+        ],
       );
     },
   );
@@ -316,6 +400,44 @@ void main() {
       );
     },
   );
+  test('message writes never replay after Gateway rejection', () async {
+    final coordinator = GatewayAuthCoordinator(
+      gatewayBaseUrl: 'https://gateway.test/apix/',
+      appHeaderProvider: _testAppHeaders,
+      deviceIdService: const _TestDeviceIdService(),
+      keyStore: _FakeKeyStore(),
+      registrationStore: _MemoryGatewayRegistrationStore(),
+      transport: _FakeTransport(handler: _gatewayAuthResponse),
+    );
+    final interceptor = GatewayRequestInterceptor(coordinator: coordinator);
+    for (final route in ['batch', 'select']) {
+      for (final code in [20502, 20503, 20504, 20509]) {
+        var attempts = 0;
+        final response = await interceptor.call(
+          TransportRequest(
+            method: 'POST',
+            uri: Uri.parse(
+              'https://gateway.test/aitown-chat/api/v1/worlds/w/locations/l/llm-messages/$route',
+            ),
+            headers: const {},
+            bodyBytes: null,
+            timeoutMs: 15000,
+          ),
+          (request) async {
+            attempts++;
+            expect(request.headers['X-Signature'], isNotEmpty);
+            return _json({
+              'err_no': code,
+              'err_msg': 'rejected',
+              'data': false,
+            });
+          },
+        );
+        expect(gatewayErrNo(response.body), code);
+        expect(attempts, 1);
+      }
+    }
+  });
 
   test('interceptor syncs server time and retries once on 20502', () async {
     final keyStore = _FakeKeyStore();

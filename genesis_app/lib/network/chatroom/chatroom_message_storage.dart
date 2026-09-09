@@ -46,6 +46,18 @@ abstract class ChatroomMessageStorage {
     int maxMessagesPerLocation = 200,
   });
 
+  /// Atomically replaces a closed round range; omitted bounds replace the location.
+  Future<void> replaceMessages({
+    required String ownerUid,
+    required String worldId,
+    required String locationId,
+    required List<Map<String, dynamic>> messages,
+    int? startConversationRoundId,
+    int? endConversationRoundId,
+    bool Function()? isCurrent,
+    int maxMessagesPerLocation = 200,
+  });
+
   Future<void> clearCache(String ownerUid);
 }
 
@@ -246,6 +258,46 @@ class SqfliteChatroomMessageStorage implements ChatroomMessageStorage {
   }
 
   @override
+  /// Atomically replaces a closed round range; omitted bounds replace the location.
+  Future<void> replaceMessages({
+    required String ownerUid,
+    required String worldId,
+    required String locationId,
+    required List<Map<String, dynamic>> messages,
+    int? startConversationRoundId,
+    int? endConversationRoundId,
+    bool Function()? isCurrent,
+    int maxMessagesPerLocation = 200,
+  }) async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      final rows = await txn.query(
+        'chatroom_messages',
+        where: 'owner_uid = ? AND world_id = ? AND location_id = ?',
+        whereArgs: [ownerUid, worldId, locationId],
+      );
+      final next = _replacementMessages(
+        rows.map(_messageFromRow).whereType<Map<String, dynamic>>(),
+        messages,
+        startConversationRoundId,
+        endConversationRoundId,
+        maxMessagesPerLocation,
+      );
+      await txn.delete(
+        'chatroom_messages',
+        where: 'owner_uid = ? AND world_id = ? AND location_id = ?',
+        whereArgs: [ownerUid, worldId, locationId],
+      );
+      for (final message in next) {
+        await _insertMessage(txn, ownerUid, worldId, locationId, message);
+      }
+      if (isCurrent?.call() == false) {
+        throw StateError('Stale history transaction');
+      }
+    });
+  }
+
+  @override
   Future<void> clearCache(String ownerUid) async {
     final db = await _db;
     await db.delete(
@@ -282,6 +334,19 @@ class SqfliteChatroomMessageStorage implements ChatroomMessageStorage {
     final existing = existingRows.isEmpty
         ? null
         : _messageFromRow(existingRows.first);
+    if (_globalMessageId(message) > 0) {
+      await executor.delete(
+        'chatroom_messages',
+        where:
+            'owner_uid = ? AND world_id = ? AND location_id = ? AND global_msg_id = ?',
+        whereArgs: [
+          ownerUid,
+          worldId,
+          resolvedLocationId,
+          _globalMessageId(message),
+        ],
+      );
+    }
     final messageForStorage = _messageForStorage(
       _preservingLlmStreamFlag(message, existing),
       locationMessageId,
@@ -391,6 +456,13 @@ class MemoryChatroomMessageStorage implements ChatroomMessageStorage {
     for (final message in messages) {
       if (_messageId(message) <= 0) continue;
       final key = _messageStorageKey(message);
+      bucket.removeWhere(
+        (oldKey, old) =>
+            oldKey != key &&
+            _storageLocationMessageId(message) > 0 &&
+            _storageLocationMessageId(old) ==
+                _storageLocationMessageId(message),
+      );
       bucket[key] = _messageForStorage(
         _preservingLlmStreamFlag(message, bucket[key]),
         _storageLocationMessageId(message),
@@ -410,6 +482,12 @@ class MemoryChatroomMessageStorage implements ChatroomMessageStorage {
     if (_messageId(message) <= 0) return;
     final bucket = _bucket(ownerUid, worldId, locationId);
     final key = _messageStorageKey(message);
+    bucket.removeWhere(
+      (oldKey, old) =>
+          oldKey != key &&
+          _storageLocationMessageId(message) > 0 &&
+          _storageLocationMessageId(old) == _storageLocationMessageId(message),
+    );
     bucket[key] = _messageForStorage(
       _preservingLlmStreamFlag(message, bucket[key]),
       _storageLocationMessageId(message),
@@ -434,6 +512,36 @@ class MemoryChatroomMessageStorage implements ChatroomMessageStorage {
         maxWorldMessageId: maxWorldMessageId,
       );
     });
+  }
+
+  @override
+  /// Atomically replaces a closed round range; omitted bounds replace the location.
+  Future<void> replaceMessages({
+    required String ownerUid,
+    required String worldId,
+    required String locationId,
+    required List<Map<String, dynamic>> messages,
+    int? startConversationRoundId,
+    int? endConversationRoundId,
+    bool Function()? isCurrent,
+    int maxMessagesPerLocation = 200,
+  }) async {
+    final bucket = _bucket(ownerUid, worldId, locationId);
+    final next = _replacementMessages(
+      bucket.values,
+      messages,
+      startConversationRoundId,
+      endConversationRoundId,
+      maxMessagesPerLocation,
+    );
+    if (isCurrent?.call() == false) return;
+    bucket.clear();
+    for (final message in next) {
+      bucket[_messageStorageKey(message)] = _messageForStorage(
+        message,
+        _storageLocationMessageId(message),
+      );
+    }
   }
 
   @override
@@ -608,6 +716,8 @@ bool _messageIsAtOrBeforeLocationCursor(
 
 String _messageStorageKey(Map<String, dynamic>? message) {
   if (message == null) return '';
+  final globalId = _globalMessageId(message);
+  if (globalId > 0) return 'global:$globalId';
   final locationMessageId = _storageLocationMessageId(message);
   if (locationMessageId > 0) return 'location:$locationMessageId';
   return 'message:${_messageId(message)}';
@@ -631,6 +741,10 @@ Map<String, dynamic> _preservingLlmStreamFlag(
   Map<String, dynamic> incoming,
   Map<String, dynamic>? existing,
 ) {
+  if (incoming['payload'] is Map &&
+      (incoming['payload'] as Map)['status'] == 20) {
+    return incoming;
+  }
   if (asBool(existing?['is_llm_stream']) &&
       !asBool(incoming['is_llm_stream'])) {
     return <String, dynamic>{...incoming, 'is_llm_stream': true};
@@ -686,3 +800,30 @@ const Set<String> _legacySupplementalSenderTypesToDelete = <String>{
   'story_events',
   'characters_moved',
 };
+
+List<Map<String, dynamic>> _replacementMessages(
+  Iterable<Map<String, dynamic>> existing,
+  List<Map<String, dynamic>> incoming,
+  int? start,
+  int? end,
+  int limit,
+) {
+  if ((start != null || end != null) &&
+      (start == null || end == null || start <= 0 || end < start)) {
+    throw ArgumentError('Invalid replacement range');
+  }
+  final byId = <String, Map<String, dynamic>>{};
+  for (final message in existing) {
+    final round = asInt(message['conversation_round_id']);
+    if (start != null && (round < start || round > end!)) {
+      byId[_messageStorageKey(message)] = message;
+    }
+  }
+  for (final message in incoming) {
+    if (_messageId(message) > 0) byId[_messageStorageKey(message)] = message;
+  }
+  final sorted = _sortMessageJson(byId.values);
+  return limit > 0 && sorted.length > limit
+      ? sorted.sublist(sorted.length - limit)
+      : sorted;
+}
