@@ -228,7 +228,11 @@ class _FollowsPageState extends State<FollowsPage>
     } catch (error) {
       if (!mounted || generation != _loadGeneration) return;
       setState(() => _loadingUids.remove(uid));
-      showGenesisToast(context, apiErrorMessage(error));
+      showGenesisToast(
+        context,
+        apiErrorMessage(error),
+        brightness: Brightness.dark,
+      );
     }
   }
 

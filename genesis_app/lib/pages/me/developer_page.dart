@@ -45,6 +45,7 @@ import '../../routers/app_router.dart';
 import '../../utils/gem_amount.dart';
 import '../gems/gem_wallet_page.dart';
 import '../world/world_update_push_banner.dart';
+import '../origin_editor/origin_debug_tools.dart';
 import '../../ui/genesis_ui.dart';
 import 'about_us_page.dart';
 
@@ -102,13 +103,16 @@ void resetDeveloperPageTabForTesting() {
 }
 
 class DeveloperPage extends StatelessWidget {
-  const DeveloperPage({super.key});
+  const DeveloperPage({super.key, this.randomAction});
+
+  final OriginDebugRandomAction? randomAction;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: DeveloperPageContent(
+          randomAction: randomAction,
           headerLeading: _DeveloperPageBackButton(
             onPressed: () => Navigator.of(context).maybePop(),
           ),
@@ -119,9 +123,14 @@ class DeveloperPage extends StatelessWidget {
 }
 
 class DeveloperPageSheet extends StatelessWidget {
-  const DeveloperPageSheet({super.key, this.sheetScrollController});
+  const DeveloperPageSheet({
+    super.key,
+    this.sheetScrollController,
+    this.randomAction,
+  });
 
   final ScrollController? sheetScrollController;
+  final OriginDebugRandomAction? randomAction;
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +143,7 @@ class DeveloperPageSheet extends StatelessWidget {
           showHeader: false,
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
           child: DeveloperPageContent(
+            randomAction: randomAction,
             dismissBeforePreview: true,
             sheetScrollController: sheetScrollController,
             headerTrailing: GenesisBottomSheetCloseButton(
@@ -158,6 +168,7 @@ class DeveloperPageContent extends StatefulWidget {
     this.headerLeading,
     this.headerTrailing,
     this.sheetScrollController,
+    this.randomAction,
   });
 
   final bool dismissBeforePreview;
@@ -165,6 +176,7 @@ class DeveloperPageContent extends StatefulWidget {
   final Widget? headerLeading;
   final Widget? headerTrailing;
   final ScrollController? sheetScrollController;
+  final OriginDebugRandomAction? randomAction;
 
   @override
   State<DeveloperPageContent> createState() => _DeveloperPageContentState();
@@ -911,6 +923,11 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
       ),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
+        if (buildOriginDebugRandomContentButton(action: widget.randomAction)
+            case final randomButton?) ...[
+          randomButton,
+          const SizedBox(height: _itemGap),
+        ],
         Row(
           children: [
             Expanded(

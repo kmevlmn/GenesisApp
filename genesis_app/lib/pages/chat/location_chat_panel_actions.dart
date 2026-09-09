@@ -52,7 +52,7 @@ extension _LocationChatPanelActions on _LocationChatPanelState {
         : message.text;
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    showGenesisToast(context, 'Copied');
+    showGenesisToast(context, 'Copied', brightness: Brightness.dark);
   }
 
   String _messageReportTargetId(ChatMessageVm message) {

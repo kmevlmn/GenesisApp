@@ -611,13 +611,13 @@ sealed class AppRouter {
           builder: (_) => const SearchPage(),
         );
       case RouteNames.create:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const CreateOriginPage(),
         );
       case RouteNames.edit:
         final args = _EditRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => EditOriginPage(originId: args.originId),
         );

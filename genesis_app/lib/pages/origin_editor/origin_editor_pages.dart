@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../app/debug/location_chat_bubble_layout_settings.dart';
@@ -20,6 +20,7 @@ import '../../components/world_point.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../network/api_exception.dart';
 import '../../ui/genesis_ui.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 import '../../ui/tokens/genesis_avatar_radii.dart';
 import '../../utils/genesis_ugc_text.dart';
 import '../create/create_form_widgets.dart';
@@ -87,7 +88,7 @@ enum _DraftLeaveAction { submit, save, discard }
 enum OriginDraftSubmitStatus { idle, checkingPending, processing }
 
 const TextStyle _editSummaryLabelStyle = TextStyle(
-  color: Colors.black,
+  color: GenesisColors.darkTextPrimary,
   fontSize: 14,
   fontWeight: FontWeight.w600,
   height: 1.2,
@@ -159,6 +160,37 @@ class _KeyboardHiddenBottomActionState
   }
 }
 
+const double _updateNotesBottomGap = 24;
+
+/// The list's lower boundary follows whichever obstruction is taller. Keeping
+/// the resting action height reserved avoids a one-frame resize when the IME
+/// reaches zero and Publish becomes visible again.
+class _UpdateNotesBottomAction extends StatelessWidget {
+  const _UpdateNotesBottomAction({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final actionHeight =
+        GenesisPrimaryButton.defaultHeight +
+        8 +
+        14 +
+        MediaQuery.viewPaddingOf(context).bottom;
+    return SizedBox(
+      height: keyboardInset > actionHeight ? keyboardInset : actionHeight,
+      width: double.infinity,
+      child: keyboardInset > 0
+          ? null
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+              child: Align(alignment: Alignment.topCenter, child: child),
+            ),
+    );
+  }
+}
+
 class OriginDraftFlowPage extends StatefulWidget {
   const OriginDraftFlowPage({
     super.key,
@@ -172,6 +204,7 @@ class OriginDraftFlowPage extends StatefulWidget {
     required this.onSubmit,
     this.submitLabel = 'Save',
     this.submittingLabel = 'Saving...',
+    this.disabledSubmitBackgroundColor = GenesisColors.darkFaintFill,
     this.failurePrefix = 'Save failed',
     this.leaveTitle = 'Save the draft before leaving?',
     this.leaveSubmitLabel,
@@ -198,6 +231,7 @@ class OriginDraftFlowPage extends StatefulWidget {
   final OriginSubmitHandler onSubmit;
   final String submitLabel;
   final String submittingLabel;
+  final Color disabledSubmitBackgroundColor;
   final String failurePrefix;
   final String leaveTitle;
   final String? leaveSubmitLabel;
@@ -221,12 +255,31 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
   bool _isLoading = true;
   bool _isSubmitting = false;
   bool _isHandlingLeave = false;
+  VoidCallback? _unregisterDebugRandomAction;
+  final ScrollController _summaryScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     widget.updateNotesController?.addListener(_handleUpdateNotesChanged);
     _reloadDraft();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _unregisterDebugRandomAction ??= registerOriginDebugRandomAction(
+      context: context,
+      label: () => widget.title,
+      repository: () => widget.repository,
+      generator: () => widget.debugDraftGenerator,
+      enabled: () =>
+          mounted &&
+          !_isLoading &&
+          !_isSubmitting &&
+          widget.submitStatus == OriginDraftSubmitStatus.idle,
+      onGenerated: _reloadDraft,
+    );
   }
 
   @override
@@ -246,6 +299,8 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
 
   @override
   void dispose() {
+    _unregisterDebugRandomAction?.call();
+    _summaryScrollController.dispose();
     widget.updateNotesController?.removeListener(_handleUpdateNotesChanged);
     super.dispose();
   }
@@ -296,7 +351,7 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
       final result = await widget.onSubmit(context, widget.repository, latest);
       if (!mounted) return false;
       if (result.showMessage && result.message.trim().isNotEmpty) {
-        showGenesisToast(context, result.message);
+        showGenesisToast(context, result.message, brightness: Brightness.dark);
       }
       if (result.draft != null) {
         setState(() {
@@ -327,7 +382,7 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
   }
 
   void _showError(String message) {
-    showGenesisToast(context, message);
+    showGenesisToast(context, message, brightness: Brightness.dark);
   }
 
   String? _submitBlockReason(CreateOriginDraft draft) {
@@ -452,16 +507,48 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
 
   @override
   Widget build(BuildContext context) {
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: kGenesisLightSystemUiOverlayStyle,
+          child: _buildFlow(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFlow(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: GenesisColors.darkBackground,
+        appBar: GenesisBackAppBar(
+          pageName: widget.title,
+          backgroundColor: GenesisColors.darkBackground,
+          foregroundColor: GenesisColors.darkTextPrimary,
+          systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+        ),
+        body: const Center(child: GenesisLoadingIndicator()),
+      );
     }
 
-    const disabledSubmitColor = GenesisColors.brandSoft;
     final canUseSubmitButton =
         !_isSubmitting &&
         widget.submitStatus == OriginDraftSubmitStatus.idle &&
         _submitBlockReason(_draft) == null;
     final submitLabel = _submitButtonLabel();
+    final submitButton = GenesisPrimaryButton(
+      label: submitLabel,
+      width: _primaryActionButtonWidth(context),
+      onPressed: canUseSubmitButton ? () => unawaited(_submit()) : null,
+      onDisabledPressed: _showSubmitDisabledReason,
+      backgroundColor: GenesisColors.redPrimary,
+      foregroundColor: GenesisColors.darkTextPrimary,
+      disabledBackgroundColor: widget.disabledSubmitBackgroundColor,
+      disabledForegroundColor: GenesisColors.darkTextPrimary,
+    );
 
     return PopScope(
       canPop: false,
@@ -472,25 +559,21 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
       child: GenesisEdgeSwipeBack(
         onBack: () => unawaited(_handleLeaveRequest()),
         child: Scaffold(
-          resizeToAvoidBottomInset: true,
+          backgroundColor: GenesisColors.darkBackground,
+          resizeToAvoidBottomInset: widget.updateNotesController == null,
           appBar: GenesisBackAppBar(
             pageName: widget.title,
+            backgroundColor: GenesisColors.darkBackground,
+            foregroundColor: GenesisColors.darkTextPrimary,
+            systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
             onBack: () => unawaited(_handleLeaveRequest()),
           ),
-          floatingActionButton: buildOriginDebugRandomContentButton(
-            repository: widget.repository,
-            generator: widget.debugDraftGenerator,
-            enabled:
-                !_isSubmitting &&
-                widget.submitStatus == OriginDraftSubmitStatus.idle,
-            onGenerated: _reloadDraft,
-          ),
-          floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
           body: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: _clearInputFocus,
             child: SafeArea(
               top: false,
+              bottom: widget.updateNotesController == null,
               child: Column(
                 children: [
                   Expanded(
@@ -498,9 +581,9 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Column(
                         children: [
-                          const SizedBox(height: 14),
                           Expanded(
                             child: ListView(
+                              controller: _summaryScrollController,
                               padding: EdgeInsets.only(
                                 bottom: widget.updateNotesController == null
                                     ? 10
@@ -508,6 +591,7 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
                               ),
                               children: [
                                 if (widget.showCurrentVersion) ...[
+                                  const SizedBox(height: 8),
                                   Text(
                                     'Current Version: ${_versionLabel(_draft.basics.originVersion)}',
                                     style: _editSummaryLabelStyle,
@@ -588,20 +672,10 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
                       ),
                     ),
                   ),
-                  _KeyboardHiddenBottomAction(
-                    child: GenesisPrimaryButton(
-                      label: submitLabel,
-                      width: _primaryActionButtonWidth(context),
-                      onPressed: canUseSubmitButton
-                          ? () => unawaited(_submit())
-                          : null,
-                      onDisabledPressed: _showSubmitDisabledReason,
-                      backgroundColor: createFormGreen,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: disabledSubmitColor,
-                      disabledForegroundColor: Colors.white,
-                    ),
-                  ),
+                  if (widget.updateNotesController != null)
+                    _UpdateNotesBottomAction(child: submitButton)
+                  else
+                    _KeyboardHiddenBottomAction(child: submitButton),
                 ],
               ),
             ),
@@ -825,9 +899,14 @@ class _UpdateNotesField extends StatelessWidget {
       label: '',
       controller: controller,
       hintText: 'What changed in this version?',
+      fillColor: GenesisColors.darkFaintFill,
+      textColor: GenesisColors.darkTextPrimary,
+      hintColor: GenesisColors.darkInputPlaceholder,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      inputLineHeight: 1.4,
       minLines: 4,
       maxLines: 4,
-      visibilityBottomPadding: 10,
+      visibilityBottomPadding: _updateNotesBottomGap,
       textInputAction: TextInputAction.done,
       onChanged: (_) {},
       onEditingComplete: () => FocusManager.instance.primaryFocus?.unfocus(),

@@ -15,11 +15,10 @@ import 'origin_debug_draft_factory.dart';
 import 'origin_debug_image_upload.dart';
 import 'origin_draft_repository.dart';
 
-typedef OriginDebugDraftGenerator =
-    FutureOr<CreateOriginDraft> Function(
-      BuildContext context,
-      CreateOriginDraft currentDraft,
-    );
+import '../../ui/genesis_ui.dart';
+import 'origin_debug_random_action.dart';
+
+export 'origin_debug_random_action.dart';
 
 OriginDebugDraftGenerator? createOriginDebugDraftGenerator() {
   if (!kDebugMode) return null;
@@ -97,89 +96,160 @@ Future<CreateOriginDraft> _uploadGeneratedImages(
   );
 }
 
-Widget? buildOriginDebugRandomContentButton({
-  required OriginDraftRepository repository,
-  required OriginDebugDraftGenerator? generator,
-  required bool enabled,
+final _randomActions = <_RegisteredRandomAction>[];
+
+VoidCallback registerOriginDebugRandomAction({
+  required BuildContext context,
+  required String Function() label,
+  required OriginDraftRepository Function() repository,
+  required OriginDebugDraftGenerator? Function() generator,
+  required bool Function() enabled,
   required Future<void> Function() onGenerated,
 }) {
-  if (!kDebugMode || generator == null) return null;
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 64),
-    child: _OriginDebugRandomContentButton(
-      repository: repository,
-      generator: generator,
-      enabled: enabled,
-      onGenerated: onGenerated,
-    ),
+  if (!kDebugMode) return () {};
+  final action = _RegisteredRandomAction(
+    context: context,
+    labelProvider: label,
+    repository: repository,
+    generator: generator,
+    enabled: enabled,
+    onGenerated: onGenerated,
   );
+  _randomActions.add(action);
+  return () {
+    action.active = false;
+    _randomActions.remove(action);
+  };
 }
 
-class _OriginDebugRandomContentButton extends StatefulWidget {
-  const _OriginDebugRandomContentButton({
+OriginDebugRandomAction? captureOriginDebugRandomAction() {
+  if (!kDebugMode) return null;
+  for (final action in _randomActions.reversed) {
+    if (action.active &&
+        action.context.mounted &&
+        ModalRoute.of(action.context)?.isCurrent == true &&
+        action.generator() != null) {
+      return action;
+    }
+  }
+  return null;
+}
+
+class _RegisteredRandomAction implements OriginDebugRandomAction {
+  _RegisteredRandomAction({
+    required this.context,
+    required this.labelProvider,
     required this.repository,
     required this.generator,
     required this.enabled,
     required this.onGenerated,
   });
 
-  final OriginDraftRepository repository;
-  final OriginDebugDraftGenerator generator;
-  final bool enabled;
+  final BuildContext context;
+  final String Function() labelProvider;
+  final OriginDraftRepository Function() repository;
+  final OriginDebugDraftGenerator? Function() generator;
+  final bool Function() enabled;
   final Future<void> Function() onGenerated;
+  bool active = true;
+  bool generating = false;
 
   @override
-  State<_OriginDebugRandomContentButton> createState() =>
-      _OriginDebugRandomContentButtonState();
+  String get label => labelProvider();
+  @override
+  bool get isEnabled =>
+      active &&
+      context.mounted &&
+      !generating &&
+      enabled() &&
+      generator() != null;
+
+  @override
+  Future<void> generate() async {
+    if (!isEnabled) throw StateError('No active editor available.');
+    final targetRepository = repository();
+    final targetGenerator = generator()!;
+    generating = true;
+    try {
+      final current = await targetRepository.loadSummaryDraft();
+      if (!active || !context.mounted) throw StateError('Editor closed.');
+      final generated = await targetGenerator(context, current);
+      if (!active ||
+          !context.mounted ||
+          !enabled() ||
+          repository() != targetRepository) {
+        throw StateError('Editor changed during generation.');
+      }
+      await targetRepository.saveFinalDraft(
+        _markChangedDebugSectionsSaved(current, generated),
+      );
+      if (active && context.mounted) await onGenerated();
+    } finally {
+      generating = false;
+    }
+  }
 }
 
-class _OriginDebugRandomContentButtonState
-    extends State<_OriginDebugRandomContentButton> {
-  bool _isGenerating = false;
+Widget? buildOriginDebugRandomContentButton({
+  required OriginDebugRandomAction? action,
+}) {
+  if (!kDebugMode) return null;
+  return _DeveloperRandomContentButton(action: action);
+}
+
+class _DeveloperRandomContentButton extends StatefulWidget {
+  const _DeveloperRandomContentButton({required this.action});
+  final OriginDebugRandomAction? action;
+  @override
+  State<_DeveloperRandomContentButton> createState() =>
+      _DeveloperRandomContentButtonState();
+}
+
+class _DeveloperRandomContentButtonState
+    extends State<_DeveloperRandomContentButton> {
+  bool _generating = false;
 
   Future<void> _generate() async {
-    if (_isGenerating || !widget.enabled) return;
-    setState(() => _isGenerating = true);
+    final action = widget.action;
+    if (_generating || action == null || !action.isEnabled) return;
+    setState(() => _generating = true);
     try {
-      final current = await widget.repository.loadSummaryDraft();
-      if (!mounted) return;
-      final generatedDraft = await widget.generator(context, current);
-      if (!mounted) return;
-      final generated = _markChangedDebugSectionsSaved(current, generatedDraft);
-      await widget.repository.saveFinalDraft(generated);
-      if (!mounted) return;
-      await widget.onGenerated();
-      if (!mounted) return;
-      setState(() => _isGenerating = false);
-      showGenesisToast(context, 'Random test content generated.');
+      await action.generate();
+      if (mounted) showGenesisToast(context, 'Random test content generated.');
     } catch (error, stackTrace) {
-      debugPrint('[OriginEditor] debug draft generation failed: $error');
-      debugPrint('[OriginEditor] stacktrace:\n$stackTrace');
-      if (!mounted) return;
-      setState(() => _isGenerating = false);
-      showGenesisToast(context, 'Unable to generate random test content.');
+      debugPrint(
+        '[OriginEditor] debug draft generation failed: $error\n$stackTrace',
+      );
+      if (mounted) {
+        showGenesisToast(context, 'Unable to generate random test content.');
+      }
+    } finally {
+      if (mounted) setState(() => _generating = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton.extended(
-      key: const ValueKey<String>('origin-debug-random-content-button'),
-      heroTag: null,
-      onPressed: _isGenerating || !widget.enabled
-          ? null
-          : () => unawaited(_generate()),
-      icon: _isGenerating
-          ? const SizedBox.square(
-              dimension: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : const Icon(Icons.casino_outlined),
-      label: const Text('Random'),
-      tooltip: 'Generate random test content',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GenesisPrimaryButton(
+          key: const ValueKey<String>('origin-debug-random-content-button'),
+          label: _generating ? 'Generating...' : 'Random',
+          onPressed: !_generating && (widget.action?.isEnabled ?? false)
+              ? () => unawaited(_generate())
+              : null,
+          backgroundColor: const Color(0xFFE1E1E3),
+          foregroundColor: Colors.black,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          widget.action == null
+              ? 'Open Create or Edit home before opening Developer to use Random.'
+              : 'Generate random content for ${widget.action!.label}.',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF666666)),
+        ),
+      ],
     );
   }
 }

@@ -782,7 +782,7 @@ class _OriginSetupRoleCardState extends State<_OriginSetupRoleCard>
     if (widget.busy || !_editing || form == null) return;
     final validationMessage = _editValidationMessage;
     if (validationMessage != null) {
-      showGenesisToast(context, validationMessage);
+      showGenesisToast(context, validationMessage, brightness: Brightness.dark);
       return;
     }
     widget.onEditedRoleChanged?.call(

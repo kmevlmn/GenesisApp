@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/debug_floating_button_visibility.dart';
 import '../pages/me/developer_page.dart';
+import '../pages/origin_editor/origin_debug_tools.dart';
 import '../ui/components/genesis_safe_area.dart';
 import 'common/genesis_modal_routes.dart';
 
@@ -123,6 +124,7 @@ class _DeveloperDebugFloatingButtonState
         widget.navigatorKey.currentState?.overlay?.context ??
         widget.navigatorKey.currentContext;
     if (navigatorContext == null) return;
+    final randomAction = captureOriginDebugRandomAction();
     setState(() => _sheetOpen = true);
     try {
       await showGenesisModalBottomSheet<void>(
@@ -136,8 +138,10 @@ class _DeveloperDebugFloatingButtonState
           maxChildSize: 1,
           snap: true,
           expand: false,
-          builder: (_, scrollController) =>
-              DeveloperPageSheet(sheetScrollController: scrollController),
+          builder: (_, scrollController) => DeveloperPageSheet(
+            sheetScrollController: scrollController,
+            randomAction: randomAction,
+          ),
         ),
       );
     } finally {

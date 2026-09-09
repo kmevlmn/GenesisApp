@@ -285,7 +285,7 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
     if (!mounted) return;
     final applyId = item.applyId.trim();
     if (applyId.isEmpty) {
-      showGenesisToast(context, 'Review failed');
+      showGenesisToast(context, 'Review failed', brightness: Brightness.dark);
       return;
     }
 
@@ -302,10 +302,14 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
           approvalStatus: action.approvalStatus,
         );
       });
-      showGenesisToast(context, action.successText);
+      showGenesisToast(
+        context,
+        action.successText,
+        brightness: Brightness.dark,
+      );
     } catch (_) {
       if (!mounted) return;
-      showGenesisToast(context, 'Review failed');
+      showGenesisToast(context, 'Review failed', brightness: Brightness.dark);
     }
   }
 
@@ -332,7 +336,11 @@ class _MessageCategoryListPageState extends State<MessageCategoryListPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _loadingFollowUids.remove(uid));
-      showGenesisToast(context, apiErrorMessage(error));
+      showGenesisToast(
+        context,
+        apiErrorMessage(error),
+        brightness: Brightness.dark,
+      );
     }
   }
 

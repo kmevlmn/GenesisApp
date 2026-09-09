@@ -106,6 +106,7 @@ extension _WorldPageSheets on _WorldPageState {
         actionContext,
         'Only worlds launched by you alone can be deleted.',
         duration: const Duration(seconds: 3),
+        brightness: Brightness.dark,
       );
       return;
     }
@@ -136,7 +137,11 @@ extension _WorldPageSheets on _WorldPageState {
       ).pop(WorldPageResult.deleted(deletedWorldId: worldId));
     } catch (error) {
       if (!actionContext.mounted) return;
-      showGenesisToast(actionContext, apiErrorMessage(error));
+      showGenesisToast(
+        actionContext,
+        apiErrorMessage(error),
+        brightness: Brightness.dark,
+      );
     }
   }
 }

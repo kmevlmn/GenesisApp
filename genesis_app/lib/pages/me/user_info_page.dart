@@ -294,7 +294,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
     if (_isBlockingUser || _profileBlocked) return;
     final targetUid = _targetUid();
     if (targetUid.isEmpty) {
-      showGenesisToast(context, 'Block failed');
+      showGenesisToast(context, 'Block failed', brightness: Brightness.dark);
       return;
     }
     if (!await ensureGenesisLogin(context)) return;
@@ -320,6 +320,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
       showGenesisToast(
         context,
         'User blocked. This content has been reported to Worldo team.',
+        brightness: Brightness.dark,
       );
     } catch (error, stackTrace) {
       debugPrint('[UserInfo][Block] failed: $error');
@@ -329,6 +330,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
       showGenesisToast(
         context,
         _blockActionFailureMessage(error, 'Block failed'),
+        brightness: Brightness.dark,
       );
     }
   }
@@ -348,7 +350,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
     if (_isBlockingUser || !_profileBlocked) return;
     final targetUid = _targetUid();
     if (targetUid.isEmpty) {
-      showGenesisToast(context, 'Unblock failed');
+      showGenesisToast(context, 'Unblock failed', brightness: Brightness.dark);
       return;
     }
     if (!await ensureGenesisLogin(context)) return;
@@ -374,6 +376,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
       showGenesisToast(
         context,
         _blockActionFailureMessage(error, 'Unblock failed'),
+        brightness: Brightness.dark,
       );
     }
   }

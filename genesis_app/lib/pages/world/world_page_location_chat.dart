@@ -26,7 +26,13 @@ extension _WorldPageLocationChat on _WorldPageState {
       }
     }
     if (descriptor == null || !mounted) {
-      if (mounted) showGenesisToast(context, 'Location is unavailable');
+      if (mounted) {
+        showGenesisToast(
+          context,
+          'Location is unavailable',
+          brightness: Brightness.dark,
+        );
+      }
       return;
     }
     if (descriptor.locationId == _activeChatLocationId) return;
@@ -55,7 +61,11 @@ extension _WorldPageLocationChat on _WorldPageState {
       if (relationStatus == 'approved') {
         await _runWorldAction(WorldHeaderActionKind.launch);
       } else if (mounted) {
-        showGenesisToast(context, 'Request approval to launch');
+        showGenesisToast(
+          context,
+          'Request approval to launch',
+          brightness: Brightness.dark,
+        );
       }
       return;
     }

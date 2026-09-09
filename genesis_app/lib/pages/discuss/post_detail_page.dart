@@ -141,10 +141,20 @@ class _PostDetailPageState extends State<PostDetailPage> {
         rootDiscussId: rootDiscussId,
         page: page,
       );
-      if (!loaded) showGenesisToast(context, 'Load replies failed');
+      if (!loaded) {
+        showGenesisToast(
+          context,
+          'Load replies failed',
+          brightness: Brightness.dark,
+        );
+      }
     } catch (_) {
       if (mounted && generation == _loadGeneration) {
-        showGenesisToast(context, 'Load replies failed');
+        showGenesisToast(
+          context,
+          'Load replies failed',
+          brightness: Brightness.dark,
+        );
       }
     }
   }
@@ -160,7 +170,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
         },
       );
     } catch (_) {
-      if (mounted) showGenesisToast(context, 'Load replies failed');
+      if (mounted) {
+        showGenesisToast(
+          context,
+          'Load replies failed',
+          brightness: Brightness.dark,
+        );
+      }
     }
   }
 
@@ -551,7 +567,9 @@ class _ReplyActionRow extends StatelessWidget {
         isLiked: previousLiked,
         likeCount: previousCount,
       );
-      if (context.mounted) showGenesisToast(context, 'Like failed');
+      if (context.mounted) {
+        showGenesisToast(context, 'Like failed', brightness: Brightness.dark);
+      }
     } finally {
       controller.setLikePending(normalizedDiscussId, false);
     }

@@ -79,6 +79,7 @@ class _SettingsPageState extends State<SettingsPage> {
       title: 'Feedback',
       contentInputKey: const ValueKey<String>('genesis-feedback-content-input'),
       successMessage: 'Feedback submitted',
+      brightness: Brightness.dark,
       failureMessage: 'Feedback failed',
       onSubmit: (content) => api.v1.feedback.create(content: content),
     );
@@ -91,11 +92,19 @@ class _SettingsPageState extends State<SettingsPage> {
         mode: LaunchMode.externalApplication,
       );
       if (!launched && mounted) {
-        showGenesisToast(context, 'Could not open Discord');
+        showGenesisToast(
+          context,
+          'Could not open Discord',
+          brightness: Brightness.dark,
+        );
       }
     } catch (_) {
       if (mounted) {
-        showGenesisToast(context, 'Could not open Discord');
+        showGenesisToast(
+          context,
+          'Could not open Discord',
+          brightness: Brightness.dark,
+        );
       }
     }
   }
@@ -389,12 +398,17 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
         wasBlocked
             ? 'User unblocked'
             : 'User blocked. This content has been reported to Worldo team.',
+        brightness: Brightness.dark,
       );
     } catch (error, stackTrace) {
       debugPrint('Failed to update blocked user ${item.uid}: $error');
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
-      showGenesisToast(context, _blockedUserActionFailureMessage(error));
+      showGenesisToast(
+        context,
+        _blockedUserActionFailureMessage(error),
+        brightness: Brightness.dark,
+      );
     } finally {
       if (mounted) {
         setState(() => _updatingUids.remove(item.uid));
@@ -702,7 +716,11 @@ class _AccountPageState extends State<AccountPage> {
 
   Future<void> _handleDeletePressed() async {
     if (!_hasReadAgreement) {
-      showGenesisToast(context, 'Agree to our terms to continue.');
+      showGenesisToast(
+        context,
+        'Agree to our terms to continue.',
+        brightness: Brightness.dark,
+      );
       return;
     }
 

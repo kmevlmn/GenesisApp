@@ -239,6 +239,7 @@ class WorldDetailSection extends StatelessWidget {
                                   context,
                                   'Only worlds launched by you alone can be deleted.',
                                   duration: const Duration(seconds: 3),
+                                  brightness: Brightness.dark,
                                 );
                                 return;
                               }
@@ -348,7 +349,11 @@ class WorldDetailSection extends StatelessWidget {
       ),
     );
     if (!context.mounted) return;
-    showGenesisToast(context, 'Link copied. Share it with your friends.');
+    showGenesisToast(
+      context,
+      'Link copied. Share it with your friends.',
+      brightness: Brightness.dark,
+    );
   }
 }
 

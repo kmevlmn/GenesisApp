@@ -310,7 +310,11 @@ class _OriginRoleLaunchSheetState extends State<OriginRoleLaunchSheet> {
   Future<void> _submit() async {
     if (_launching) return;
     if (!_canLaunch) {
-      showGenesisToast(context, _launchValidationMessage);
+      showGenesisToast(
+        context,
+        _launchValidationMessage,
+        brightness: Brightness.dark,
+      );
       return;
     }
     final OriginRoleLaunchSelection selection;

@@ -178,6 +178,9 @@ class CreateTextFieldBlock extends StatefulWidget {
     this.onSubmitted,
     this.scrollPadding,
     this.fillColor,
+    this.textColor,
+    this.hintColor,
+    this.contentPadding,
     this.handoffVerticalDragToAncestor = false,
     this.visibilityBottomPadding = 0,
     this.inputFormatters = const [],
@@ -206,6 +209,9 @@ class CreateTextFieldBlock extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final EdgeInsets? scrollPadding;
   final Color? fillColor;
+  final Color? textColor;
+  final Color? hintColor;
+  final EdgeInsets? contentPadding;
   final bool handoffVerticalDragToAncestor;
   final double visibilityBottomPadding;
   final List<TextInputFormatter> inputFormatters;
@@ -305,7 +311,9 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
               color: widget.fillColor ?? createFormFieldFill,
               borderRadius: BorderRadius.circular(8),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            padding:
+                widget.contentPadding ??
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             alignment: _isSingleLine ? Alignment.center : Alignment.topCenter,
             child: Row(
               crossAxisAlignment: _isSingleLine
@@ -327,7 +335,7 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
                       child: TextField(
                         controller: widget.controller,
                         focusNode: focusNode,
-                        cursorColor: createFormText,
+                        cursorColor: widget.textColor ?? createFormText,
                         scrollPadding:
                             widget.scrollPadding ??
                             const EdgeInsets.fromLTRB(
@@ -355,7 +363,7 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
                         maxLines: widget.maxLines,
                         style: GenesisTypography.withFallback(
                           TextStyle(
-                            color: createFormText,
+                            color: widget.textColor ?? createFormText,
                             fontSize: 14,
                             height: widget.inputLineHeight,
                           ),
@@ -368,7 +376,7 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
                           contentPadding: EdgeInsets.zero,
                           hintStyle: GenesisTypography.withFallback(
                             TextStyle(
-                              color: createFormHint,
+                              color: widget.hintColor ?? createFormHint,
                               fontSize: 14,
                               letterSpacing: 0,
                               height: widget.inputLineHeight,

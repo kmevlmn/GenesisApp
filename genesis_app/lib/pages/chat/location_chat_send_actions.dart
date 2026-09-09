@@ -241,6 +241,7 @@ extension _LocationChatSendActions on _LocationChatPanelState {
           context,
           _locationChatDraftRestoreToastMessage(e),
           duration: const Duration(seconds: 4),
+          brightness: Brightness.dark,
         );
       }
       if (receiptReceived) {
@@ -248,6 +249,7 @@ extension _LocationChatSendActions on _LocationChatPanelState {
           context,
           'Message sent, but syncing the server message timed out.',
           duration: const Duration(seconds: 4),
+          brightness: Brightness.dark,
         );
       }
       _recordPanelDebug(

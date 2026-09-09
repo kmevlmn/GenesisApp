@@ -928,7 +928,11 @@ class _OriginWorldPageState extends State<OriginWorldPage> {
     final userInfo = await services.sessionStore.readUserInfo();
     if (userInfo == null || userInfo.isEmpty) {
       if (mounted) {
-        showGenesisToast(context, 'No saved profile found');
+        showGenesisToast(
+          context,
+          'No saved profile found',
+          brightness: Brightness.dark,
+        );
       }
       return null;
     }

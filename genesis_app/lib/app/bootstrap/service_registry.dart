@@ -157,6 +157,7 @@ class ServiceRegistry {
           showGenesisToastInOverlay(
             overlay,
             toastMessage,
+            brightness: Brightness.dark,
             duration: const Duration(seconds: 4),
           );
         });

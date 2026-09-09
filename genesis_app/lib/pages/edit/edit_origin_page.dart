@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/auth/login_guard.dart';
 import '../../components/common/genesis_generation_wait_overlay.dart';
-import '../../components/genesis_logo.dart';
 import '../../components/page_header.dart';
+import '../../ui/genesis_ui.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 import '../../network/api_client.dart';
 import '../../network/api_exception.dart';
 import '../../network/json_utils.dart';
@@ -151,17 +153,43 @@ class _EditOriginPageState extends State<EditOriginPage> {
 
   @override
   Widget build(BuildContext context) {
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: kGenesisLightSystemUiOverlayStyle,
+          child: _buildPage(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        appBar: GenesisBackAppBar(pageName: 'Edit Worldo'),
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: GenesisColors.darkBackground,
+        appBar: GenesisBackAppBar(
+          pageName: 'Edit Worldo',
+          backgroundColor: GenesisColors.darkBackground,
+          foregroundColor: GenesisColors.darkTextPrimary,
+          systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+        ),
+        body: Center(child: GenesisLoadingIndicator()),
       );
     }
 
     final repository = _repository;
     if (_error != null || repository == null) {
       return Scaffold(
-        appBar: const GenesisBackAppBar(pageName: 'Edit Worldo'),
+        backgroundColor: GenesisColors.darkBackground,
+        appBar: const GenesisBackAppBar(
+          pageName: 'Edit Worldo',
+          backgroundColor: GenesisColors.darkBackground,
+          foregroundColor: GenesisColors.darkTextPrimary,
+          systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -171,10 +199,17 @@ class _EditOriginPageState extends State<EditOriginPage> {
                 Text(
                   _error ?? 'Worldo detail is unavailable.',
                   textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: GenesisColors.darkTextSecondary,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: _loadOrigin,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: GenesisColors.darkFaintFill,
+                    foregroundColor: GenesisColors.darkTextPrimary,
+                  ),
                   child: const Text('Retry'),
                 ),
               ],
@@ -200,6 +235,7 @@ class _EditOriginPageState extends State<EditOriginPage> {
       canSubmit: repository.hasSubmitChanges,
       submitLabel: 'Publish',
       submittingLabel: 'Publishing...',
+      disabledSubmitBackgroundColor: GenesisColors.redSecondary,
       failurePrefix: 'Publish failed',
       leaveTitle: 'Publish changes before leaving?',
       leaveSubmitLabel: 'Publish',
@@ -219,9 +255,17 @@ class _EditOriginPageState extends State<EditOriginPage> {
         flow,
         Positioned.fill(
           child: GenesisGenerationWaitOverlay(
+            brightness: Brightness.dark,
             title: 'Publishing your Worldo',
-            illustration: const Center(
-              child: GenesisLogo(height: 88, width: 152),
+            illustration: Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/images/app_icon.png',
+                  width: 88,
+                  height: 88,
+                ),
+              ),
             ),
             perspectiveLines: _generationWaitLines,
             centeredPerspectiveLineCount: 2,

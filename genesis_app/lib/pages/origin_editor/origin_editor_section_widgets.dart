@@ -37,7 +37,14 @@ class _SectionRow extends StatelessWidget {
                   height: 24,
                   child: icon == null
                       ? null
-                      : SvgPicture.asset(icon!, fit: BoxFit.contain),
+                      : SvgPicture.asset(
+                          icon!,
+                          fit: BoxFit.contain,
+                          colorFilter: const ColorFilter.mode(
+                            GenesisColors.darkTextSecondary,
+                            BlendMode.srcIn,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -58,9 +65,9 @@ class _SectionRow extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     textAlign: TextAlign.left,
                                     style: const TextStyle(
-                                      color: Colors.black,
+                                      color: GenesisColors.darkTextPrimary,
                                       fontSize: 16,
-                                      fontWeight: FontWeight.w400,
+                                      fontWeight: FontWeight.w600,
                                       height: 1.2,
                                     ),
                                   ),
@@ -79,7 +86,7 @@ class _SectionRow extends StatelessWidget {
                             Icon(
                               Icons.chevron_right,
                               key: ValueKey<String>('section-chevron-$title'),
-                              color: Color(0xFF666666),
+                              color: GenesisColors.darkTextTertiary,
                             ),
                           ],
                         ],
@@ -112,8 +119,10 @@ class _SectionRow extends StatelessWidget {
                                     ? null
                                     : TextOverflow.ellipsis,
                                 softWrap: wrapFirstSummaryLine && index == 0,
-                                style: const TextStyle(
-                                  color: Color(0xFF444444),
+                                style: TextStyle(
+                                  color: summary == 'Not started yet'
+                                      ? GenesisColors.darkTextTertiary
+                                      : GenesisColors.darkTextSecondary,
                                   fontSize: 12,
                                   height: 1.4,
                                 ),
@@ -128,7 +137,11 @@ class _SectionRow extends StatelessWidget {
             ),
           ),
           if (showDivider)
-            const Divider(height: 1, thickness: 1, color: Color(0xFFEAEAEA)),
+            const Divider(
+              height: 1,
+              thickness: 1,
+              color: GenesisColors.darkFaintFill,
+            ),
         ],
       ),
     );
@@ -148,7 +161,7 @@ class _SectionRow extends StatelessWidget {
     return <InlineSpan>[
       TextSpan(
         text: line.substring(0, colonIndex + 1),
-        style: const TextStyle(color: Color(0xFF999999)),
+        style: const TextStyle(color: GenesisColors.darkTextTertiary),
       ),
       TextSpan(text: line.substring(colonIndex + 1)),
     ];
@@ -163,7 +176,14 @@ class _ModifiedSectionBadge extends StatelessWidget {
     return SizedBox(
       width: 16,
       height: 16,
-      child: SvgPicture.asset(refreshModifiedIconAsset, fit: BoxFit.contain),
+      child: SvgPicture.asset(
+        refreshModifiedIconAsset,
+        fit: BoxFit.contain,
+        colorFilter: const ColorFilter.mode(
+          GenesisColors.redSecondary,
+          BlendMode.srcIn,
+        ),
+      ),
     );
   }
 }

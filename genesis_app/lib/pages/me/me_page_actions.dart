@@ -5,7 +5,11 @@ extension _MePageActions on _MePageState {
     if (_loggingInProvider != null) return;
     final login = widget.onLogin;
     if (login == null) {
-      showGenesisToast(context, 'Sign-in unavailable');
+      showGenesisToast(
+        context,
+        'Sign-in unavailable',
+        brightness: Brightness.dark,
+      );
       return;
     }
     final sessionRevisionBeforeLogin = _sessionRevisionListenable?.value;
@@ -24,7 +28,11 @@ extension _MePageActions on _MePageState {
           unawaited(_runPostLoginFlow(onLoginCompleted));
         }
       } else {
-        showGenesisToast(context, 'Sign-in failed');
+        showGenesisToast(
+          context,
+          'Sign-in failed',
+          brightness: Brightness.dark,
+        );
       }
     } on AuthCancelledException {
       // User cancelled provider UI.
@@ -33,7 +41,11 @@ extension _MePageActions on _MePageState {
       debugPrint('[Auth][MePage] stacktrace:\n$st');
       if (!mounted) return;
       final message = e.toString().trim();
-      showGenesisToast(context, message.isEmpty ? 'Sign-in failed' : message);
+      showGenesisToast(
+        context,
+        message.isEmpty ? 'Sign-in failed' : message,
+        brightness: Brightness.dark,
+      );
     } finally {
       if (mounted) _updateState(() => _loggingInProvider = null);
     }
@@ -64,11 +76,19 @@ extension _MePageActions on _MePageState {
         mode: LaunchMode.externalApplication,
       );
       if (!launched && mounted) {
-        showGenesisToast(context, 'Could not open Discord');
+        showGenesisToast(
+          context,
+          'Could not open Discord',
+          brightness: Brightness.dark,
+        );
       }
     } catch (_) {
       if (mounted) {
-        showGenesisToast(context, 'Could not open Discord');
+        showGenesisToast(
+          context,
+          'Could not open Discord',
+          brightness: Brightness.dark,
+        );
       }
     }
   }
@@ -86,11 +106,19 @@ extension _MePageActions on _MePageState {
       );
     } on UnsupportedGifImageException {
       if (!mounted) return;
-      showGenesisToast(context, unsupportedGifImageMessage);
+      showGenesisToast(
+        context,
+        unsupportedGifImageMessage,
+        brightness: Brightness.dark,
+      );
       return;
     } catch (_) {
       if (!mounted) return;
-      showGenesisToast(context, 'Image pick failed');
+      showGenesisToast(
+        context,
+        'Image pick failed',
+        brightness: Brightness.dark,
+      );
       return;
     }
     if (!mounted) return;
@@ -170,7 +198,7 @@ extension _MePageActions on _MePageState {
       _displayName.value = updatedDisplayName;
     } catch (_) {
       if (!mounted) return;
-      showGenesisToast(context, 'Update failed');
+      showGenesisToast(context, 'Update failed', brightness: Brightness.dark);
     } finally {
       if (mounted) _isUpdatingProfile.value = false;
     }
@@ -192,7 +220,7 @@ extension _MePageActions on _MePageState {
       _avatarUrl.value = updatedAvatarUrl;
     } catch (_) {
       if (!mounted) return;
-      showGenesisToast(context, 'Update failed');
+      showGenesisToast(context, 'Update failed', brightness: Brightness.dark);
     } finally {
       if (mounted) _isUpdatingProfile.value = false;
     }

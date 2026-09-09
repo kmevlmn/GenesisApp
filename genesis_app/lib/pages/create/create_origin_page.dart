@@ -6,9 +6,9 @@ import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/auth/login_guard.dart';
 import '../../components/common/genesis_generation_wait_overlay.dart';
-import '../../components/genesis_logo.dart';
 import '../../network/api_client.dart';
 import '../../network/json_utils.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../utils/display_name_formatter.dart';
 import '../origin_editor/origin_debug_tools.dart';
 import '../origin_editor/origin_draft_repository.dart';
@@ -82,6 +82,7 @@ class _CreateOriginPageState extends State<CreateOriginPage> {
       failurePrefix: 'Create failed',
       submitLabel: 'Create',
       submittingLabel: 'Creating...',
+      disabledSubmitBackgroundColor: GenesisColors.redSecondary,
       onSubmit: _onCreate,
       submitStatus: _submitStatus,
       reloadSignal: _reloadSignal,
@@ -95,9 +96,17 @@ class _CreateOriginPageState extends State<CreateOriginPage> {
         flow,
         Positioned.fill(
           child: GenesisGenerationWaitOverlay(
+            brightness: Brightness.dark,
             title: 'Creating your Worldo',
-            illustration: const Center(
-              child: GenesisLogo(height: 88, width: 152),
+            illustration: Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/images/app_icon.png',
+                  width: 88,
+                  height: 88,
+                ),
+              ),
             ),
             perspectiveLines: _generationWaitLines,
             centeredPerspectiveLineCount: 2,

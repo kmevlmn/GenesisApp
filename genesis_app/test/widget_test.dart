@@ -17974,6 +17974,11 @@ void main() {
       MaterialApp(
         initialRoute: RouteNames.create,
         onGenerateRoute: AppRouter.onGenerateRoute,
+        onGenerateInitialRoutes: (_) => [
+          AppRouter.onGenerateRoute(
+            const RouteSettings(name: RouteNames.create),
+          ),
+        ],
       ),
     );
     await tester.pumpAndSettle();
@@ -18174,7 +18179,7 @@ void main() {
       createButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.brandSoft,
+      GenesisColors.redSecondary,
     );
   });
 
@@ -18211,7 +18216,7 @@ void main() {
       createButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.brandSoft,
+      GenesisColors.redSecondary,
     );
   });
 
@@ -19924,10 +19929,10 @@ void main() {
     expect((bestRoleSpans.first as TextSpan).text, 'Suggested:');
     expect(
       (bestRoleSpans.first as TextSpan).style?.color,
-      const Color(0xFF999999),
+      GenesisColors.darkTextTertiary,
     );
     expect((bestRoleSpans.last as TextSpan).text, ' Tff');
-    expect(bestRoleSummary.style?.color, const Color(0xFF444444));
+    expect(bestRoleSummary.style?.color, GenesisColors.darkTextSecondary);
     expect(find.text('L1 · Region : 1'), findsOneWidget);
     expect(find.text('L2 · Building : 1'), findsOneWidget);
     expect(find.text('L3 · Room : 1'), findsOneWidget);
@@ -23045,7 +23050,7 @@ void main() {
       createButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.brandSoft,
+      GenesisColors.redSecondary,
     );
   });
 
@@ -23473,7 +23478,7 @@ void main() {
       rootPublish.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.brandSoft,
+      GenesisColors.redSecondary,
     );
     expect(transport.requestsFor('/api/v2/origin/update'), isEmpty);
 

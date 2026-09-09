@@ -265,7 +265,11 @@ extension _OriginWorldPageLocationChat on _OriginWorldPageState {
           .where((character) => _characterStableId(character) == selectedRoleId)
           .firstOrNull;
       if (character == null) {
-        showGenesisToast(context, 'This role is no longer available');
+        showGenesisToast(
+          context,
+          'This role is no longer available',
+          brightness: Brightness.dark,
+        );
         _setLocationChatRoleId(
           _OriginWorldPageState._profileLocationChatRoleId,
         );

@@ -39,7 +39,11 @@ class _LoginSheetState extends State<LoginSheet> {
         Navigator.of(context).pop(true);
       } else {
         debugPrint('[Auth][LoginSheet] login failed: onLogin returned false');
-        showGenesisToast(context, 'Sign-in failed');
+        showGenesisToast(
+          context,
+          'Sign-in failed',
+          brightness: Brightness.dark,
+        );
       }
     } on AuthCancelledException {
       debugPrint('[Auth][LoginSheet] login cancelled');
@@ -53,7 +57,11 @@ class _LoginSheetState extends State<LoginSheet> {
       debugPrint('[Auth][LoginSheet] stacktrace:\n$st');
       if (!mounted) return;
       final message = e.toString().trim();
-      showGenesisToast(context, message.isEmpty ? 'Sign-in failed' : message);
+      showGenesisToast(
+        context,
+        message.isEmpty ? 'Sign-in failed' : message,
+        brightness: Brightness.dark,
+      );
     } finally {
       debugPrint('[Auth][LoginSheet] submit end');
       if (mounted) setState(() => _submittingProvider = null);

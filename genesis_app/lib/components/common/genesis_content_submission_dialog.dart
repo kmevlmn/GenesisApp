@@ -17,7 +17,9 @@ Future<bool> showGenesisContentSubmissionDialog({
   required GenesisContentSubmitter onSubmit,
   required String successMessage,
   required String failureMessage,
+  Brightness? brightness,
 }) async {
+  final toastBrightness = brightness ?? Theme.of(context).brightness;
   final submitted = await showGenesisDialog<bool>(
     context: context,
     barrierColor: const Color(0x52000000),
@@ -28,6 +30,7 @@ Future<bool> showGenesisContentSubmissionDialog({
         onSubmit: onSubmit,
         successMessage: successMessage,
         failureMessage: failureMessage,
+        toastBrightness: toastBrightness,
       );
     },
   );
@@ -41,6 +44,7 @@ class _GenesisContentSubmissionDialog extends StatefulWidget {
     required this.onSubmit,
     required this.successMessage,
     required this.failureMessage,
+    required this.toastBrightness,
   });
 
   final String title;
@@ -48,6 +52,7 @@ class _GenesisContentSubmissionDialog extends StatefulWidget {
   final GenesisContentSubmitter onSubmit;
   final String successMessage;
   final String failureMessage;
+  final Brightness toastBrightness;
 
   @override
   State<_GenesisContentSubmissionDialog> createState() =>
@@ -77,12 +82,20 @@ class _GenesisContentSubmissionDialogState
       final overlay = Overlay.maybeOf(context, rootOverlay: true);
       Navigator.of(context).pop(true);
       if (overlay != null) {
-        showGenesisToastInOverlay(overlay, widget.successMessage);
+        showGenesisToastInOverlay(
+          overlay,
+          widget.successMessage,
+          brightness: widget.toastBrightness,
+        );
       }
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      showGenesisToast(context, widget.failureMessage);
+      showGenesisToast(
+        context,
+        widget.failureMessage,
+        brightness: Brightness.dark,
+      );
     }
   }
 

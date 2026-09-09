@@ -1,7 +1,12 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:genesis_flutter_android/app/debug_floating_button_visibility.dart';
+import 'package:genesis_flutter_android/components/developer_debug_floating_button.dart';
+import 'package:genesis_flutter_android/pages/me/developer_page.dart';
+import 'package:genesis_flutter_android/pages/origin_editor/origin_debug_tools.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
@@ -58,22 +63,13 @@ void main() {
   test('release debug tools expose only empty entry points', () {
     final updateNotesController = TextEditingController();
     addTearDown(updateNotesController.dispose);
-    final repository = MemoryOriginDraftRepository(
-      initialDraft: CreateOriginDraft.empty(),
-    );
-
     expect(release_tools.createOriginDebugDraftGenerator(), isNull);
     expect(
       release_tools.editOriginDebugDraftGenerator(updateNotesController),
       isNull,
     );
     expect(
-      release_tools.buildOriginDebugRandomContentButton(
-        repository: repository,
-        generator: null,
-        enabled: true,
-        onGenerated: () async {},
-      ),
+      release_tools.buildOriginDebugRandomContentButton(action: null),
       isNull,
     );
   });
@@ -310,7 +306,7 @@ void main() {
   );
 
   testWidgets(
-    'debug random button is bottom-left and refreshes the draft summary',
+    'Developer Random fills the current draft and refreshes the editor',
     (tester) async {
       expect(kDebugMode, isTrue);
       tester.view.devicePixelRatio = 1;
@@ -321,7 +317,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
+        _debugEditorApp(
           home: OriginDraftFlowPage(
             title: 'Debug Worldo',
             repository: repository,
@@ -342,29 +338,42 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Random'), findsNothing);
+      await _openDeveloperButtons(tester);
       final button = find.byKey(
         const ValueKey<String>('origin-debug-random-content-button'),
       );
       expect(button, findsOneWidget);
-      final buttonCenter = tester.getCenter(button);
-      final screenSize =
-          tester.view.physicalSize / tester.view.devicePixelRatio;
-      expect(buttonCenter.dx, lessThan(screenSize.width / 2));
-      expect(buttonCenter.dy, greaterThan(screenSize.height / 2));
-      final saveButton = find.widgetWithText(FilledButton, 'Save');
-      expect(
-        tester.getRect(button).overlaps(tester.getRect(saveButton)),
-        isFalse,
-      );
-
       await tester.tap(button);
       await tester.pumpAndSettle();
 
+      final saveButton = find.widgetWithText(FilledButton, 'Save');
+      await _closeDeveloper(tester);
       final generated = await repository.loadSummaryDraft();
       expect(generated.validateForSubmit(), isEmpty);
       expect(find.textContaining(generated.basics.originName), findsOneWidget);
       expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
       await tester.pump(const Duration(seconds: 3));
+
+      final action = captureOriginDebugRandomAction()!;
+      final navigator = Navigator.of(
+        tester.element(find.byType(OriginDraftFlowPage)),
+      );
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Child editor')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(captureOriginDebugRandomAction(), isNull);
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(captureOriginDebugRandomAction(), same(action));
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(action.isEnabled, isFalse);
+      await expectLater(action.generate(), throwsStateError);
     },
   );
 
@@ -379,7 +388,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      _debugEditorApp(
         home: OriginDraftFlowPage(
           title: 'Debug saved states',
           repository: repository,
@@ -410,18 +419,47 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Random'), findsNothing);
+    await _openDeveloperButtons(tester);
     await tester.tap(
       find.byKey(const ValueKey<String>('origin-debug-random-content-button')),
     );
     await tester.pumpAndSettle();
 
+    await _closeDeveloper(tester);
     final generated = await repository.loadSummaryDraft();
     expect(generated.basicsSaved, isTrue);
     expect(generated.charactersSaved, isTrue);
     expect(generated.openingSaved, isTrue);
     expect(generated.locationsSaved, isFalse);
     expect(generated.storyEventsSaved, isFalse);
-    expect(find.text('✓'), findsNWidgets(3));
+    expect(find.textContaining('Randomized name'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
   });
+}
+
+Widget _debugEditorApp({required Widget home}) {
+  final navigatorKey = GlobalKey<NavigatorState>();
+  return MaterialApp(
+    navigatorKey: navigatorKey,
+    builder: (context, child) =>
+        DeveloperDebugFloatingButton(navigatorKey: navigatorKey, child: child!),
+    home: home,
+  );
+}
+
+Future<void> _openDeveloperButtons(WidgetTester tester) async {
+  resetDeveloperPageTabForTesting();
+  showGenesisDebugFloatingButton();
+  addTearDown(hideGenesisDebugFloatingButton);
+  await tester.pump();
+  await tester.tap(find.text('debug'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('button'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _closeDeveloper(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('developer-page-sheet-close')));
+  await tester.pumpAndSettle();
 }
