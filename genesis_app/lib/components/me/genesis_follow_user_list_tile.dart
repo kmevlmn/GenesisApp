@@ -124,6 +124,8 @@ class GenesisFollowUserListTile extends StatelessWidget {
                             : GenesisColors.redPrimary,
                         disabledBackgroundColor: isFollowed
                             ? neutralFill
+                            : isLoading
+                            ? GenesisColors.redPrimary
                             : GenesisColors.redPrimary.withValues(alpha: 0.55),
                         foregroundColor: isFollowed ? primary : onBrand,
                         disabledForegroundColor: isFollowed

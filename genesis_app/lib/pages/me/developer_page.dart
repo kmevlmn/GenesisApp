@@ -860,15 +860,23 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
                       _DeveloperSliderControl(
                         label: 'Gaussian blur radius',
                         valueLabel: blurLabel,
-                        value: headerEffectSettings.blurSigma,
-                        min: LocationChatHeaderEffectSettings.minBlurSigma,
-                        max: LocationChatHeaderEffectSettings.maxBlurSigma,
-                        divisions: 20,
+                        value: GenesisBlur.presets
+                            .indexOf(
+                              GenesisBlur.normalize(
+                                headerEffectSettings.blurSigma,
+                              ),
+                            )
+                            .toDouble(),
+                        min: 0,
+                        max: 2,
+                        divisions: 2,
                         sliderKey: const ValueKey<String>(
                           'developer-location-chat-header-blur-slider',
                         ),
-                        onChanged:
-                            locationChatHeaderEffectSettings.previewBlurSigma,
+                        onChanged: (index) =>
+                            locationChatHeaderEffectSettings.previewBlurSigma(
+                              GenesisBlur.presets[index.round()],
+                            ),
                         onChangeEnd: (_) {
                           unawaited(_saveLocationChatHeaderEffectSettings());
                         },

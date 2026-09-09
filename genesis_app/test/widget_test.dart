@@ -15877,7 +15877,7 @@ void main() {
       pendingButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      const Color(0xFFFF2442).withValues(alpha: 0.62),
+      GenesisColors.darkButtonDisabledBackground,
     );
 
     await tester.tap(buttonFinder);
@@ -18034,7 +18034,7 @@ void main() {
   });
 
   testWidgets(
-    'invalid create basics save uses the secondary red with primary text',
+    'invalid create basics save uses muted brand fill with secondary text',
     (WidgetTester tester) async {
       await CreateOriginDraftStore.clear();
 
@@ -18060,14 +18060,14 @@ void main() {
       );
       expect(
         saveButton.style?.foregroundColor?.resolve({WidgetState.disabled}),
-        GenesisColors.darkTextPrimary,
+        GenesisColors.darkButtonDisabledForeground,
       );
       expect(saveButton.onPressed, isNull);
       expect(
         saveButton.style?.backgroundColor?.resolve(<WidgetState>{
           WidgetState.disabled,
         }),
-        GenesisColors.redSecondary,
+        GenesisColors.redPrimary.withValues(alpha: 0.4),
       );
     },
   );
@@ -18198,7 +18198,7 @@ void main() {
       createButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.redSecondary,
+      GenesisColors.redPrimary.withValues(alpha: 0.4),
     );
   });
 
@@ -18235,7 +18235,7 @@ void main() {
       createButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.redSecondary,
+      GenesisColors.redPrimary.withValues(alpha: 0.4),
     );
   });
 
@@ -22982,7 +22982,7 @@ void main() {
     );
     expect(find.byType(CreateInlineAddButton), findsOneWidget);
     final addEventText = tester.widget<Text>(find.text('+ Add Event'));
-    expect(addEventText.style?.color, GenesisColors.createAdd);
+    expect(addEventText.style?.color, GenesisColors.redSecondary);
     expect(addEventText.style?.fontSize, 16);
     expect(addEventText.style?.fontWeight, FontWeight.w600);
     expect(
@@ -23097,7 +23097,7 @@ void main() {
       createButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.redSecondary,
+      GenesisColors.redPrimary.withValues(alpha: 0.4),
     );
   });
 
@@ -23531,7 +23531,7 @@ void main() {
       rootPublish.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.redSecondary,
+      GenesisColors.redPrimary.withValues(alpha: 0.4),
     );
     expect(transport.requestsFor('/api/v2/origin/update'), isEmpty);
 

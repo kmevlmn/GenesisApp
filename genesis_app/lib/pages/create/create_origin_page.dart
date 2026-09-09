@@ -8,7 +8,6 @@ import '../../components/auth/login_guard.dart';
 import '../../components/common/genesis_generation_wait_overlay.dart';
 import '../../network/api_client.dart';
 import '../../network/json_utils.dart';
-import '../../ui/tokens/genesis_colors.dart';
 import '../../utils/display_name_formatter.dart';
 import '../origin_editor/origin_debug_tools.dart';
 import '../origin_editor/origin_draft_repository.dart';
@@ -82,7 +81,6 @@ class _CreateOriginPageState extends State<CreateOriginPage> {
       failurePrefix: 'Create failed',
       submitLabel: 'Create',
       submittingLabel: 'Creating...',
-      disabledSubmitBackgroundColor: GenesisColors.redSecondary,
       onSubmit: _onCreate,
       submitStatus: _submitStatus,
       reloadSignal: _reloadSignal,

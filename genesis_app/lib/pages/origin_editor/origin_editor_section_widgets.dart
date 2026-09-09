@@ -180,7 +180,7 @@ class _ModifiedSectionBadge extends StatelessWidget {
         refreshModifiedIconAsset,
         fit: BoxFit.contain,
         colorFilter: const ColorFilter.mode(
-          GenesisColors.redSecondary,
+          GenesisColors.redPrimary,
           BlendMode.srcIn,
         ),
       ),

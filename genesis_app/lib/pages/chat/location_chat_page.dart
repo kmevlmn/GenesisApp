@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../../ui/tokens/genesis_blur.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/bootstrap/service_registry.dart';
 import '../../app/config/genesis_image_config.dart';
@@ -132,12 +133,7 @@ ChatUiStyleConfig resolveLocationChatHeaderEffectStyle({
   final surfaceOpacity = settings.transparencyStrength
       .clamp(0.0, 1.0)
       .toDouble();
-  final blurSigma = settings.blurSigma
-      .clamp(
-        LocationChatHeaderEffectSettings.minBlurSigma,
-        LocationChatHeaderEffectSettings.maxBlurSigma,
-      )
-      .toDouble();
+  final blurSigma = GenesisBlur.normalize(settings.blurSigma);
   final surfaceBackground = baseStyle.conversationBackgroundColor.withValues(
     alpha: surfaceOpacity,
   );
@@ -1019,7 +1015,7 @@ class _LocationChatRoster extends StatelessWidget {
     required this.selfOccupantId,
   });
 
-  static const double _blurSigma = 14;
+  static const double _blurSigma = GenesisBlur.strong;
 
   final List<WorldChatroomEntity> occupants;
   final String selfOccupantId;

@@ -134,7 +134,7 @@ void main() {
     );
     expect(
       backdropBlur.filterConfig,
-      const ImageFilterConfig.blur(sigmaX: 20, sigmaY: 20, bounded: false),
+      const ImageFilterConfig.blur(sigmaX: 14, sigmaY: 14, bounded: false),
     );
     final bannerMaterial = tester.widget<Material>(
       find.byKey(const ValueKey<String>('world-update-push-banner')),

@@ -402,6 +402,58 @@ void main() {
     );
   });
 
+  testWidgets(
+    'GenesisPrimaryButton uses muted dark disabled and loading states',
+    (tester) async {
+      var taps = 0;
+      for (final loading in [false, true]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: GenesisPrimaryButton(
+                label: 'Save',
+                onPressed: loading ? () => taps++ : null,
+                isLoading: loading,
+              ),
+            ),
+          ),
+        );
+        final button = tester.widget<FilledButton>(find.byType(FilledButton));
+        expect(button.onPressed, isNull);
+        expect(GenesisColors.darkButtonDisabledForeground.a, 1);
+        expect(
+          Color.alphaBlend(
+            GenesisColors.darkButtonDisabledForeground,
+            GenesisColors.redPrimary,
+          ),
+          GenesisColors.darkButtonDisabledForeground,
+        );
+        expect(
+          button.style?.backgroundColor?.resolve({WidgetState.disabled}),
+          GenesisColors.redPrimary.withValues(alpha: 0.4),
+        );
+        expect(
+          button.style?.foregroundColor?.resolve({WidgetState.disabled}),
+          GenesisColors.darkButtonDisabledForeground,
+        );
+        expect(button.style?.backgroundColor?.resolve({}), GenesisColors.brand);
+        await tester.tap(find.byType(FilledButton));
+        expect(taps, 0);
+        if (loading) {
+          expect(
+            tester
+                .widget<CircularProgressIndicator>(
+                  find.byType(CircularProgressIndicator),
+                )
+                .color,
+            GenesisColors.darkButtonDisabledForeground,
+          );
+        }
+      }
+    },
+  );
+
   testWidgets('GenesisPrimaryButton reports taps while disabled', (
     tester,
   ) async {

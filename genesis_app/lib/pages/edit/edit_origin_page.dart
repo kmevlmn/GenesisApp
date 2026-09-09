@@ -235,7 +235,6 @@ class _EditOriginPageState extends State<EditOriginPage> {
       canSubmit: repository.hasSubmitChanges,
       submitLabel: 'Publish',
       submittingLabel: 'Publishing...',
-      disabledSubmitBackgroundColor: GenesisColors.redSecondary,
       failurePrefix: 'Publish failed',
       leaveTitle: 'Publish changes before leaving?',
       leaveSubmitLabel: 'Publish',

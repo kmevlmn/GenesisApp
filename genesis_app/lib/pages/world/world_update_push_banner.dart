@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math' as math;
 
+import '../../ui/tokens/genesis_blur.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -407,8 +409,8 @@ class _WorldUpdatePushBanner extends StatelessWidget {
           child: BackdropFilter(
             key: const ValueKey<String>('world-update-push-backdrop-blur'),
             filterConfig: const ImageFilterConfig.blur(
-              sigmaX: 20,
-              sigmaY: 20,
+              sigmaX: GenesisBlur.strong,
+              sigmaY: GenesisBlur.strong,
               bounded: false,
             ),
             child: Material(

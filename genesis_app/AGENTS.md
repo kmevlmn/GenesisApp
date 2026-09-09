@@ -161,7 +161,7 @@ HTTP 映射层的图片规则：
 ## 公共操作弹窗
 
 - `GenesisActionBox` 统一使用深色样式，包括从浅色页面打开的情况；主题仅作用于弹窗，不能改变调用页面的主题。
-- 主面板与独立 Cancel 面板均使用 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.4)`（40% 不透明度），叠加局限于面板圆角内的背景模糊（`sigmaX / sigmaY = 20`）；外边框为 1px `darkFaintFill`（约 12% 白），分隔线同样使用 `darkFaintFill`。这些参数在公共组件中集中管理，不在页面重复配置；透明度只作用于面板填充，不给整个弹窗或文字增加 Opacity。
+- 主面板与独立 Cancel 面板均使用 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.4)`（40% 不透明度），叠加局限于面板圆角内的背景模糊（`sigmaX / sigmaY = GenesisBlur.strong`（14））；外边框为 1px `darkFaintFill`（约 12% 白），分隔线同样使用 `darkFaintFill`。这些参数在公共组件中集中管理，不在页面重复配置；透明度只作用于面板填充，不给整个弹窗或文字增加 Opacity。
 - 标题与普通操作使用 `darkTextPrimary`，说明正文使用 `darkTextSecondary`，UID / WID / 时间等辅助信息和禁用操作使用 `darkTextTertiary`。
 - 公共弹窗内的红色文字统一使用 `GenesisColors.redSecondary`，包括主要操作、危险操作和红色强调正文，不使用品牌红 `redPrimary`。主要操作默认继承公共组件颜色，调用处不重复覆盖；Cancel、Reject 等普通操作使用一级白字。
 - 自定义标题、正文和输入框也须引用公共 token；输入文字和光标使用 `darkTextPrimary`，Placeholder 使用 `darkInputPlaceholder`，输入填充使用 `darkFaintFill`，不额外描边。保留各交互所需的输入行数和布局。
@@ -216,12 +216,19 @@ HTTP 映射层的图片规则：
 | --- | --- | --- | --- |
 | 一级：品牌红 | `GenesisColors.redPrimary` | `#FF2442` | 主要操作、可用发送按钮、选中态、红点及角色边框等强强调 |
 | 二级：正文粉红 | `GenesisColors.redSecondary` | `#FF8A9A` | 深色页面 Personality / 性格描述、事件线索等需要持续阅读的强调正文；取自 Worldo Detail 的 Personality |
-| 三级：浅粉色 | `GenesisColors.redTertiary` | `#FFB8C3` | 浅粉填充、既有禁用按钮填充、轻量装饰；不替代正文或白字层级 |
+| 三级：浅粉色 | `GenesisColors.redTertiary` | `#FFB8C3` | 浅粉填充、轻量装饰；不替代正文或白字层级 |
 
 - 深色页面的红色强调正文必须使用 `redSecondary`，不得使用品牌红 `redPrimary`，避免长段文字过于刺眼。错误提示、危险操作等语义状态单独按其用途处理。
 - `brand` / `brandBright` / `create` / `danger` 保留为一级红的语义别名，`brandSoft` 保留为三级红的别名；不再分别定义同色值。
 - Worldo Detail Personality、World Detail Cast 的 Personality、Location Chat 的同色强调和 Tick Event 线索统一引用 `redSecondary`。页面级颜色别名可以保留，但必须映射公共 token。
 - 新增及修改红色样式时必须调用对应 token，不复制色值；其他红色、不同透明度和特殊状态不因颜色接近而强行替换。
+
+## 深色主按钮禁用态规范
+
+- Save / Create / Launch / Publish / Select 等标准主操作按钮统一使用 `GenesisPrimaryButton` 的深色默认禁用样式：底色 `GenesisColors.darkButtonDisabledBackground`（由 `redPrimary` 派生的 40% 不透明度品牌红），文字和加载指示器使用 `GenesisColors.darkButtonDisabledForeground`（将 `darkTextSecondary` 预先合成到 `darkBackground` 上的不透明浅灰，保留接近二级白的亮度，避免红色底透入文字）。色值在 `GenesisColors` 集中定义，页面不要重复配置同一套禁用色或透明度。
+- 这组 token 适用于深色填充主操作按钮；文字按钮、关闭/删除等图标按钮及中性操作按钮按各自组件规范处理，不因禁用而统一改成红底。
+- 禁用及保存进行中不再使用 `redSecondary` / `redTertiary` 等粉色填充；可用态保留品牌红 `redPrimary` 和一级白字。保留现有按钮尺寸、圆角和布局，不新增描边。
+- 颜色不改变校验和点击行为：禁用时不得执行主操作，已有 `onDisabledPressed` 说明提示保持；保存进行中沿用现有进度文字或加载指示器。
 
 ## 深色面板关闭按钮规范
 
@@ -237,6 +244,17 @@ HTTP 映射层的图片规则：
 - 默认按钮 24×24、删除 SVG 14px、圆角 6px；不透明底色使用 `GenesisColors.darkFaintSurface`（`#313133`），1px 描边使用 `darkFaintFill`，图标使用 `darkTextPrimary`。不叠加背景模糊。
 - 禁用时整体不透明度为 45%，禁止执行删除；可以通过 `onDisabledPressed` 提示不可删除的原因。按钮位置、删除回调和确认流程由调用方负责。
 - 本规范用于独立图标按钮；Report 菜单内的 Delete 文字操作继续遵守浮动菜单规范。
+
+## 深色 Toast 设计规范
+
+- 页面短提示统一使用 `showGenesisToast` / `showGenesisToastInOverlay`，实现位于 `lib/components/common/genesis_center_toast.dart`，不得在页面自行拼装或用 `SnackBar` 替代。
+- 底色固定为不透明 `#424244`，唯一色值来源为 `GenesisColors.darkToastBackground`；使用处引用 token，不重复硬编码。不使用半透明白底、深灰旧色 `#383B42` 或额外背景 blur。
+- 文字为纯白 `Colors.white`，这是 Toast 的明确高对比文字例外；字号 14、字重 `FontWeight.w400`、行高 1.4，沿用 `GenesisTypography` 字体及 fallback，居中排版。
+- 外形为胶囊圆角，使用 `BorderRadius.circular(999)`；不加描边或阴影。内边距左右 16、上下 8，单行默认高度约 36；长文案允许换行并自然增高，不固定高度截断文字。
+- Toast 在根 Overlay 中水平、垂直居中，屏幕左右至少留 36；不改为底部系统提示的位置。以上尺寸均为 Flutter 逻辑像素。
+- 默认显示 2 秒，可由调用方通过 `duration` 指定；新提示替换旧提示，不堆叠；提示不拦截底层触摸，空白文案不展示。
+- 深色样式依据触发页面主题或显式 `brightness: Brightness.dark`，不能受根 Overlay 的浅色主题影响。本节只规定深色 Toast，浅色分支独立保留。
+- 系统剪贴板提示由操作系统管理，不属于此组件；不以系统提示的存在或样式替代应用 Toast 的规范。
 
 ## 深色 Sheet Handle 设计规范
 
@@ -330,3 +348,7 @@ HTTP 映射层的图片规则：
 - 页面流：优先使用 `test/widget_test.dart --plain-name "<case name>"` 跑相关窄用例，不要默认只跑全量大烟测。
 
 完成前报告实际跑过的命令；不能运行时说明原因和剩余风险。
+
+## 背景模糊规范
+
+背景毛玻璃统一引用 `lib/ui/tokens/genesis_blur.dart`：`GenesisBlur.light` 为 4，`GenesisBlur.strong` 为 14；0 表示关闭。开发设置也使用这三档。阴影和地图加载动画的光晕不属于背景模糊。

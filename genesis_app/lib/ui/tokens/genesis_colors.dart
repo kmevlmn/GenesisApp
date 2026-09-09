@@ -15,10 +15,23 @@ abstract final class GenesisColors {
   // The same fill composited over #151517 for surfaces that must be opaque.
   static const Color darkFaintSurface = Color(0xFF313133);
 
+  // Opaque toast surface sampled from the approved dark reference.
+  static const Color darkToastBackground = Color(0xFF424244);
+
   // Red hierarchy: actions, readable accent text, pale/disabled fills.
   static const Color redPrimary = Color(0xFFFF2442);
   static const Color redSecondary = Color(0xFFFF8A9A);
   static const Color redTertiary = Color(0xFFFFB8C3);
+
+  // Disabled filled primary actions on dark surfaces; preserve icon-button styles.
+  static final Color darkButtonDisabledBackground = redPrimary.withValues(
+    alpha: 0.4,
+  );
+  // Flatten secondary white over the base surface so red cannot tint the text.
+  static final Color darkButtonDisabledForeground = Color.alphaBlend(
+    darkTextSecondary,
+    darkBackground,
+  );
 
   // Existing semantic names remain aliases of the shared red hierarchy.
   static const Color brand = redPrimary;

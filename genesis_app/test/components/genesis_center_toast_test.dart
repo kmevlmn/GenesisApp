@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/components/common/genesis_center_toast.dart';
 import 'package:genesis_flutter_android/ui/theme/genesis_dark_theme.dart';
-import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_typography.dart';
 
 void main() {
@@ -82,27 +81,27 @@ void main() {
       await tester.pump();
 
       final toast = find.text('Copied');
-      expect(
-        tester.widget<Text>(toast).style?.color,
-        GenesisColors.darkTextPrimary,
-      );
+      expect(tester.widget<Text>(toast).style?.color, Colors.white);
       final box = tester.widget<DecoratedBox>(
         find.ancestor(of: toast, matching: find.byType(DecoratedBox)).first,
       );
+      expect((box.decoration as BoxDecoration).color, const Color(0xFF424244));
+      expect((box.decoration as BoxDecoration).border, isNull);
       expect(
-        (box.decoration as BoxDecoration).color,
-        GenesisColors.darkFaintSurface,
+        (box.decoration as BoxDecoration).borderRadius,
+        BorderRadius.circular(999),
       );
       expect(
-        (box.decoration as BoxDecoration).border,
-        Border.all(color: GenesisColors.darkFaintFill),
+        find.ancestor(of: toast, matching: find.byType(BackdropFilter)),
+        findsNothing,
       );
+      expect(tester.widget<Text>(toast).style?.fontWeight, FontWeight.w400);
       final padding = tester.widget<Padding>(
         find.ancestor(of: toast, matching: find.byType(Padding)).first,
       );
       expect(
         padding.padding,
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       );
       await tester.pump(const Duration(seconds: 2));
       expect(toast, findsNothing);

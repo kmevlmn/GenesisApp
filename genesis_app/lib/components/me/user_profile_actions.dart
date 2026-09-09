@@ -114,9 +114,7 @@ class _ProfileActionButtons extends StatelessWidget {
     final foregroundColor = isFollowed
         ? neutralForeground
         : (dark ? GenesisColors.darkTextPrimary : Colors.white);
-    final disabledBackgroundColor = isFollowed
-        ? neutralBackground
-        : GenesisColors.redPrimary.withValues(alpha: 0.55);
+    final disabledBackgroundColor = backgroundColor;
     final disabledForegroundColor = dark
         ? GenesisColors.darkTextTertiary
         : (isFollowed ? Colors.black54 : Colors.white);

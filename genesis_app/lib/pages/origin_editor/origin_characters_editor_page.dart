@@ -289,8 +289,6 @@ class _OriginCharactersEditorPageState
                   label: _isSaving ? 'Saving...' : 'Save',
                   backgroundColor: GenesisColors.redPrimary,
                   foregroundColor: GenesisColors.darkTextPrimary,
-                  disabledBackgroundColor: GenesisColors.redSecondary,
-                  disabledForegroundColor: GenesisColors.darkTextPrimary,
                   width: _primaryActionButtonWidth(context),
                   onPressed: _canUseSaveButton ? _saveCharacters : null,
                   onDisabledPressed: () => _showError(_saveDisabledReason),

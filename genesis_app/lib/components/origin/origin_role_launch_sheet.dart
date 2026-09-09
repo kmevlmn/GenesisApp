@@ -979,19 +979,22 @@ class _SheetActions extends StatelessWidget {
                     key: const ValueKey<String>('origin-role-launch-icon'),
                     width: 14,
                     height: 14,
-                    colorFilter: const ColorFilter.mode(
-                      Colors.white,
+                    colorFilter: ColorFilter.mode(
+                      canLaunch
+                          ? Colors.white
+                          : GenesisColors.darkButtonDisabledForeground,
                       BlendMode.srcIn,
                     ),
                   )
                 : null,
             iconGap: 6,
-            onPressed: onLaunch,
+            onPressed: canLaunch ? onLaunch : null,
+            onDisabledPressed: launching ? null : onLaunch,
             isLoading: launching,
             height: 35,
-            backgroundColor: canLaunch || launching
-                ? GenesisColors.brand
-                : GenesisColors.brandSoft,
+            backgroundColor: GenesisColors.brand,
+            disabledBackgroundColor: GenesisColors.darkButtonDisabledBackground,
+            disabledForegroundColor: GenesisColors.darkButtonDisabledForeground,
             foregroundColor: Colors.white,
             fontWeight: FontWeight.w600,
           ),

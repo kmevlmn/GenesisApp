@@ -51,7 +51,7 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
         .toList(growable: false);
     _OpeningLocationOption? selectedOption;
     final savedLocationId = draft.opening.locationId.trim();
-    if (draft.openingSaved && savedLocationId.isNotEmpty) {
+    if (savedLocationId.isNotEmpty) {
       for (final option in options) {
         if (option.id == savedLocationId) {
           selectedOption = option;
@@ -428,8 +428,6 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
                       label: _isSaving ? 'Saving...' : 'Save',
                       backgroundColor: GenesisColors.redPrimary,
                       foregroundColor: GenesisColors.darkTextPrimary,
-                      disabledBackgroundColor: GenesisColors.redSecondary,
-                      disabledForegroundColor: GenesisColors.darkTextPrimary,
                       width: _primaryActionButtonWidth(context),
                       onPressed: _canSave && !_isSaving ? _save : null,
                       onDisabledPressed: () => showGenesisToast(

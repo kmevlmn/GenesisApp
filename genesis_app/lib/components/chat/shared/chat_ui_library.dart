@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import '../../../ui/tokens/genesis_blur.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -134,7 +136,7 @@ final ChatUiStyleConfig kPrivateChatStyle = ChatUiStyleConfig.standard.copyWith(
   headerBackdropBlurSigma: 0,
   composerBackgroundColor: const Color(0xF2F6F6F6),
   clearComposerBackgroundGradient: true,
-  composerBackdropBlurSigma: 20,
+  composerBackdropBlurSigma: GenesisBlur.strong,
   composerSendButtonColor: const Color(0xFF338960),
   composerSendButtonDisabledColor: const Color(0xFFBFD8CD),
   senderNameTextStyle: ChatUiStyleConfig.standard.senderNameTextStyle.copyWith(
@@ -148,7 +150,7 @@ const double _npcChatAvatarSize = 40;
 const Color _npcChatAvatarBackgroundColor = Color(0xFF4A5F7A);
 const Color _locationChatBackgroundColor = GenesisColors.darkBackground;
 const Color _locationChatSurfaceColor = Colors.transparent;
-const double _locationChatSurfaceBlurSigma = 4;
+const double _locationChatSurfaceBlurSigma = GenesisBlur.light;
 const double _chatHeaderTrailingWidth = 96;
 
 ChatUiStyleConfig get kLocationChatStyle => ChatUiStyleConfig.standard.copyWith(
@@ -171,11 +173,11 @@ ChatUiStyleConfig get kLocationChatStyle => ChatUiStyleConfig.standard.copyWith(
   composerSendButtonBorderRadius: 8,
   composerSendButtonColor: const Color(0xFFFF2442),
   composerSendButtonDisabledColor: const Color(0x21FFFFFF),
-  composerSendButtonBackdropBlurSigma: 14,
+  composerSendButtonBackdropBlurSigma: GenesisBlur.strong,
   composerSendButtonIconSize: 17,
   composerActionGap: 9,
   inputBackgroundColor: const Color(0x1FFFFFFF),
-  inputBackdropBlurSigma: 4,
+  inputBackdropBlurSigma: GenesisBlur.light,
   inputBorderRadius: 8,
   inputHintStyle: const TextStyle(color: GenesisColors.darkInputPlaceholder),
   inputTextStyle: ChatUiStyleConfig.standard.inputTextStyle.copyWith(

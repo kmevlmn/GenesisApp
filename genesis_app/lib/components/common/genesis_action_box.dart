@@ -1,5 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
+import '../../ui/tokens/genesis_blur.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../ui/tokens/genesis_colors.dart';
@@ -228,7 +230,10 @@ class _ActionBoxSurface extends StatelessWidget {
   const _ActionBoxSurface({super.key, required this.child});
 
   static const _borderRadius = BorderRadius.all(Radius.circular(18));
-  static final _blur = ImageFilter.blur(sigmaX: 20, sigmaY: 20);
+  static final _blur = ImageFilter.blur(
+    sigmaX: GenesisBlur.strong,
+    sigmaY: GenesisBlur.strong,
+  );
 
   final Widget child;
 

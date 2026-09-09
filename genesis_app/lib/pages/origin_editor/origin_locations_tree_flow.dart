@@ -518,7 +518,13 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
                                   ];
                                   setSheetState(() {});
                                 },
-                                onRemoveCharacter: (charId) {
+                                onRemoveCharacter: (charId) async {
+                                  if (!await _confirmOpeningCharacterRemoval(
+                                        draftForm,
+                                        {charId},
+                                      ) ||
+                                      !context.mounted)
+                                    return;
                                   draftForm.selectedCharacterIds = draftForm
                                       .selectedCharacterIds
                                       .where((item) => item != charId)
@@ -584,10 +590,6 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
                                       label: 'Save',
                                       backgroundColor: GenesisColors.redPrimary,
                                       foregroundColor:
-                                          GenesisColors.darkTextPrimary,
-                                      disabledBackgroundColor:
-                                          GenesisColors.redSecondary,
-                                      disabledForegroundColor:
                                           GenesisColors.darkTextPrimary,
                                       width: saveWidth,
                                       onPressed:

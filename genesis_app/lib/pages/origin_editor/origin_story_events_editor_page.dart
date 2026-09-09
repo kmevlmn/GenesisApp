@@ -101,7 +101,7 @@ class _OriginStoryEventsEditorPageState
   }
 
   void _showError(String message) {
-    showGenesisToast(context, message);
+    showGenesisToast(context, message, brightness: Brightness.dark);
   }
 
   @override
@@ -117,10 +117,26 @@ class _OriginStoryEventsEditorPageState
 
   @override
   Widget build(BuildContext context) {
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: CreateFormTheme(child: _buildPage(context)),
+      ),
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: Colors.white,
-      appBar: const GenesisBackAppBar(pageName: 'Story Events'),
+      backgroundColor: GenesisColors.darkBackground,
+      appBar: const GenesisBackAppBar(
+        pageName: 'Story Events',
+        backgroundColor: GenesisColors.darkBackground,
+        foregroundColor: GenesisColors.darkTextPrimary,
+        systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+      ),
       body: CreateKeyboardDismissArea(
         child: SafeArea(
           top: false,
@@ -137,7 +153,7 @@ class _OriginStoryEventsEditorPageState
                         child: Text(
                           '${_eventControllers.length}/$_maxEvents (Added / Max)',
                           style: const TextStyle(
-                            color: createFormText,
+                            color: GenesisColors.darkTextTertiary,
                             fontSize: 14,
                             height: 1.2,
                           ),
@@ -178,6 +194,8 @@ class _OriginStoryEventsEditorPageState
                 minimum: const EdgeInsets.fromLTRB(28, 8, 28, 14),
                 child: GenesisPrimaryButton(
                   label: _isSaving ? 'Saving...' : 'Save',
+                  backgroundColor: GenesisColors.redPrimary,
+                  foregroundColor: GenesisColors.darkTextPrimary,
                   width: _primaryActionButtonWidth(context),
                   onPressed: _canUseSaveButton ? _saveEvents : null,
                   onDisabledPressed: () =>

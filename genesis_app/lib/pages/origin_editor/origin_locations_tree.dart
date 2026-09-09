@@ -377,7 +377,12 @@ extension _OriginLocationsTree on _OriginLocationsEditorPageState {
     _removeCharacterFromForm(_forms[locationIndex], charId);
   }
 
-  void _removeCharacterFromForm(_LocationForm form, String charId) {
+  Future<void> _removeCharacterFromForm(
+    _LocationForm form,
+    String charId,
+  ) async {
+    if (!await _confirmOpeningCharacterRemoval(form, {charId}) || !mounted)
+      return;
     _setLocationEditorState(() {
       form.selectedCharacterIds = form.selectedCharacterIds
           .where((item) => item != charId)
@@ -488,10 +493,54 @@ extension _OriginLocationsTree on _OriginLocationsEditorPageState {
       },
     );
     if (selectedIds == null || !mounted) return;
+    if (!await _confirmOpeningCharacterRemoval(
+          form,
+          currentIds.difference(selectedIds.toSet()),
+        ) ||
+        !mounted)
+      return;
     _setLocationEditorState(() {
       form.selectedCharacterIds = selectedIds;
     });
     if (notifyFormChanged) _onFormChanged();
+  }
+
+  Future<bool> _confirmOpeningCharacterRemoval(
+    _LocationForm form,
+    Set<String> removedIds,
+  ) async {
+    if (removedIds.isEmpty) return true;
+    final draft = await widget.repository.loadDraft();
+    if (!mounted) return false;
+    if (form.locationId.trim() != draft.opening.locationId.trim()) return true;
+    final count = draft.opening.dialogue
+        .where(
+          (item) =>
+              item.type.trim() == OpeningDialogueDraft.characterType &&
+              removedIds.contains(item.characterId.trim()),
+        )
+        .length;
+    if (count == 0) return true;
+    return await showGenesisActionBox<bool>(
+          context: context,
+          title: 'Remove character from location?',
+          titleContent: Text(
+            'Saving Locations will also delete $count Opening dialogue '
+            '${count == 1 ? 'bubble' : 'bubbles'} for the removed characters.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: GenesisColors.darkTextSecondary,
+              fontSize: 13,
+              height: 1.3,
+            ),
+          ),
+          titleHeight: 120,
+          actions: const [
+            GenesisActionBoxAction<bool>(label: 'Remove', value: true),
+          ],
+          cancelLabel: 'Cancel',
+        ) ==
+        true;
   }
 
   Set<String> _boundCharacterIdsExceptForm(_LocationForm excludedForm) {

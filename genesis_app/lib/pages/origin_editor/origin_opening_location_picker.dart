@@ -85,8 +85,6 @@ class _OpeningLocationPickerSheetState
                   onDisabledPressed: () =>
                       showGenesisToast(context, 'Select a location first.'),
                   backgroundColor: GenesisColors.redPrimary,
-                  disabledBackgroundColor: GenesisColors.redSecondary,
-                  disabledForegroundColor: GenesisColors.darkTextPrimary,
                   foregroundColor: GenesisColors.darkTextPrimary,
                 ),
               ),
@@ -186,11 +184,11 @@ class _OpeningLocationOptionRow extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: selected
-                    ? GenesisColors.darkTextPrimary
+                    ? GenesisColors.redPrimary
                     : GenesisColors.darkFaintFill,
                 border: Border.all(
                   color: selected
-                      ? GenesisColors.darkTextPrimary
+                      ? GenesisColors.redPrimary
                       : GenesisColors.darkFaintFill,
                   width: 1.5,
                 ),
@@ -199,7 +197,7 @@ class _OpeningLocationOptionRow extends StatelessWidget {
                   ? const Icon(
                       Icons.check,
                       size: 15,
-                      color: GenesisColors.darkBackground,
+                      color: GenesisColors.darkTextPrimary,
                     )
                   : null,
             ),

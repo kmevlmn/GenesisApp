@@ -272,6 +272,53 @@ class CreateOriginDraft {
     );
   }
 
+  /// Saves location edits and removes dialogue only for newly unbound speakers.
+  /// Pre-existing invalid dialogue remains available for explicit repair.
+  CreateOriginDraft withSavedLocations(List<LocationDraft> updatedLocations) {
+    final updated = copyWith(
+      locations: updatedLocations,
+      locationsSaved: updatedLocations.isNotEmpty,
+    );
+    final id = opening.locationId.trim();
+    if (id.isEmpty) return updated;
+    final remaining = updatedLocations.where(
+      (location) =>
+          (location.level == 0 || location.level == 3) &&
+          location.locationId.trim() == id,
+    );
+    if (remaining.isEmpty) {
+      return updated.copyWith(
+        opening: const OpeningDraft(),
+        openingSaved: false,
+      );
+    }
+    final previousIds = locations
+        .where((location) => location.locationId.trim() == id)
+        .expand((location) => location.initialCharacterIds)
+        .map((id) => id.trim())
+        .toSet();
+    final currentIds = remaining.first.initialCharacterIds
+        .map((id) => id.trim())
+        .toSet();
+    final removedIds = previousIds.difference(currentIds);
+    final dialogue = opening.dialogue
+        .where(
+          (item) =>
+              item.type.trim() != OpeningDialogueDraft.characterType ||
+              !removedIds.contains(item.characterId.trim()),
+        )
+        .toList(growable: false);
+    if (dialogue.length == opening.dialogue.length) return updated;
+    return updated.copyWith(
+      opening: OpeningDraft(
+        locationId: opening.locationId,
+        locationName: opening.locationName,
+        dialogue: dialogue,
+      ),
+      openingSaved: openingSaved && dialogue.isNotEmpty,
+    );
+  }
+
   bool get hasAllSectionsSaved {
     return basicsSaved &&
         charactersSaved &&
@@ -384,6 +431,27 @@ class CreateOriginDraft {
             !validCharacterIds.contains(item.characterId.trim()),
       )) {
         errors.add('Opening: A selected character is no longer available.');
+      }
+      final openingCharacterIds = locations
+          .where(
+            (location) =>
+                (location.level == 0 || location.level == 3) &&
+                (location.locationId.trim().isEmpty
+                        ? location.name.trim()
+                        : location.locationId.trim()) ==
+                    opening.locationId.trim(),
+          )
+          .expand((location) => location.initialCharacterIds)
+          .map((id) => id.trim())
+          .toSet();
+      if (opening.dialogue.any(
+        (item) =>
+            item.type.trim() == OpeningDialogueDraft.characterType &&
+            !openingCharacterIds.contains(item.characterId.trim()),
+      )) {
+        errors.add(
+          'Opening: A dialogue character is not in the selected location. Open Opening to fix it.',
+        );
       }
     }
 

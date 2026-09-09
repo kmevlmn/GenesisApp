@@ -5,7 +5,7 @@ const Color _tickMessageAccentColor = GenesisColors.redPrimary;
 const Color _tickMessageHeaderColor = Color(0xFFF4F3F6);
 const Color _tickMessageBorderColor = Color(0x33FFFFFF);
 const Color _tickMessageDividerColor = Color(0x29FFFFFF);
-const double _tickMessageBlurSigma = 14;
+const double _tickMessageBlurSigma = GenesisBlur.strong;
 
 class ChatTickPayloadVm extends ChatTimelinePayloadVm {
   const ChatTickPayloadVm({

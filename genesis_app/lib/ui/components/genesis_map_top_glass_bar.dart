@@ -1,9 +1,11 @@
 import 'dart:ui';
 
+import '../tokens/genesis_blur.dart';
+
 import 'package:flutter/material.dart';
 
 const Color genesisMapTopGlassBarColor = Color(0x80151517);
-const double genesisMapTopGlassBarBlurSigma = 10;
+const double genesisMapTopGlassBarBlurSigma = GenesisBlur.strong;
 const double genesisMapTopGlassBarRadius = 12;
 
 // Match Location Chat's unchanged 48px back-button slot in its 50px header.

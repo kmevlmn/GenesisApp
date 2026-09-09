@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import '../../ui/tokens/genesis_blur.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -105,7 +107,10 @@ class MemoryModelEntryButton extends StatelessWidget {
     return ClipRRect(
       borderRadius: borderRadius,
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        filter: ImageFilter.blur(
+          sigmaX: GenesisBlur.strong,
+          sigmaY: GenesisBlur.strong,
+        ),
         child: Material(
           key: const ValueKey('memory-model-entry'),
           color: foreground.withValues(alpha: 0.13),

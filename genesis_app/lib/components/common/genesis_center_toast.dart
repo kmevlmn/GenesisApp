@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
+
+import '../../ui/tokens/genesis_blur.dart';
+import '../../ui/tokens/genesis_colors.dart';
 
 import 'package:flutter/material.dart';
 
-import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_typography.dart';
 
 OverlayEntry? _currentGenesisToast;
@@ -43,43 +46,51 @@ void showGenesisToastInOverlay(
 
   final entry = OverlayEntry(
     builder: (context) {
+      final radius = BorderRadius.circular(isDark ? 999 : 8);
+      final surface = DecoratedBox(
+        decoration: BoxDecoration(
+          color: isDark
+              ? GenesisColors.darkToastBackground
+              : Colors.black.withValues(alpha: 0.72),
+          borderRadius: radius,
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: isDark ? 8 : 12,
+          ),
+          child: Text(
+            trimmedMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              inherit: false,
+              fontFamily: GenesisTypography.fontFamily,
+              fontFamilyFallback: GenesisTypography.fontFamilyFallback,
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: isDark ? FontWeight.w400 : FontWeight.w500,
+              height: isDark ? 1.4 : 1.35,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ),
+      );
       return Positioned.fill(
         child: IgnorePointer(
           child: Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 36),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? GenesisColors.darkFaintSurface
-                      : Colors.black.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(8),
-                  border: isDark
-                      ? Border.all(color: GenesisColors.darkFaintFill)
-                      : null,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Text(
-                    trimmedMessage,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      inherit: false,
-                      fontFamily: GenesisTypography.fontFamily,
-                      fontFamilyFallback: GenesisTypography.fontFamilyFallback,
-                      color: isDark
-                          ? GenesisColors.darkTextPrimary
-                          : Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      height: 1.35,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ),
+              child: ClipRRect(
+                borderRadius: radius,
+                child: isDark
+                    ? surface
+                    : BackdropFilter(
+                        filter: ImageFilter.blur(
+                          sigmaX: GenesisBlur.strong,
+                          sigmaY: GenesisBlur.strong,
+                        ),
+                        child: surface,
+                      ),
               ),
             ),
           ),

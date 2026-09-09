@@ -206,7 +206,6 @@ class OriginDraftFlowPage extends StatefulWidget {
     required this.onSubmit,
     this.submitLabel = 'Save',
     this.submittingLabel = 'Saving...',
-    this.disabledSubmitBackgroundColor = GenesisColors.darkFaintFill,
     this.failurePrefix = 'Save failed',
     this.leaveTitle = 'Save the draft before leaving?',
     this.leaveSubmitLabel,
@@ -233,7 +232,6 @@ class OriginDraftFlowPage extends StatefulWidget {
   final OriginSubmitHandler onSubmit;
   final String submitLabel;
   final String submittingLabel;
-  final Color disabledSubmitBackgroundColor;
   final String failurePrefix;
   final String leaveTitle;
   final String? leaveSubmitLabel;
@@ -550,8 +548,6 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
       onDisabledPressed: _showSubmitDisabledReason,
       backgroundColor: GenesisColors.redPrimary,
       foregroundColor: GenesisColors.darkTextPrimary,
-      disabledBackgroundColor: widget.disabledSubmitBackgroundColor,
-      disabledForegroundColor: GenesisColors.darkTextPrimary,
     );
 
     return PopScope(
@@ -663,6 +659,7 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
                                     widget.storyEventsPageBuilder(
                                       widget.repository,
                                     ),
+                                    dark: true,
                                   ),
                                 ),
                                 if (widget.updateNotesController != null) ...[

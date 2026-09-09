@@ -69,6 +69,17 @@ class GenesisPrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = isLoading || onPressed == null;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final resolvedDisabledBackground =
+        disabledBackgroundColor ??
+        (dark
+            ? GenesisColors.darkButtonDisabledBackground
+            : defaultDisabledBackgroundColor);
+    final resolvedDisabledForeground =
+        disabledForegroundColor ??
+        (dark
+            ? GenesisColors.darkButtonDisabledForeground
+            : defaultDisabledForegroundColor);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: disabled && onDisabledPressed != null
@@ -98,10 +109,8 @@ class GenesisPrimaryButton extends StatelessWidget {
           style: FilledButton.styleFrom(
             backgroundColor: backgroundColor ?? defaultBackgroundColor,
             foregroundColor: foregroundColor ?? defaultForegroundColor,
-            disabledBackgroundColor:
-                disabledBackgroundColor ?? defaultDisabledBackgroundColor,
-            disabledForegroundColor:
-                disabledForegroundColor ?? defaultDisabledForegroundColor,
+            disabledBackgroundColor: resolvedDisabledBackground,
+            disabledForegroundColor: resolvedDisabledForeground,
             side: side,
             textStyle: defaultTextStyle.copyWith(
               fontSize: fontSize,
@@ -119,7 +128,7 @@ class GenesisPrimaryButton extends StatelessWidget {
                   dimension: loadingSize,
                   child: CircularProgressIndicator(
                     strokeWidth: loadingStrokeWidth,
-                    color: foregroundColor ?? defaultForegroundColor,
+                    color: resolvedDisabledForeground,
                   ),
                 )
               : _PrimaryButtonLabel(
