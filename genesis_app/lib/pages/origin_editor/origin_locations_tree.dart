@@ -477,9 +477,13 @@ extension _OriginLocationsTree on _OriginLocationsEditorPageState {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return _CharacterPickerSheet(
-          characters: availableCharacters,
-          initialSelectedIds: currentIds,
+        return GenesisDarkTheme(
+          child: CreateFormTheme(
+            child: _CharacterPickerSheet(
+              characters: availableCharacters,
+              initialSelectedIds: currentIds,
+            ),
+          ),
         );
       },
     );

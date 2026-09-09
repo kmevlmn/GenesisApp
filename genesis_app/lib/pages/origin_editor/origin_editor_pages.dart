@@ -632,6 +632,7 @@ class _OriginDraftFlowPageState extends State<OriginDraftFlowPage> {
                                     widget.locationsPageBuilder(
                                       widget.repository,
                                     ),
+                                    dark: true,
                                   ),
                                 ),
                                 if (widget.openingPageBuilder != null)

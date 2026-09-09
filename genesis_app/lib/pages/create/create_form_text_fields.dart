@@ -181,6 +181,7 @@ class CreateTextFieldBlock extends StatefulWidget {
     this.textColor,
     this.hintColor,
     this.contentPadding,
+    this.minimumHeight,
     this.handoffVerticalDragToAncestor = false,
     this.visibilityBottomPadding = 0,
     this.inputFormatters = const [],
@@ -212,6 +213,7 @@ class CreateTextFieldBlock extends StatefulWidget {
   final Color? textColor;
   final Color? hintColor;
   final EdgeInsets? contentPadding;
+  final double? minimumHeight;
   final bool handoffVerticalDragToAncestor;
   final double visibilityBottomPadding;
   final List<TextInputFormatter> inputFormatters;
@@ -311,8 +313,10 @@ class _CreateTextFieldBlockState extends State<CreateTextFieldBlock> {
             SizedBox(height: widget.labelInputGap),
           ],
           Container(
-            constraints: CreateFormTheme.isDarkOf(context)
-                ? const BoxConstraints(minHeight: 40)
+            constraints:
+                widget.minimumHeight != null ||
+                    CreateFormTheme.isDarkOf(context)
+                ? BoxConstraints(minHeight: widget.minimumHeight ?? 40)
                 : null,
             decoration: BoxDecoration(
               color:

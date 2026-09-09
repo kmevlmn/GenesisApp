@@ -9,7 +9,7 @@ extension _OriginLocationsEditorView on _OriginLocationsEditorPageState {
           '${_forms.length}/'
           '${_OriginLocationsEditorPageState._maxLocations} (Added / Max)',
           style: const TextStyle(
-            color: createFormText,
+            color: GenesisColors.darkTextTertiary,
             fontSize: 14,
             height: 1.2,
           ),
@@ -74,7 +74,7 @@ class _LocationsModeSwitch extends StatelessWidget {
                 const Icon(
                   Icons.visibility_outlined,
                   size: 16,
-                  color: Color(0xFF4B6192),
+                  color: GenesisColors.darkTextSecondary,
                 )
               else
                 Transform.scale(
@@ -85,7 +85,7 @@ class _LocationsModeSwitch extends StatelessWidget {
                     width: 16,
                     height: 16,
                     colorFilter: const ColorFilter.mode(
-                      Color(0xFF4B6192),
+                      GenesisColors.darkTextSecondary,
                       BlendMode.srcIn,
                     ),
                   ),
@@ -94,7 +94,7 @@ class _LocationsModeSwitch extends StatelessWidget {
               Text(
                 label,
                 style: const TextStyle(
-                  color: Color(0xFF4B6192),
+                  color: GenesisColors.darkTextSecondary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   height: 1.2,
@@ -179,6 +179,12 @@ class _InlineTreeLocationNameEditor extends StatelessWidget {
                         maxLines: 1,
                         counterInside: true,
                         inputLineHeight: 1.2,
+                        // Retain the compact tree row's existing text alignment.
+                        minimumHeight: 0,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 10,
+                        ),
                         textInputAction: TextInputAction.done,
                         onEditingComplete: onEditingComplete,
                         onChanged: (_) => onChanged(),
@@ -190,7 +196,9 @@ class _InlineTreeLocationNameEditor extends StatelessWidget {
                     offset: Offset(0, level == 0 ? 2.5 : 1.5),
                     child: _InlineLocationSaveButton(
                       key: saveButtonKey,
-                      onPressed: onEditingComplete,
+                      onPressed: controller.text.trim().isEmpty
+                          ? null
+                          : onEditingComplete,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -263,12 +271,12 @@ class _LocationEditorNote extends StatelessWidget {
     }
     if (levels.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.only(top: 8),
+        padding: EdgeInsets.zero,
         child: CreateFormNote(note: value),
       );
     }
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -276,9 +284,9 @@ class _LocationEditorNote extends StatelessWidget {
             Text(
               heading,
               style: TextStyle(
-                color: const Color(0xCC131215),
-                fontSize: 11,
-                height: 1.45,
+                color: GenesisColors.darkTextTertiary,
+                fontSize: 12,
+                height: 1.2,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -295,14 +303,14 @@ class _LocationEditorNote extends StatelessWidget {
                       height: 19,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F3F6),
+                        color: GenesisColors.darkFaintFill,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         level.badge,
                         style: TextStyle(
-                          color: const Color(0xFF131215),
-                          fontSize: 9.5,
+                          color: GenesisColors.darkTextTertiary,
+                          fontSize: 10,
                           height: 1,
                           fontWeight: FontWeight.w600,
                         ),
@@ -313,10 +321,10 @@ class _LocationEditorNote extends StatelessWidget {
                       child: Text(
                         level.name,
                         style: TextStyle(
-                          color: const Color(0xFF131215),
-                          fontSize: 11,
-                          height: 1,
-                          fontWeight: FontWeight.w700,
+                          color: GenesisColors.darkTextTertiary,
+                          fontSize: 12,
+                          height: 1.2,
+                          fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -330,9 +338,9 @@ class _LocationEditorNote extends StatelessWidget {
                   child: Text(
                     level.description,
                     style: TextStyle(
-                      color: const Color(0x99131215),
-                      fontSize: 11,
-                      height: 1.45,
+                      color: GenesisColors.darkTextTertiary,
+                      fontSize: 12,
+                      height: 1.2,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -345,9 +353,9 @@ class _LocationEditorNote extends StatelessWidget {
             Text(
               line,
               style: TextStyle(
-                color: const Color(0x99131215),
-                fontSize: 11,
-                height: 1.45,
+                color: GenesisColors.darkTextTertiary,
+                fontSize: 12,
+                height: 1.2,
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -411,13 +419,13 @@ class _InlineTreeLocationPreviewHeader extends StatelessWidget {
 TextStyle _inlineLocationNameStyle(int level) {
   if (level <= 0) {
     return const TextStyle(
-      color: Colors.black,
+      color: GenesisColors.darkTextPrimary,
       fontSize: 16,
       fontWeight: FontWeight.w600,
     );
   }
   return const TextStyle(
-    color: Colors.black,
+    color: GenesisColors.darkTextPrimary,
     fontSize: 14,
     height: 1.2,
     fontWeight: FontWeight.w600,
@@ -427,40 +435,43 @@ TextStyle _inlineLocationNameStyle(int level) {
 class _InlineLocationSaveButton extends StatelessWidget {
   const _InlineLocationSaveButton({super.key, required this.onPressed});
 
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 24,
-      height: 24,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xE6F4F4F6),
-              border: Border.all(color: const Color(0xFF888888)),
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Save',
-            onPressed: onPressed,
-            padding: const EdgeInsets.all(5),
-            constraints: const BoxConstraints.tightFor(width: 24, height: 24),
-            icon: SvgPicture.asset(
-              checkLineIconAsset,
-              width: 14,
-              height: 14,
-              colorFilter: const ColorFilter.mode(
-                createFormMuted,
-                BlendMode.srcIn,
+    return Opacity(
+      opacity: onPressed == null ? 0.45 : 1,
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: GenesisColors.darkFaintSurface,
+                border: Border.all(color: GenesisColors.darkFaintFill),
+                borderRadius: BorderRadius.circular(6),
               ),
             ),
-            splashRadius: 12,
-          ),
-        ],
+            IconButton(
+              tooltip: 'Save',
+              onPressed: onPressed,
+              padding: const EdgeInsets.all(5),
+              constraints: const BoxConstraints.tightFor(width: 24, height: 24),
+              icon: SvgPicture.asset(
+                checkLineIconAsset,
+                width: 14,
+                height: 14,
+                colorFilter: const ColorFilter.mode(
+                  GenesisColors.darkTextPrimary,
+                  BlendMode.srcIn,
+                ),
+              ),
+              splashRadius: 12,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -509,7 +520,7 @@ class _LocationTreeAddL3Button extends StatelessWidget {
           onTap: onTap,
           child: CustomPaint(
             painter: CreateDashedRRectPainter(
-              color: createFormBorder,
+              color: GenesisColors.darkFaintFill,
               radius: 4,
               strokeWidth: 1.2,
             ),
@@ -521,14 +532,14 @@ class _LocationTreeAddL3Button extends StatelessWidget {
                 children: [
                   const Icon(
                     Icons.add,
-                    color: GenesisColors.createAdd,
+                    color: GenesisColors.redSecondary,
                     size: 22,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     isRequired ? 'L3 *' : 'L3',
                     style: const TextStyle(
-                      color: GenesisColors.createAdd,
+                      color: GenesisColors.redSecondary,
                       fontSize: 12,
                       height: 1.2,
                       fontWeight: FontWeight.w600,

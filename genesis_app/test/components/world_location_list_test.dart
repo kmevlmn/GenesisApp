@@ -204,8 +204,9 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: const Scaffold(
           body: WorldLocationList(
             points: <WorldPoint>[
               WorldPoint(

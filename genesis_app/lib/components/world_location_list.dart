@@ -899,6 +899,9 @@ class _PointCharacterGroups extends StatelessWidget {
 class _PointCharacterGroupRow extends StatelessWidget {
   const _PointCharacterGroupRow({required this.iconAsset, required this.users});
 
+  static const _fontSize = 12.0;
+  static const _lineHeight = 1.4;
+
   final String iconAsset;
   final List<UserAvatar> users;
 
@@ -909,9 +912,10 @@ class _PointCharacterGroupRow extends StatelessWidget {
       children: [
         SizedBox(
           width: 12,
-          height: 15,
+          height:
+              MediaQuery.textScalerOf(context).scale(_fontSize) * _lineHeight,
           child: Align(
-            alignment: Alignment.topCenter,
+            alignment: Alignment.center,
             child: SvgPicture.asset(
               iconAsset,
               colorFilter: Theme.of(context).brightness == Brightness.dark
@@ -932,8 +936,8 @@ class _PointCharacterGroupRow extends StatelessWidget {
           child: Text.rich(
             TextSpan(children: _characterSpans()),
             style: TextStyle(
-              fontSize: 12,
-              height: 1.4,
+              fontSize: _fontSize,
+              height: _lineHeight,
               fontWeight: FontWeight.w400,
               color: Theme.of(context).brightness == Brightness.dark
                   ? GenesisColors.darkTextPrimary
@@ -1068,11 +1072,29 @@ class _LocationCoverImage extends StatelessWidget {
           logicalWidth: logicalWidth,
           devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
         );
-        return GenesisListImage(
-          imageUrl: resizedUrl.isNotEmpty ? resizedUrl : rawUrl,
+        final imageUrl = rawUrl.isEmpty
+            ? _locationDefaultImageAsset
+            : (resizedUrl.isNotEmpty ? resizedUrl : rawUrl);
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        final image = GenesisListImage(
+          imageUrl: imageUrl,
           width: logicalWidth,
           height: logicalHeight,
           placeholderAsset: _locationDefaultImageAsset,
+          placeholder: dark
+              ? const ColoredBox(color: GenesisColors.darkFaintFill)
+              : null,
+        );
+        if (!dark || imageUrl != _locationDefaultImageAsset) return image;
+        return DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            borderRadius: GenesisImageRadii.content,
+            border: Border.all(
+              color: GenesisColors.darkFaintFill.withValues(alpha: 0.06),
+            ),
+          ),
+          child: image,
         );
       },
     );

@@ -20417,8 +20417,8 @@ void main() {
     final l1Badge = tester.widget<Text>(
       find.descendant(of: statisticsNote, matching: find.text('L1')),
     );
-    expect(l1Badge.style?.fontSize, 9.5);
-    expect(l1Badge.style?.color, const Color(0xFF131215));
+    expect(l1Badge.style?.fontSize, 10);
+    expect(l1Badge.style?.color, GenesisColors.darkTextTertiary);
     expect(
       find.byKey(const ValueKey<String>('locations-inline-name-Loc_1')),
       findsOneWidget,
@@ -20485,13 +20485,29 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 2));
 
+    IconButton inlineSave(String id) => tester.widget<IconButton>(
+      find.descendant(
+        of: find.byKey(ValueKey<String>('locations-inline-save-$id')),
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(inlineSave('Loc_1').onPressed, isNull);
+
     final l1Editor = find.byKey(
       const ValueKey<String>('locations-inline-name-Loc_1'),
     );
     await tester.enterText(
       find.descendant(of: l1Editor, matching: find.byType(TextField)),
+      '   ',
+    );
+    await tester.pump();
+    expect(inlineSave('Loc_1').onPressed, isNull);
+    await tester.enterText(
+      find.descendant(of: l1Editor, matching: find.byType(TextField)),
       'Downtown',
     );
+    await tester.pump();
+    expect(inlineSave('Loc_1').onPressed, isNotNull);
     await tester.tap(
       find.byKey(const ValueKey<String>('locations-inline-save-Loc_1')),
     );
@@ -20510,6 +20526,7 @@ void main() {
       findsNothing,
     );
 
+    expect(inlineSave('Loc_1_1').onPressed, isNull);
     final l2Editor = find.byKey(
       const ValueKey<String>('locations-inline-name-Loc_1_1'),
     );
@@ -20528,6 +20545,8 @@ void main() {
       find.descendant(of: l2Editor, matching: find.byType(TextField)),
       'Main Street',
     );
+    await tester.pump();
+    expect(inlineSave('Loc_1_1').onPressed, isNotNull);
     await tester.tap(
       find.byKey(const ValueKey<String>('locations-inline-save-Loc_1_1')),
     );
@@ -20546,7 +20565,7 @@ void main() {
           .widget<Text>(find.descendant(of: addL3, matching: find.text('L3 *')))
           .style
           ?.color,
-      GenesisColors.createAdd,
+      GenesisColors.redSecondary,
     );
     expect(
       tester
@@ -20554,7 +20573,7 @@ void main() {
             find.descendant(of: addL3, matching: find.byIcon(Icons.add)),
           )
           .color,
-      GenesisColors.createAdd,
+      GenesisColors.redSecondary,
     );
     final addL3Border = tester
         .widgetList<CustomPaint>(
@@ -20563,7 +20582,7 @@ void main() {
         .map((widget) => widget.painter)
         .whereType<CreateDashedRRectPainter>()
         .single;
-    expect(addL3Border.color, createFormBorder);
+    expect(addL3Border.color, GenesisColors.darkFaintFill);
     expect(
       find.byKey(const ValueKey<String>('create-add-l2-Loc_1')),
       findsNothing,
@@ -21751,7 +21770,7 @@ void main() {
     expect(modeSwitch, findsOneWidget);
     expect(
       tester.widget<Text>(find.text('Preview')).style?.color,
-      const Color(0xFF4B6192),
+      GenesisColors.darkTextSecondary,
     );
     expect(
       tester.widget<Text>(find.text('Preview')).style?.fontWeight,
@@ -21885,7 +21904,7 @@ void main() {
     expect(saveIconWidget.height, 14);
     expect(
       saveIconWidget.colorFilter,
-      const ColorFilter.mode(createFormMuted, BlendMode.srcIn),
+      const ColorFilter.mode(GenesisColors.darkTextPrimary, BlendMode.srcIn),
     );
     final saveButtonDecoration =
         tester
@@ -21899,10 +21918,10 @@ void main() {
                 )
                 .decoration
             as BoxDecoration;
-    expect(saveButtonDecoration.color, const Color(0xE6F4F4F6));
+    expect(saveButtonDecoration.color, GenesisColors.darkFaintSurface);
     expect(
       (saveButtonDecoration.border as Border).top.color,
-      const Color(0xFF888888),
+      GenesisColors.darkFaintFill,
     );
     expect(saveButtonDecoration.borderRadius, BorderRadius.circular(6));
     final inlineDeleteButton = find.byType(GenesisDeleteButton);
@@ -22110,7 +22129,7 @@ void main() {
     expect(find.text('Central Station'), findsOneWidget);
     expect(
       tester.widget<Text>(find.text('Edit')).style?.color,
-      const Color(0xFF4B6192),
+      GenesisColors.darkTextSecondary,
     );
     expect(
       tester.widget<Text>(find.text('Edit')).style?.fontWeight,

@@ -48,6 +48,7 @@ class GenesisBottomSheetPanel extends StatelessWidget {
     this.padding = const EdgeInsets.fromLTRB(16, 20, 16, 14),
     this.titleBottomSpacing = 20,
     this.titleTextStyle,
+    this.backgroundColor,
     this.maintainBottomViewPadding = false,
     this.showHeader = true,
   });
@@ -68,6 +69,7 @@ class GenesisBottomSheetPanel extends StatelessWidget {
   final EdgeInsets padding;
   final double titleBottomSpacing;
   final TextStyle? titleTextStyle;
+  final Color? backgroundColor;
   final bool maintainBottomViewPadding;
   final bool showHeader;
 
@@ -75,7 +77,9 @@ class GenesisBottomSheetPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: dark ? GenesisColors.darkRaisedBackground : Colors.white,
+      color:
+          backgroundColor ??
+          (dark ? GenesisColors.darkRaisedBackground : Colors.white),
       borderRadius: borderRadius,
       child: SafeArea(
         top: false,
