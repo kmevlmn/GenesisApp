@@ -512,8 +512,23 @@ void main() {
         );
         expect(cards.list, isEmpty);
         expect(cards.total, 0);
+        expect(cards.conversationRoundId, 9007199254740993);
         expect(cards.originalCardId, 0);
       }
+      await expectLater(
+        api.chatroomHttp.batchMutateLlmCardMessages(
+          worldId: 'w_cards_contract',
+          locationId: 'l_cards_contract',
+          conversationRoundId: 9007199254740993,
+          cardId: 9007199254740994,
+          operations: const [
+            ChatroomLlmMessageOperation.delete(
+              globalMessageId: 9007199254740995,
+            ),
+          ],
+        ),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 501)),
+      );
       await expectLater(
         api.chatroomHttp.selectLlmCard(
           worldId: 'w_cards_contract',

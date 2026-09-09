@@ -8,6 +8,7 @@ import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_client.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_http_api.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_models.dart';
+import 'package:genesis_flutter_android/network/chatroom/chatroom_http_models.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_socket_transport.dart';
 import 'package:genesis_flutter_android/network/genesis_api.dart';
 import 'package:genesis_flutter_android/network/http_transport.dart';
@@ -36,6 +37,7 @@ Map<String, Object?> _regen([String state = 'queued']) => {
   if (state == 'failed') 'error': {'code': 9999, 'message': 'failed'},
 };
 Map<String, Object?> _cards() => {
+  'conversation_round_id': _id,
   'original_card_id': 0,
   'selected_card_id': 0,
   'active_card_id': 0,
@@ -60,6 +62,7 @@ Map<String, Object?> _frame(
   'location_id': location,
   'user_id': user,
   'conversation_round_id': _id,
+  if (type == 'llm_card_stream') 'global_message_id': _id + 3,
   'sender_type': 'character',
   'sender_id': 'c',
   'sender_name': 'Alice',
@@ -67,6 +70,25 @@ Map<String, Object?> _frame(
   'payload': payload ?? {},
   'err_no': code,
   'err_msg': code == 0 ? '' : 'server failure',
+};
+
+Map<String, Object?> _card({int cardId = _id, String content = 'Hello'}) => {
+  'card_id': cardId,
+  'card_index': 1,
+  'is_original': true,
+  'generation_state': 'succeeded',
+  'can_edit': true,
+  'can_delete': false,
+  'messages': [
+    {
+      ..._frame('character', payload: {'content': content}),
+      'card_id': cardId,
+      'card_message_index': 1,
+      'global_message_id': _id + 3,
+    },
+  ],
+  'billing': _billing('not_required'),
+  'created_at': '2026-09-08 16:00:00',
 };
 
 class _Http implements HttpTransport {
@@ -93,11 +115,13 @@ class _Http implements HttpTransport {
 class _Socket implements ChatroomSocket {
   final incoming = StreamController<String>.broadcast();
   final sent = <Map<String, dynamic>>[];
+  bool failSend = false;
   @override
   Stream<String> get messages => incoming.stream;
   @override
   Future<void> send(String message) async {
     sent.add(jsonDecode(message) as Map<String, dynamic>);
+    if (failSend) throw const SocketException('send failed');
   }
 
   @override
@@ -151,6 +175,515 @@ Future<ChatroomSession> _session(
 }
 
 void main() {
+  test(
+    'Go on sends exact body and accepts a new round before any user echo',
+    () async {
+      final socket = _Socket();
+      final session = await _session(socket);
+      final events = <ChatroomEvent>[];
+      final subscription = session.events.listen(events.add);
+      addTearDown(subscription.cancel);
+      final pending = session.goOn(
+        locationId: 'l',
+        sourceConversationRoundId: _id,
+        clientMsgId: 'go-1',
+      );
+      await _tick();
+      expect(socket.sent.last, {
+        'type': 'go_on',
+        'world_id': 'w',
+        'client_msg_id': 'go-1',
+        'payload': {'location_id': 'l', 'source_conversation_round_id': _id},
+      });
+      // A complete round may be broadcast before the receipt arrives.
+      for (final type in [
+        'waiting_conversation_round',
+        'end_conversation_round',
+      ]) {
+        socket.emit({..._frame(type), 'conversation_round_id': _id + 1});
+      }
+      socket.emit({
+        ..._frame(
+          'ack',
+          payload: {
+            'billing': {
+              'price': 1,
+              'price_cent': 120,
+              'pricing_version': 'round_v3',
+            },
+          },
+        ),
+        'conversation_round_id': _id + 1,
+        'client_msg_id': 'go-1',
+      });
+      final receipt = await pending;
+      await _tick();
+      expect(receipt.sourceConversationRoundId, _id);
+      expect(receipt.conversationRoundId, _id + 1);
+      expect(receipt.clientMsgId, 'go-1');
+      expect(receipt.worldId, 'w');
+      expect(receipt.locationId, 'l');
+      expect(receipt.billing!.priceCent, 120);
+      expect(receipt.billing!.price, 1);
+      expect(
+        events.whereType<ChatroomWaitingConversationRound>(),
+        hasLength(1),
+      );
+      expect(events.whereType<ChatroomEndConversationRound>(), hasLength(1));
+      final ack = events.whereType<ChatroomAck>().single;
+      expect(ack.receiptConversationRoundId, _id + 1);
+      expect(ack.cardConversationRoundId, _id + 1);
+      expect(ack.hasCanonicalMessageMetadata, isFalse);
+      expect(events.whereType<ChatroomUserMessage>(), isEmpty);
+    },
+  );
+
+  test(
+    'Go on receipt billing is optional and does not invent missing prices',
+    () async {
+      final socket = _Socket();
+      final session = await _session(socket);
+      for (final payload in <Map<String, Object?>>[
+        {},
+        {'billing': {}},
+        {
+          'billing': {'price_cent': 0},
+        },
+      ]) {
+        final pending = session.goOn(
+          locationId: 'l',
+          sourceConversationRoundId: _id,
+          clientMsgId: 'go',
+        );
+        await _tick();
+        socket.emit({
+          ..._frame('ack', payload: payload),
+          'conversation_round_id': _id + 1,
+          'client_msg_id': 'go',
+        });
+        final receipt = await pending;
+        if (payload.isEmpty) {
+          expect(receipt.billing, isNull);
+        } else {
+          expect(receipt.billing!.price, isNull);
+          expect(receipt.billing!.pricingVersion, isNull);
+          expect(
+            receipt.billing!.priceCent,
+            (payload['billing'] as Map)['price_cent'],
+          );
+        }
+      }
+    },
+  );
+
+  test(
+    'Go on rejects legacy, missing join and invalid arguments without sending',
+    () async {
+      for (final v2 in [false, true]) {
+        final socket = _Socket();
+        final session = await _session(socket, v2: v2, join: false);
+        await expectLater(
+          session.goOn(
+            locationId: 'l',
+            sourceConversationRoundId: _id,
+            clientMsgId: 'go',
+          ),
+          throwsA(isA<ChatroomProtocolException>()),
+        );
+        expect(socket.sent, isEmpty);
+      }
+      final socket = _Socket();
+      final session = await _session(socket);
+      for (final args in [('', _id, 'go'), ('l', 0, 'go'), ('l', _id, ' ')]) {
+        await expectLater(
+          session.goOn(
+            locationId: args.$1,
+            sourceConversationRoundId: args.$2,
+            clientMsgId: args.$3,
+          ),
+          throwsArgumentError,
+        );
+      }
+      await expectLater(
+        session.goOn(
+          locationId: 'other',
+          sourceConversationRoundId: _id,
+          clientMsgId: 'go',
+        ),
+        throwsA(isA<ChatroomProtocolException>()),
+      );
+      expect(socket.sent, hasLength(1));
+    },
+  );
+
+  test('Go on timeout, send failure and disconnect never resend', () async {
+    for (final outcome in ['timeout', 'send', 'disconnect']) {
+      final socket = _Socket();
+      final session = await _session(socket);
+      socket.failSend = outcome == 'send';
+      final pending = session.goOn(
+        locationId: 'l',
+        sourceConversationRoundId: _id,
+        clientMsgId: 'go',
+      );
+      final assertion = expectLater(
+        pending,
+        throwsA(isA<ChatroomFailureEvent>()),
+      );
+      await _tick();
+      if (outcome == 'disconnect') await session.disconnect();
+      await assertion;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      expect(
+        socket.sent.where((frame) => frame['type'] == 'go_on'),
+        hasLength(1),
+      );
+    }
+  });
+
+  test(
+    'Go on pending IDs, error ACKs and mismatched receipts stay isolated',
+    () async {
+      final socket = _Socket();
+      final session = await _session(socket);
+      final first = session.goOn(
+        locationId: 'l',
+        sourceConversationRoundId: _id,
+        clientMsgId: 'go',
+      );
+      final failed = expectLater(
+        first,
+        throwsA(
+          isA<ChatroomFailureEvent>()
+              .having((e) => e.code, 'code', '2015')
+              .having((e) => e.requestType, 'request', 'go_on'),
+        ),
+      );
+      await expectLater(
+        session.goOn(
+          locationId: 'l',
+          sourceConversationRoundId: _id,
+          clientMsgId: 'go',
+        ),
+        throwsStateError,
+      );
+      socket.emit({..._frame('ack', code: 2015), 'client_msg_id': 'go'});
+      await failed;
+      for (final patch in <Map<String, Object?>>[
+        {'world_id': 'other'},
+        {'location_id': 'other'},
+        {'conversation_round_id': null},
+        {'conversation_round_id': 0},
+        {'conversation_round_id': _id},
+      ]) {
+        final pending = session.goOn(
+          locationId: 'l',
+          sourceConversationRoundId: _id,
+          clientMsgId: 'next',
+        );
+        final assertion = expectLater(
+          pending,
+          throwsA(isA<ChatroomProtocolException>()),
+        );
+        await _tick();
+        socket.emit({
+          ..._frame('ack'),
+          'conversation_round_id': _id + 1,
+          'client_msg_id': 'next',
+          ...patch,
+        });
+        await assertion;
+      }
+    },
+  );
+
+  test(
+    'V2 round errors preserve numeric code and routing without request ID',
+    () async {
+      final socket = _Socket();
+      final session = await _session(socket);
+      final errors = <ChatroomErrorEvent>[];
+      final failures = <ChatroomFailureEvent>[];
+      final a = session.errors.listen(errors.add);
+      final b = session.failures.listen(failures.add);
+      addTearDown(a.cancel);
+      addTearDown(b.cancel);
+      final error = _frame('error', code: 2015)..remove('client_msg_id');
+      socket.emit(error);
+      await _tick();
+      await _tick();
+      expect(errors.single.errNo, 2015);
+      expect(errors.single.code, '2015');
+      expect(errors.single.conversationRoundId, '$_id');
+      expect(errors.single.worldId, 'w');
+      expect(errors.single.locationId, 'l');
+      expect(errors.single.userId, 'u');
+      expect(errors.single.clientMsgId, isEmpty);
+      expect(failures.single.code, '2015');
+      expect(failures.single.cause, same(errors.single));
+    },
+  );
+
+  test(
+    'candidate batch uses same endpoint with card ID and returns saved card only',
+    () async {
+      final transport = _Http()
+        ..data = {
+          'conversation_round_id': _id,
+          'card': _card(content: ' saved '),
+        };
+      final api = ChatroomHttpApi(
+        ApiClient(baseUrl: 'https://chat.test/', transport: transport),
+      );
+      final result = await api.batchMutateLlmCardMessages(
+        worldId: 'w',
+        locationId: 'l',
+        conversationRoundId: _id,
+        cardId: _id,
+        operations: const [
+          ChatroomLlmMessageOperation.edit(
+            globalMessageId: _id + 3,
+            content: ' saved ',
+          ),
+          ChatroomLlmMessageOperation.delete(globalMessageId: _id + 4),
+        ],
+      );
+      expect(result.card.messages.single.content, ' saved ');
+      expect(result.card.messages.single.globalMessageId, _id + 3);
+      final request = transport.requests.single;
+      expect(
+        request.uri.path,
+        '/aitown-chat/api/v1/worlds/w/locations/l/llm-messages/batch',
+      );
+      expect(jsonDecode(utf8.decode(request.bodyBytes!)), {
+        'conversation_round_id': _id,
+        'card_id': _id,
+        'operations': [
+          {
+            'action': 'edit',
+            'global_message_id': _id + 3,
+            'content': ' saved ',
+          },
+          {'action': 'delete', 'global_message_id': _id + 4},
+        ],
+      });
+      transport.data = {
+        'start_conversation_round_id': _id,
+        'end_conversation_round_id': _id,
+        'newest_message_id': 0,
+      };
+      final formal = await api.batchMutateLlmMessages(
+        worldId: 'w',
+        locationId: 'l',
+        conversationRoundId: _id,
+        operations: const [
+          ChatroomLlmMessageOperation.delete(globalMessageId: _id + 3),
+        ],
+      );
+      expect(formal.newestMessageId, 0);
+      expect(
+        jsonDecode(
+          utf8.decode(transport.requests.last.bodyBytes!),
+        ).containsKey('card_id'),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'candidate batch rejects invalid operations, mismatched responses and never retries',
+    () async {
+      final transport = _Http();
+      final api = ChatroomHttpApi(
+        ApiClient(baseUrl: 'https://chat.test/', transport: transport),
+      );
+      Future<ChatroomCardMutationResult> submit({
+        int cardId = _id,
+        List<ChatroomLlmMessageOperation> operations = const [
+          ChatroomLlmMessageOperation.delete(globalMessageId: _id + 3),
+        ],
+      }) => api.batchMutateLlmCardMessages(
+        worldId: 'w',
+        locationId: 'l',
+        conversationRoundId: _id,
+        cardId: cardId,
+        operations: operations,
+      );
+      for (final id in [0, -1]) {
+        await expectLater(submit(cardId: id), throwsArgumentError);
+      }
+      for (final operations in <List<ChatroomLlmMessageOperation>>[
+        [],
+        List.filled(
+          101,
+          const ChatroomLlmMessageOperation.delete(globalMessageId: _id),
+        ),
+        const [
+          ChatroomLlmMessageOperation.delete(globalMessageId: _id),
+          ChatroomLlmMessageOperation.edit(globalMessageId: _id, content: 'x'),
+        ],
+        const [
+          ChatroomLlmMessageOperation.edit(globalMessageId: _id, content: ' '),
+        ],
+      ]) {
+        await expectLater(submit(operations: operations), throwsArgumentError);
+      }
+      expect(transport.requests, isEmpty);
+      for (final data in [
+        {'conversation_round_id': _id + 1, 'card': _card()},
+        {'conversation_round_id': _id, 'card': _card(cardId: _id + 1)},
+        {'conversation_round_id': _id, 'card': false},
+      ]) {
+        transport.data = data;
+        await expectLater(submit(), throwsA(isA<ApiException>()));
+      }
+      transport.code = 2025;
+      await expectLater(submit(), throwsA(isA<ApiException>()));
+      transport.fail = true;
+      await expectLater(submit(), throwsA(isA<ApiException>()));
+      expect(transport.requests, hasLength(5));
+    },
+  );
+
+  test(
+    'saved card models preserve stable IDs, fixed index gaps and V2 fields',
+    () {
+      final raw = _card();
+      final first = (raw['messages'] as List).single as Map<String, Object?>;
+      raw['messages'] = [
+        first,
+        {...first, 'global_message_id': _id + 4, 'card_message_index': 3},
+      ];
+      final card = ChatroomLlmCard.fromJson(
+        jsonDecode(jsonEncode(raw)),
+        conversationRoundId: _id,
+      );
+      expect(card.messages.map((m) => m.cardMessageIndex), [1, 3]);
+      expect(card.messages.last.globalMessageId, _id + 4);
+      expect(card.messages.first.message.senderId, 'c');
+      expect(card.messages.first.message.payload['content'], 'Hello');
+      for (final key in [
+        'card_id',
+        'global_message_id',
+        'conversation_round_id',
+        'card_message_index',
+      ]) {
+        for (final value in ['1', 1.0]) {
+          expect(
+            () => ChatroomLlmCardMessage.fromJson({...first, key: value}),
+            throwsFormatException,
+          );
+        }
+      }
+      expect(
+        () => ChatroomLlmCardMessage.fromJson({
+          ...first,
+          'location_message_id': 1,
+        }),
+        throwsFormatException,
+      );
+      expect(
+        () => ChatroomLlmCard.fromJson({
+          ...raw,
+          'generation_state': 'failed',
+        }, conversationRoundId: _id),
+        throwsFormatException,
+      );
+    },
+  );
+
+  test(
+    'Go on ignores unrelated ACKs and exposes late receipts without resending',
+    () async {
+      final socket = _Socket();
+      final session = await _session(socket);
+      final receipts = <ChatroomAck>[];
+      final subscription = session.events
+          .where((e) => e is ChatroomAck)
+          .cast<ChatroomAck>()
+          .listen(receipts.add);
+      addTearDown(subscription.cancel);
+      final pending = session.goOn(
+        locationId: 'l',
+        sourceConversationRoundId: _id,
+        clientMsgId: 'go',
+      );
+      final timedOut = expectLater(
+        pending,
+        throwsA(
+          isA<ChatroomFailureEvent>().having(
+            (e) => e.code,
+            'code',
+            'ack_timeout',
+          ),
+        ),
+      );
+      await _tick();
+      socket.emit({
+        ..._frame('ack'),
+        'conversation_round_id': _id + 1,
+        'client_msg_id': 'unrelated',
+      });
+      await timedOut;
+      socket.emit({
+        ..._frame('ack'),
+        'conversation_round_id': _id + 1,
+        'client_msg_id': 'go',
+      });
+      await _tick();
+      await _tick();
+      expect(receipts.last.clientMsgId, 'go');
+      expect(receipts.last.receiptConversationRoundId, _id + 1);
+      expect(socket.sent.where((f) => f['type'] == 'go_on'), hasLength(1));
+    },
+  );
+
+  test(
+    'new receipt and round error DTOs reject lossy IDs and malformed billing',
+    () {
+      for (final type in ['ack', 'error']) {
+        for (final value in ['9007199254740993', 9007199254740993.toDouble()]) {
+          expect(
+            () => ChatroomV2Message.fromJson({
+              ..._frame(type),
+              'conversation_round_id': value,
+            }),
+            throwsFormatException,
+          );
+        }
+      }
+      for (final value in ['2015', 2015.0, null]) {
+        expect(
+          () =>
+              ChatroomV2Message.fromJson({..._frame('error'), 'err_no': value}),
+          throwsFormatException,
+        );
+      }
+      for (final value in ['120', 120.0, -1]) {
+        expect(
+          () => ChatroomRoundBilling.fromJson({'price_cent': value}),
+          throwsFormatException,
+        );
+      }
+      expect(
+        () => ChatroomRoundBilling.fromJson({'pricing_version': 1}),
+        throwsFormatException,
+      );
+    },
+  );
+
+  test('cards query rejects a response for another round', () async {
+    final transport = _Http()
+      ..data = {..._cards(), 'conversation_round_id': _id + 1};
+    final api = ChatroomHttpApi(
+      ApiClient(baseUrl: 'https://chat.test/', transport: transport),
+    );
+    await expectLater(
+      api.getLlmCards(worldId: 'w', locationId: 'l', conversationRoundId: _id),
+      throwsA(isA<ApiException>()),
+    );
+  });
+
   test(
     'cards GET and select POST preserve auth, paths, IDs and exact bodies',
     () async {
@@ -313,14 +846,16 @@ void main() {
       'original_card_id': _id,
       'list': [
         {
-          'card_id': _id,
+          ..._card(),
           'opaque_snapshot': {'nested_id': _id + 1},
         },
       ],
       'total': 1,
     };
     final cards = ChatroomLlmCardsResponse.fromJson(raw);
-    expect(cards.list.single['opaque_snapshot'], {'nested_id': _id + 1});
+    expect(cards.list.single.rawJson['opaque_snapshot'], {
+      'nested_id': _id + 1,
+    });
     expect(
       () => ChatroomLlmCardsResponse.fromJson({...raw, 'total': 2}),
       throwsFormatException,
@@ -562,7 +1097,9 @@ void main() {
       {...raw, 'conversation_round_id': _id.toDouble()},
       {...raw, 'type': 'character'},
       {...raw, 'stream_type': 'llm_chunk'},
-      {...raw, 'global_message_id': _id},
+      {...raw, 'global_message_id': 0},
+      {...raw, 'global_message_id': _id.toDouble()},
+      {...raw, 'message_id': _id},
     ]) {
       expect(
         () => parse(bad),

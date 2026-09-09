@@ -22,6 +22,10 @@ import 'package:genesis_flutter_android/network/chatroom/chatroom_connection_con
 import 'package:genesis_flutter_android/network/chatroom/chatroom_http_models.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_message_storage.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_models.dart';
+import 'package:genesis_flutter_android/network/chatroom/chatroom_reply_action_storage.dart';
+import 'package:genesis_flutter_android/network/genesis_api.dart';
+import 'package:genesis_flutter_android/network/http_transport.dart';
+import 'package:genesis_flutter_android/network/local_mock_genesis_transport.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_socket_transport.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_timeline_payload.dart';
 import 'package:genesis_flutter_android/network/chatroom/world_chatroom_service.dart';
@@ -1657,9 +1661,12 @@ void main() {
   });
 
   testWidgets(
-    'reply Edit opens from a nested navigator and Done updates local chat',
+    'reply Edit persists through HTTP and refreshes canonical history from a nested navigator',
     (tester) async {
-      final harness = await _connectedLocationChatTestService();
+      final backend = _LocationChatReplyHttpTransport();
+      final harness = await _connectedLocationChatTestService(
+        replyTransport: backend,
+      );
       await tester.pumpWidget(
         AppServicesScope(
           services: harness.services,
@@ -1688,6 +1695,8 @@ void main() {
         tester,
         () => harness.service.state.joinedLocationId == 'location-current',
       );
+      backend.seedReplyRound();
+      harness.socket.serverV2UserMessage(messageId: 301);
       harness.socket.serverV2StreamFrame(
         streamType: 'llm_stream_end',
         roundId: 301,
@@ -1697,7 +1706,11 @@ void main() {
       harness.socket.serverEndConversationRound(roundId: 301);
       await _pumpUntilLocationChatTest(
         tester,
-        () => find.bySemanticsLabel('Edit').evaluate().isNotEmpty,
+        () => tester
+            .widget<LocationChatAnchoredMessageList>(
+              find.byType(LocationChatAnchoredMessageList),
+            )
+            .editEnabled,
       );
       await tester.pumpAndSettle();
       final originalHeaderHeight = tester
@@ -1715,26 +1728,26 @@ void main() {
           const ValueKey('edit-subscription-prompt'),
           skipOffstage: false,
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         tester.getSize(find.byType(ChatHeader)).height,
         originalHeaderHeight,
       );
       expect(find.byType(ChatComposer), findsNothing);
-      await tester.enterText(find.byType(TextField), 'Saved local reply.');
+      await tester.enterText(find.byType(TextField), 'Saved server reply.');
       await tester.tap(find.byKey(const ValueKey('location-chat-edit-done')));
       await tester.pumpAndSettle();
       expect(find.byType(LocationChatEditPage), findsNothing);
       expect(
         find.byKey(const ValueKey('edit-subscription-prompt')),
-        findsOneWidget,
+        findsNothing,
       );
       var list = tester.widget<LocationChatAnchoredMessageList>(
         find.byType(LocationChatAnchoredMessageList),
       );
       expect(
-        list.messages.any((message) => message.text == 'Saved local reply.'),
+        list.messages.any((message) => message.text == 'Saved server reply.'),
         isTrue,
       );
       expect(
@@ -1744,7 +1757,28 @@ void main() {
             .messagesByLocation['location-current']!
             .last
             .content,
-        'Original reply.',
+        'Saved server reply.',
+      );
+      expect(backend.batches, [
+        {
+          'conversation_round_id': 301,
+          'operations': [
+            {
+              'action': 'edit',
+              'global_message_id': 90302,
+              'content': 'Saved server reply.',
+            },
+          ],
+        },
+      ]);
+      expect(backend.rangeRequests, isNotEmpty);
+      expect(
+        backend.rangeRequests.every(
+          (query) =>
+              query['start_conversation_round_id'] == '301' &&
+              query['end_conversation_round_id'] == '301',
+        ),
+        isTrue,
       );
       tester.widget<ChatComposer>(find.byType(ChatComposer)).controller.text =
           'Draft';
@@ -1753,14 +1787,14 @@ void main() {
         find.byType(LocationChatAnchoredMessageList),
       );
       expect(
-        list.messages.any((message) => message.text == 'Saved local reply.'),
+        list.messages.any((message) => message.text == 'Saved server reply.'),
         isTrue,
       );
       await tester.tap(find.bySemanticsLabel('Edit'));
       await tester.pumpAndSettle();
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        'Saved local reply.',
+        'Saved server reply.',
       );
       await tester.enterText(find.byType(TextField), 'Discarded change');
       await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
@@ -1769,16 +1803,25 @@ void main() {
         find.byType(LocationChatAnchoredMessageList),
       );
       expect(
-        list.messages.any((message) => message.text == 'Saved local reply.'),
+        list.messages.any((message) => message.text == 'Saved server reply.'),
         isTrue,
+      );
+      expect(
+        backend.batches,
+        hasLength(1),
+        reason: 'Cancel does not issue a batch.',
       );
       await tester.tap(find.bySemanticsLabel('Edit'));
       await tester.pumpAndSettle();
       final messageId = list.messages
-          .firstWhere((message) => message.text == 'Saved local reply.')
+          .firstWhere((message) => message.text == 'Saved server reply.')
+          .localId;
+      final editorMessageId = tester
+          .widget<ChatMessageRow>(find.byType(ChatMessageRow))
+          .message
           .localId;
       await tester.tap(
-        find.byKey(ValueKey('location-chat-edit-delete-$messageId')),
+        find.byKey(ValueKey('location-chat-edit-delete-$editorMessageId')),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('location-chat-edit-done')));
@@ -1791,18 +1834,435 @@ void main() {
         isFalse,
       );
       expect(
+        harness.service.state.messagesByLocation['location-current']!.any(
+          (message) => message.globalMessageId == 90302,
+        ),
+        isFalse,
+      );
+      expect(backend.batches.last, {
+        'conversation_round_id': 301,
+        'operations': [
+          {'action': 'delete', 'global_message_id': 90302},
+        ],
+      });
+      expect(backend.batches, hasLength(2));
+      expect(
+        list.messages.any((message) => message.isMe),
+        isTrue,
+        reason: 'The user message remains outside the edited AI block.',
+      );
+      expect(harness.socket.sendMessageCount, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      unawaited(harness.service.dispose());
+    },
+  );
+
+  testWidgets(
+    'Regenerate button requests and displays a private candidate without replacing the user message',
+    (tester) async {
+      final backend = _LocationChatReplyHttpTransport();
+      final harness = await _mountCompletedReplyActionPanel(
+        tester,
+        backend: backend,
+      );
+      await tester.tap(find.bySemanticsLabel('Regenerate'));
+      await _pumpUntilLocationChatTest(
+        tester,
+        () =>
+            harness.socket.replyActionFrames('regenerate_llm_card').length == 1,
+      );
+      final request = harness.socket
+          .replyActionFrames('regenerate_llm_card')
+          .single;
+      expect(request['world_id'], 'world-current');
+      expect(request['conversation_round_id'], 301);
+      expect(request['payload'], {'location_id': 'location-current'});
+      expect(request['client_msg_id'], isNotEmpty);
+      final canonicalBefore =
+          harness.service.state.messagesByLocation['location-current']!;
+      expect(canonicalBefore.map((message) => message.content), [
+        'message 301',
+        'Original reply.',
+      ]);
+
+      backend.beginCandidate();
+      harness.socket.serverReplyActionAck(
+        'regenerate_llm_card',
+        roundId: 301,
+        payload: {
+          'regeneration': {
+            'conversation_round_id': 301,
+            'original_card_id': 501,
+            'card_id': 502,
+            'generation_state': 'generating',
+            'billing': {'status': 'reserved'},
+          },
+        },
+      );
+      await _pumpUntilLocationChatTest(
+        tester,
+        () =>
+            harness.service.replyActions!
+                .stateFor('location-current')!
+                .viewedCardId ==
+            502,
+      );
+      harness.socket.serverCandidateStream(streamType: 'start');
+      harness.socket.serverCandidateStream(
+        streamType: 'chunk',
+        content: 'Private candidate.',
+        seq: 1,
+      );
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => tester
+            .widget<LocationChatAnchoredMessageList>(
+              find.byType(LocationChatAnchoredMessageList),
+            )
+            .messages
+            .any((message) => message.text == 'Private candidate.'),
+      );
+      var list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.where((message) => message.isMe).single.text,
+        'message 301',
+      );
+      expect(
+        list.messages.any((message) => message.text == 'Original reply.'),
+        isFalse,
+      );
+      expect(list.editEnabled, isFalse);
+      expect(list.goOnEnabled, isFalse);
+      expect(find.text('2 / 2'), findsOneWidget);
+      expect(
+        harness.service.state.messagesByLocation['location-current']!.map(
+          (message) => message.content,
+        ),
+        ['message 301', 'Original reply.'],
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('location-chat-reply-previous-card')),
+      );
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => tester
+            .widget<LocationChatAnchoredMessageList>(
+              find.byType(LocationChatAnchoredMessageList),
+            )
+            .messages
+            .any((message) => message.text == 'Original reply.'),
+      );
+      list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.where((message) => message.isMe).single.text,
+        'message 301',
+      );
+      expect(list.editEnabled, isTrue);
+      expect(find.text('1 / 2'), findsOneWidget);
+      expect(
+        harness.socket.replyActionFrames('regenerate_llm_card'),
+        hasLength(1),
+      );
+      expect(harness.socket.replyActionFrames('select_llm_card'), isEmpty);
+      expect(
+        backend.requests.any(
+          (request) => request.uri.path.endsWith('/llm-messages/select'),
+        ),
+        isFalse,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      unawaited(harness.service.dispose());
+      await tester.pump();
+    },
+  );
+
+  testWidgets(
+    'Go on button sends once and receives a new formal round without a user bubble',
+    (tester) async {
+      final backend = _LocationChatReplyHttpTransport();
+      final harness = await _mountCompletedReplyActionPanel(
+        tester,
+        backend: backend,
+      );
+      await tester.tap(find.bySemanticsLabel('Go on'));
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => harness.socket.replyActionFrames('go_on').length == 1,
+      );
+      final request = harness.socket.replyActionFrames('go_on').single;
+      expect(request['world_id'], 'world-current');
+      expect(request['payload'], {
+        'location_id': 'location-current',
+        'source_conversation_round_id': 301,
+      });
+      expect(request.containsKey('conversation_round_id'), isFalse);
+      expect(request['client_msg_id'], isNotEmpty);
+      await tester.tap(find.bySemanticsLabel('Go on'));
+      await tester.pump();
+      expect(harness.socket.replyActionFrames('go_on'), hasLength(1));
+      var list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(list.messages.where((message) => message.isMe), hasLength(1));
+      expect(harness.socket.sendMessageCount, 0);
+
+      harness.socket.serverReplyActionAck('go_on', roundId: 401);
+      harness.socket.serverWaitingConversationRound(roundId: 401);
+      await _pumpUntilLocationChatTest(
+        tester,
+        () =>
+            harness.service.replyActions!
+                .stateFor('location-current')!
+                .roundId ==
+            401,
+      );
+      backend.seedGoOnReply();
+      harness.socket.serverV2StreamFrame(
+        streamType: 'llm_stream_end',
+        roundId: 401,
+        messageId: 402,
+        locationMessageId: 303,
+        content: 'The story continues.',
+      );
+      harness.socket.serverEndConversationRound(roundId: 401);
+      await _pumpUntilLocationChatTest(
+        tester,
+        () =>
+            backend.rangeRequests.any(
+              (query) => query['start_conversation_round_id'] == '401',
+            ) &&
+            harness.service.state.messagesByLocation['location-current']!.any(
+              (message) => message.content == 'The story continues.',
+            ),
+      );
+      await tester.pumpAndSettle();
+      list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      expect(
+        list.messages.where((message) => message.isMe).single.text,
+        'message 301',
+      );
+      expect(
+        list.messages.any((message) => message.text == 'Original reply.'),
+        isTrue,
+      );
+      expect(
+        list.messages.any((message) => message.text == 'The story continues.'),
+        isTrue,
+      );
+      expect(list.replyActionsIdentity, 'world-current/location-current/401');
+      expect(harness.socket.replyActionFrames('go_on'), hasLength(1));
+      expect(harness.socket.sendMessageCount, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+      unawaited(harness.service.dispose());
+      await tester.pump();
+    },
+  );
+
+  testWidgets(
+    'send preserves a newer composer draft while finalizing the previous reply',
+    (tester) async {
+      final backend = _LocationChatReplyHttpTransport();
+      final harness = await _mountCompletedReplyActionPanel(
+        tester,
+        backend: backend,
+      );
+      final controller = harness.service.replyActions!;
+      final target = await controller.prepareEditor('location-current');
+      await controller.setDraft(target, [
+        const ChatroomLlmMessageOperation.edit(
+          globalMessageId: 90302,
+          content: 'Saved previous reply.',
+        ),
+      ]);
+      final barrier = Completer<void>();
+      backend.batchBarrier = barrier;
+      final composerField = find.descendant(
+        of: find.byType(ChatComposer),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(composerField, 'The text captured by Send.');
+      await tester.pump();
+      expect(
+        tester.widget<ChatComposer>(find.byType(ChatComposer)).sendEnabled,
+        isTrue,
+      );
+      await tester.tap(find.byKey(const ValueKey('chat-composer-send-button')));
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => backend.batches.length == 1,
+      );
+      expect(
+        harness.socket.sendMessageCount,
+        0,
+        reason: 'The prior reply must finish saving first.',
+      );
+      await tester.enterText(composerField, 'A newer unsent draft.');
+      barrier.complete();
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => harness.socket.sendMessageCount == 1,
+      );
+      final request = harness.socket.replyActionFrames('send_message').single;
+      expect(request['payload']['content'], 'The text captured by Send.');
+      expect(
+        tester.widget<ChatComposer>(find.byType(ChatComposer)).controller.text,
+        'A newer unsent draft.',
+      );
+      expect(
         harness
             .service
             .state
             .messagesByLocation['location-current']!
             .last
             .content,
-        'Original reply.',
+        'Saved previous reply.',
       );
-      expect(harness.socket.sendMessageCount, 0);
-      await tester.pumpWidget(const SizedBox.shrink());
+      harness.socket.serverV2AckForLatestSend(errNo: 0);
+      harness.socket.serverV2UserMessage(
+        messageId: 303,
+        clientMsgId: request['client_msg_id'] as String,
+        content: 'The text captured by Send.',
+      );
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => harness.service.state.messagesByLocation['location-current']!.any(
+          (message) => message.content == 'The text captured by Send.',
+        ),
+      );
       await tester.pump();
+      expect(
+        tester.widget<ChatComposer>(find.byType(ChatComposer)).controller.text,
+        'A newer unsent draft.',
+      );
+      expect(harness.socket.sendMessageCount, 1);
+      await tester.pumpWidget(const SizedBox.shrink());
       unawaited(harness.service.dispose());
+      await tester.pump();
+    },
+  );
+
+  testWidgets(
+    'Go on toolbar remains after the final AI row while a later message is streaming',
+    (tester) async {
+      final backend = _LocationChatReplyHttpTransport();
+      final harness = await _mountCompletedReplyActionPanel(
+        tester,
+        backend: backend,
+      );
+      await tester.tap(find.bySemanticsLabel('Go on'));
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => harness.socket.replyActionFrames('go_on').length == 1,
+      );
+      harness.socket.serverReplyActionAck('go_on', roundId: 401);
+      harness.socket.serverWaitingConversationRound(roundId: 401);
+      harness.socket.serverV2StreamFrame(
+        streamType: 'llm_stream_end',
+        roundId: 401,
+        messageId: 402,
+        locationMessageId: 303,
+        content: 'The first reply is complete.',
+      );
+      harness.socket.serverV2StreamFrame(
+        streamType: 'llm_stream_start',
+        roundId: 401,
+        messageId: 403,
+        locationMessageId: 304,
+      );
+      harness.socket.serverV2StreamFrame(
+        streamType: 'llm_chunk',
+        roundId: 401,
+        messageId: 403,
+        locationMessageId: 304,
+        seq: 1,
+        content: 'The next reply is still arriving.',
+      );
+      await _pumpUntilLocationChatTest(
+        tester,
+        () => tester
+            .widget<LocationChatAnchoredMessageList>(
+              find.byType(LocationChatAnchoredMessageList),
+            )
+            .messages
+            .any(
+              (message) => message.text == 'The next reply is still arriving.',
+            ),
+      );
+      final list = tester.widget<LocationChatAnchoredMessageList>(
+        find.byType(LocationChatAnchoredMessageList),
+      );
+      final firstIndex = list.messages.indexWhere(
+        (message) => message.text == 'The first reply is complete.',
+      );
+      final lastIndex = list.messages.indexWhere(
+        (message) => message.text == 'The next reply is still arriving.',
+      );
+      expect(firstIndex, greaterThanOrEqualTo(0));
+      expect(lastIndex, greaterThan(firstIndex));
+      expect(list.messages[lastIndex].status, 'streaming');
+      expect(list.replyActionsIdentity, 'world-current/location-current/401');
+      expect(
+        list.replyActionsAnchorIndex,
+        lastIndex + 1,
+        reason:
+            'One completed message must not move the toolbar inside an unfinished round.',
+      );
+      expect(list.replyActionsAnchorIndex, list.messages.length);
+      expect(list.goOnEnabled, isFalse);
+      expect(list.messages.where((message) => message.isMe), hasLength(1));
+      await tester.pumpWidget(const SizedBox.shrink());
+      unawaited(harness.service.dispose());
+      await tester.pump();
+    },
+  );
+
+  testWidgets(
+    'non-member reply buttons only expand subscription and issue no business requests',
+    (tester) async {
+      final backend = _LocationChatReplyHttpTransport();
+      final harness = await _mountCompletedReplyActionPanel(
+        tester,
+        backend: backend,
+        isMember: false,
+      );
+      final requestCount = backend.requests.length;
+      for (final label in ['Regenerate', 'Go on', 'Edit', 'Inspiration']) {
+        await tester.tap(find.bySemanticsLabel(label));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('edit-subscription-prompt')),
+          findsOneWidget,
+          reason: label,
+        );
+        expect(find.byType(LocationChatEditPage), findsNothing, reason: label);
+        expect(
+          find.byKey(const ValueKey('inspiration-replies-carousel')),
+          findsNothing,
+          reason: label,
+        );
+        expect(backend.requests, hasLength(requestCount), reason: label);
+        expect(
+          harness.socket.replyActionFrames('regenerate_llm_card'),
+          isEmpty,
+          reason: label,
+        );
+        expect(
+          harness.socket.replyActionFrames('go_on'),
+          isEmpty,
+          reason: label,
+        );
+        expect(harness.socket.sendMessageCount, 0, reason: label);
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      unawaited(harness.service.dispose());
+      await tester.pump();
     },
   );
 
@@ -2172,9 +2632,9 @@ void main() {
           .widget<LocationChatAnchoredMessageList>(
             find.byType(LocationChatAnchoredMessageList),
           )
-          .replyActionsMessageId,
-      isNull,
-      reason: 'Reply actions stay hidden until the entire round finishes.',
+          .editEnabled,
+      isFalse,
+      reason: 'Reply editing stays disabled until the entire round finishes.',
     );
 
     await tester.widget<ChatComposer>(composerFinder).onSend();
@@ -2203,9 +2663,9 @@ void main() {
           .widget<LocationChatAnchoredMessageList>(
             find.byType(LocationChatAnchoredMessageList),
           )
-          .replyActionsMessageId,
-      isNull,
-      reason: 'Reply actions stay hidden until the entire round finishes.',
+          .editEnabled,
+      isFalse,
+      reason: 'Reply editing stays disabled until the entire round finishes.',
     );
 
     socket.serverV2StreamFrame(
@@ -2225,9 +2685,9 @@ void main() {
           .widget<LocationChatAnchoredMessageList>(
             find.byType(LocationChatAnchoredMessageList),
           )
-          .replyActionsMessageId,
-      isNull,
-      reason: 'Reply actions stay hidden until the entire round finishes.',
+          .editEnabled,
+      isFalse,
+      reason: 'Reply editing stays disabled until the entire round finishes.',
     );
 
     socket.serverEndConversationRound(roundId: 301);
@@ -2244,9 +2704,10 @@ void main() {
           .widget<LocationChatAnchoredMessageList>(
             find.byType(LocationChatAnchoredMessageList),
           )
-          .replyActionsMessageId,
-      isNotNull,
-      reason: 'Reply actions appear after the final content and round end.',
+          .editEnabled,
+      isTrue,
+      reason:
+          'Reply editing is available after the final content and round end.',
     );
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -4456,15 +4917,13 @@ void main() {
     );
     expect(panelSource, contains('identical(_service, service)'));
     expect(panelSource, contains('!service.isDisposed'));
-    expect(panelSource, contains('on ChatroomProtocolException catch (error)'));
+    expect(panelSource, contains('catch (error, stackTrace)'));
+    expect(panelSource, contains('error is ChatroomProtocolException &&'));
     expect(
       panelSource,
-      contains('.catchError((Object error, StackTrace stackTrace)'),
+      contains('_isDisposedServiceError(service, error, generation)'),
     );
-    expect(
-      panelSource,
-      contains('Error.throwWithStackTrace(error, stackTrace)'),
-    );
+    expect(panelSource, contains('hydrateLocalFailed'));
     expect(panelSource, contains('hydrateLocalStaleService'));
     expect(panelSource, contains('_serviceGeneration++;'));
   });
@@ -5444,8 +5903,71 @@ Future<
     _LocationChatTestSocket socket,
   })
 >
+_mountCompletedReplyActionPanel(
+  WidgetTester tester, {
+  required _LocationChatReplyHttpTransport backend,
+  bool isMember = true,
+}) async {
+  final harness = await _connectedLocationChatTestService(
+    replyTransport: backend,
+  );
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    unawaited(harness.service.dispose());
+  });
+  await tester.pumpWidget(
+    AppServicesScope(
+      services: harness.services,
+      child: MaterialApp(
+        scrollBehavior: const GenesisScrollBehavior(),
+        onGenerateRoute: AppRouter.onGenerateRoute,
+        home: LocationChatPanel(
+          worldId: 'world-current',
+          locationId: 'location-current',
+          service: harness.service,
+          isMember: isMember,
+          leaveOnInactive: false,
+          messageQueueInitializationCovered: true,
+        ),
+      ),
+    ),
+  );
+  await _pumpUntilLocationChatTest(
+    tester,
+    () => harness.service.state.joinedLocationId == 'location-current',
+  );
+  backend.seedReplyRound();
+  harness.socket.serverV2UserMessage(messageId: 301);
+  harness.socket.serverV2StreamFrame(
+    streamType: 'llm_stream_end',
+    roundId: 301,
+    messageId: 302,
+    content: 'Original reply.',
+  );
+  harness.socket.serverEndConversationRound(roundId: 301);
+  await _pumpUntilLocationChatTest(
+    tester,
+    () => tester
+        .widget<LocationChatAnchoredMessageList>(
+          find.byType(LocationChatAnchoredMessageList),
+        )
+        .editEnabled,
+  );
+  await tester.pumpAndSettle();
+  return harness;
+}
+
+Future<
+  ({
+    AppServices services,
+    WorldChatroomService service,
+    _LocationChatTestSocket socket,
+  })
+>
 _connectedLocationChatTestService({
   Duration ackTimeout = const Duration(seconds: 12),
+  HttpTransport? replyTransport,
 }) async {
   final sessionStore = MemoryUserSessionStore();
   await sessionStore.saveUid('user-1');
@@ -5468,8 +5990,16 @@ _connectedLocationChatTestService({
     },
   );
   final service = WorldChatroomService(
-    api: services.api,
+    api: replyTransport == null
+        ? services.api
+        : GenesisApi(
+            transport: replyTransport,
+            useMock: false,
+            sessionStore: sessionStore,
+            appHeaderProvider: () async => const {},
+          ),
     client: client,
+    replyActionStorage: MemoryChatroomReplyActionStorage(),
     messageStorage: MemoryChatroomMessageStorage(),
     refreshInitialSnapshotOnConnect: false,
   );
@@ -5608,6 +6138,181 @@ class _ThrowingLocationChatService extends WorldChatroomService {
   }
 }
 
+/// Authoritative test backend: batch updates are only visible after history reload.
+class _LocationChatReplyHttpTransport implements HttpTransport {
+  final messages = <Map<String, Object?>>[];
+  final batches = <Map<String, dynamic>>[];
+  final rangeRequests = <Map<String, String>>[];
+  final requests = <TransportRequest>[];
+  final cards = <Map<String, Object?>>[];
+  Completer<void>? batchBarrier;
+
+  void seedGoOnReply() {
+    messages.add(
+      _messageJson(
+        402,
+        'character',
+        'char-1',
+        'The story continues.',
+        roundId: 401,
+        locationMessageId: 303,
+      ),
+    );
+  }
+
+  void beginCandidate() {
+    cards.addAll([
+      _cardJson(501, 1, 'succeeded', 'Original reply.'),
+      _cardJson(502, 2, 'generating', ''),
+    ]);
+  }
+
+  Map<String, Object?> _cardJson(
+    int id,
+    int index,
+    String generation,
+    String content,
+  ) => {
+    'card_id': id,
+    'card_index': index,
+    'is_original': index == 1,
+    'generation_state': generation,
+    'can_edit': generation == 'succeeded',
+    'can_delete': generation == 'succeeded',
+    'messages': generation != 'succeeded'
+        ? []
+        : [
+            {
+              'type': 'character',
+              'stream_type': '',
+              'world_id': 'world-current',
+              'location_id': 'location-current',
+              'conversation_round_id': 301,
+              'global_message_id': id == 501 ? 90302 : 90502,
+              'card_id': id,
+              'card_message_index': 1,
+              'user_id': 'user-1',
+              'sender_type': 'character',
+              'sender_id': 'char-1',
+              'sender_name': 'Alice',
+              'message_type': 'text',
+              'payload': {'content': content},
+            },
+          ],
+    'billing': {'status': index == 1 ? 'not_required' : 'reserved'},
+    'created_at': '2026-09-08',
+  };
+
+  void seedReplyRound() {
+    messages.addAll([
+      _messageJson(301, 'user', 'user-1', 'message 301'),
+      _messageJson(302, 'character', 'char-1', 'Original reply.'),
+    ]);
+  }
+
+  Map<String, Object?> _messageJson(
+    int id,
+    String type,
+    String sender,
+    String text, {
+    int roundId = 301,
+    int? locationMessageId,
+  }) => {
+    'type': type,
+    'stream_type': '',
+    'world_id': 'world-current',
+    'location_id': 'location-current',
+    'conversation_round_id': roundId,
+    'global_message_id': 90000 + id,
+    'message_id': id,
+    'location_message_id': locationMessageId ?? id,
+    if (type == 'user') 'user_id': 'user-1',
+    'sender_type': type,
+    'sender_id': sender,
+    'sender_name': type == 'user' ? 'Player One' : 'Alice',
+    'message_type': 'text',
+    'created_at': '2026-09-08 10:00:00',
+    'payload': {'content': text},
+  };
+
+  TransportResponse _ok(Object data) => TransportResponse(
+    statusCode: 200,
+    headers: const {},
+    body: jsonEncode({'err_no': 0, 'err_msg': '', 'data': data}),
+  );
+
+  @override
+  Future<TransportResponse> send(TransportRequest request) async {
+    requests.add(request);
+    if (request.uri.path.endsWith('/llm-messages/cards')) {
+      return _ok({
+        'conversation_round_id': 301,
+        'original_card_id': cards.isEmpty ? 0 : 501,
+        'selected_card_id': cards.isEmpty ? 0 : 501,
+        'active_card_id': cards.isEmpty ? 0 : 502,
+        'confirmed': false,
+        'can_regenerate': true,
+        'can_confirm': cards.isNotEmpty,
+        'list': cards,
+        'total': cards.length,
+      });
+    }
+    if (request.uri.path.endsWith('/llm-messages/batch')) {
+      final body =
+          jsonDecode(utf8.decode(request.bodyBytes!)) as Map<String, dynamic>;
+      batches.add(body);
+      if (batchBarrier case final barrier?) await barrier.future;
+      for (final raw in body['operations'] as List) {
+        final operation = raw as Map<String, dynamic>;
+        if (operation['action'] == 'delete') {
+          messages.removeWhere(
+            (message) =>
+                message['global_message_id'] == operation['global_message_id'],
+          );
+        } else {
+          final message = messages.singleWhere(
+            (message) =>
+                message['global_message_id'] == operation['global_message_id'],
+          );
+          message['payload'] = {'content': operation['content']};
+        }
+      }
+      return _ok({
+        'start_conversation_round_id': 301,
+        'end_conversation_round_id': 301,
+        'newest_message_id': messages.isEmpty
+            ? 0
+            : messages.last['location_message_id'],
+      });
+    }
+    if (request.uri.path.endsWith('/api/v2/messages')) {
+      if (request.uri.queryParameters.containsKey(
+        'start_conversation_round_id',
+      )) {
+        rangeRequests.add(request.uri.queryParameters);
+      }
+      final start = int.tryParse(
+        request.uri.queryParameters['start_conversation_round_id'] ?? '',
+      );
+      final end = int.tryParse(
+        request.uri.queryParameters['end_conversation_round_id'] ?? '',
+      );
+      return _ok({
+        'messages': messages.where((message) {
+          final round = message['conversation_round_id'] as int;
+          return (start == null || round >= start) &&
+              (end == null || round <= end);
+        }).toList(),
+        'has_more': false,
+        'newest_message_id': messages.isEmpty
+            ? 0
+            : messages.last['location_message_id'],
+      });
+    }
+    return LocalMockGenesisTransport.instance.send(request);
+  }
+}
+
 class _LocationChatTestTransport implements ChatroomSocketTransport {
   const _LocationChatTestTransport(this.socket);
 
@@ -5628,6 +6333,54 @@ class _LocationChatTestSocket implements ChatroomSocket {
 
   int get sendMessageCount =>
       _sentFrames.where((frame) => frame['type'] == 'send_message').length;
+
+  List<Map<String, dynamic>> replyActionFrames(String type) =>
+      _sentFrames.where((frame) => frame['type'] == type).toList();
+
+  void serverReplyActionAck(
+    String requestType, {
+    required int roundId,
+    Map<String, Object?> payload = const {},
+  }) {
+    final request = replyActionFrames(requestType).last;
+    _serverFrame('ack', {
+      'world_id': 'world-current',
+      'location_id': 'location-current',
+      'session_id': 'session-1',
+      'conversation_round_id': roundId,
+      'user_id': 'user-1',
+      'client_msg_id': request['client_msg_id'],
+      'payload': payload,
+      'err_no': 0,
+      'err_msg': '',
+    });
+  }
+
+  void serverCandidateStream({
+    required String streamType,
+    String content = '',
+    int? seq,
+  }) {
+    _serverFrame('llm_card_stream', {
+      'stream_type': streamType,
+      'world_id': 'world-current',
+      'location_id': 'location-current',
+      'user_id': 'user-1',
+      'conversation_round_id': 301,
+      'global_message_id': 90502,
+      'sender_type': 'character',
+      'sender_id': 'char-1',
+      'sender_name': 'Alice',
+      'payload': {
+        'card_id': 502,
+        'card_message_index': 1,
+        if (seq != null) 'seq': seq,
+        'content': content,
+      },
+      'err_no': 0,
+      'err_msg': '',
+    });
+  }
 
   void serverV2AckForLatestSend({required int errNo}) {
     final frame = _sentFrames.lastWhere(
@@ -5704,7 +6457,11 @@ class _LocationChatTestSocket implements ChatroomSocket {
     });
   }
 
-  void serverV2UserMessage({required int messageId}) {
+  void serverV2UserMessage({
+    required int messageId,
+    String clientMsgId = '',
+    String? content,
+  }) {
     _serverFrame('user', {
       'stream_type': '',
       'ts': 1786327200000 + messageId,
@@ -5719,11 +6476,11 @@ class _LocationChatTestSocket implements ChatroomSocket {
       'sender_id': 'user-1',
       'sender_name': 'Player One',
       'user_id': 'user-1',
-      'client_msg_id': '',
+      'client_msg_id': clientMsgId,
       'message_type': 'text',
       'min_app_version': 0,
       'created_at': '2026-08-10 10:00:00',
-      'payload': <String, Object?>{'content': 'message $messageId'},
+      'payload': <String, Object?>{'content': content ?? 'message $messageId'},
       'err_no': 0,
       'err_msg': '',
     });
@@ -5773,6 +6530,7 @@ class _LocationChatTestSocket implements ChatroomSocket {
       'session_id': 'session-1',
       'location_id': 'location-current',
       'conversation_round_id': roundId,
+      'user_id': 'user-1',
       'payload': <String, Object?>{},
       'err_no': 0,
       'err_msg': '',
@@ -5787,6 +6545,7 @@ class _LocationChatTestSocket implements ChatroomSocket {
       'session_id': 'session-1',
       'location_id': 'location-current',
       'conversation_round_id': roundId,
+      'user_id': 'user-1',
       'payload': <String, Object?>{},
       'err_no': 0,
       'err_msg': '',
@@ -5797,6 +6556,7 @@ class _LocationChatTestSocket implements ChatroomSocket {
     required String streamType,
     required int roundId,
     required int messageId,
+    int? locationMessageId,
     int? seq,
     String content = '',
   }) {
@@ -5808,7 +6568,7 @@ class _LocationChatTestSocket implements ChatroomSocket {
       'location_id': 'location-current',
       'global_message_id': 90000 + messageId,
       'message_id': messageId,
-      'location_message_id': messageId,
+      'location_message_id': locationMessageId ?? messageId,
       'conversation_round_id': roundId,
       'sender_type': 'character',
       'sender_id': 'char-1',

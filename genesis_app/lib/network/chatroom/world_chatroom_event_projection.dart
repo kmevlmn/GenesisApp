@@ -49,11 +49,23 @@ extension _WorldChatroomEventProjection on WorldChatroomService {
           WorldChatroomMessage.fromTickAdvanceMessage(e),
         );
       case ChatroomAiStreamStart e:
-        _startStream(e);
+        if (!_completedReplyRounds.contains(
+          '${e.locationId}:${e.conversationRoundId}',
+        )) {
+          _startStream(e);
+        }
       case ChatroomAiStreamChunk e:
-        _appendStreamChunk(e);
+        if (!_completedReplyRounds.contains(
+          '${e.locationId}:${e.conversationRoundId}',
+        )) {
+          _appendStreamChunk(e);
+        }
       case ChatroomAiStreamEnd e:
-        _finishStream(e);
+        if (!_completedReplyRounds.contains(
+          '${e.locationId}:${e.conversationRoundId}',
+        )) {
+          _finishStream(e);
+        }
       case ChatroomErrorEvent e:
         _recordFailure(ChatroomFailureEvent.fromError(e));
       case ChatroomFailureEvent e:

@@ -346,6 +346,7 @@ extension _WorldChatroomWorldProjection on WorldChatroomService {
   void _setState(WorldChatroomState state) {
     if (_disposed) return;
     _state = state;
+    _observeReplyHistory();
     if (!_states.isClosed) _states.add(state);
   }
 

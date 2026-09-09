@@ -91,7 +91,13 @@ class ChatroomHttpApi {
       strictEnvelope: true,
     );
     try {
-      return ChatroomLlmCardsResponse.fromJson(data);
+      final result = ChatroomLlmCardsResponse.fromJson(data);
+      if (result.conversationRoundId != conversationRoundId) {
+        throw const FormatException(
+          'Card query response does not match request',
+        );
+      }
+      return result;
     } on FormatException catch (error) {
       throw ApiException(
         message: error.message,
@@ -158,6 +164,67 @@ class ChatroomHttpApi {
     required int conversationRoundId,
     required List<ChatroomLlmMessageOperation> operations,
   }) async {
+    final result = ChatroomMessageMutationResult.fromJson(
+      await _postLlmMessageBatch(
+        worldId: worldId,
+        locationId: locationId,
+        conversationRoundId: conversationRoundId,
+        operations: operations,
+      ),
+    );
+    if (result.startConversationRoundId > conversationRoundId ||
+        result.endConversationRoundId < conversationRoundId) {
+      throw ApiException(
+        message: 'Message batch range excludes the submitted round',
+        kind: ApiExceptionKind.response,
+      );
+    }
+    return result;
+  }
+
+  /// Save edits to one candidate without selecting it or refreshing history.
+  Future<ChatroomCardMutationResult> batchMutateLlmCardMessages({
+    required String worldId,
+    required String locationId,
+    required int conversationRoundId,
+    required int cardId,
+    required List<ChatroomLlmMessageOperation> operations,
+  }) async {
+    validateLlmCardRequest(
+      conversationRoundId: conversationRoundId,
+      cardId: cardId,
+    );
+    final data = await _postLlmMessageBatch(
+      worldId: worldId,
+      locationId: locationId,
+      conversationRoundId: conversationRoundId,
+      cardId: cardId,
+      operations: operations,
+    );
+    try {
+      final result = ChatroomCardMutationResult.fromJson(data);
+      if (result.conversationRoundId != conversationRoundId ||
+          result.card.cardId != cardId) {
+        throw const FormatException(
+          'Candidate mutation response does not match request',
+        );
+      }
+      return result;
+    } on FormatException catch (error) {
+      throw ApiException(
+        message: error.message,
+        kind: ApiExceptionKind.response,
+      );
+    }
+  }
+
+  Future<Object?> _postLlmMessageBatch({
+    required String worldId,
+    required String locationId,
+    required int conversationRoundId,
+    required List<ChatroomLlmMessageOperation> operations,
+    int? cardId,
+  }) async {
     if (conversationRoundId <= 0) {
       throw ArgumentError.value(conversationRoundId, 'conversationRoundId');
     }
@@ -185,6 +252,7 @@ class ChatroomHttpApi {
           'aitown-chat/api/v1/worlds/$world/locations/$location/llm-messages/batch',
           body: {
             'conversation_round_id': conversationRoundId,
+            if (cardId != null) 'card_id': cardId,
             'operations': encoded,
           },
         );
@@ -194,17 +262,7 @@ class ChatroomHttpApi {
         kind: ApiExceptionKind.response,
       );
     }
-    final result = ChatroomMessageMutationResult.fromJson(
-      handleV1ResponseErrNo(json),
-    );
-    if (result.startConversationRoundId > conversationRoundId ||
-        result.endConversationRoundId < conversationRoundId) {
-      throw ApiException(
-        message: 'Message batch range excludes the submitted round',
-        kind: ApiExceptionKind.response,
-      );
-    }
-    return result;
+    return handleV1ResponseErrNo(json);
   }
 
   /// GET /aitown-chat/api/messages

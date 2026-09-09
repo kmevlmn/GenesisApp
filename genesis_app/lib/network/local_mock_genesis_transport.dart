@@ -343,6 +343,7 @@ class LocalMockGenesisTransport implements HttpTransport {
       }
       // No regeneration runtime is simulated by the local HTTP transport.
       return _v1Ok({
+        'conversation_round_id': round,
         'original_card_id': 0,
         'selected_card_id': 0,
         'active_card_id': 0,
@@ -364,6 +365,12 @@ class LocalMockGenesisTransport implements HttpTransport {
       r'^aitown-chat/api/v1/worlds/([^/]+)/locations/([^/]+)/llm-messages/batch$',
     ).firstMatch(path);
     if (method == 'POST' && mutation != null) {
+      if (body.containsKey('card_id')) {
+        return _error(
+          501,
+          'Candidate mutation is not simulated by the local transport',
+        );
+      }
       return _ok(
         _state.mutateChatroomLlmMessages(
           worldId: Uri.decodeComponent(mutation.group(1)!),

@@ -1,3 +1,5 @@
+import 'chatroom_models.dart' show ChatroomV2Message;
+
 /// Contract-only models. Candidate snapshots are separate from formal messages.
 enum ChatroomCardGenerationState {
   preparing,
@@ -153,8 +155,133 @@ class ChatroomCardSelection {
   }
 }
 
+/// A saved candidate message. Its V2 content never enters the formal cache.
+class ChatroomLlmCardMessage {
+  const ChatroomLlmCardMessage({
+    required this.message,
+    required this.cardId,
+    required this.cardMessageIndex,
+    required this.rawJson,
+  });
+
+  final ChatroomV2Message message;
+  final int cardId, cardMessageIndex;
+  final Map<String, dynamic> rawJson;
+  int get globalMessageId => message.globalMessageId!;
+  int get conversationRoundId => message.conversationRoundId!;
+  String get content => message.payload['content'] as String;
+
+  factory ChatroomLlmCardMessage.fromJson(Object? value) {
+    final json = llmCardMap(value);
+    llmCardInt(json['global_message_id']);
+    llmCardInt(json['conversation_round_id']);
+    if (json.containsKey('message_id') ||
+        json.containsKey('location_message_id')) {
+      throw const FormatException('Saved candidate cannot have formal cursors');
+    }
+    final message = ChatroomV2Message.fromJson(json);
+    if (message.worldId.trim().isEmpty ||
+        message.locationId.trim().isEmpty ||
+        message.streamType.isNotEmpty ||
+        message.payload['content'] is! String) {
+      throw const FormatException('Invalid saved candidate message');
+    }
+    return ChatroomLlmCardMessage(
+      message: message,
+      cardId: llmCardInt(json['card_id']),
+      cardMessageIndex: llmCardInt(json['card_message_index']),
+      rawJson: Map.unmodifiable(json),
+    );
+  }
+}
+
+class ChatroomLlmCard {
+  const ChatroomLlmCard({
+    required this.cardId,
+    required this.cardIndex,
+    required this.isOriginal,
+    required this.generationState,
+    required this.canEdit,
+    required this.canDelete,
+    required this.messages,
+    required this.billing,
+    required this.createdAt,
+    required this.rawJson,
+    this.error,
+  });
+
+  final int cardId, cardIndex;
+  final bool isOriginal, canEdit, canDelete;
+  final ChatroomCardGenerationState generationState;
+  final List<ChatroomLlmCardMessage> messages;
+  final ChatroomCardBilling billing;
+  final String createdAt;
+  final Object? error;
+  final Map<String, dynamic> rawJson;
+
+  factory ChatroomLlmCard.fromJson(
+    Object? value, {
+    required int conversationRoundId,
+  }) {
+    final json = llmCardMap(value);
+    final cardId = llmCardInt(json['card_id']);
+    final rawMessages = json['messages'];
+    if (rawMessages is! List || json['created_at'] is! String) {
+      throw const FormatException('Invalid saved card');
+    }
+    final messages = rawMessages.map(ChatroomLlmCardMessage.fromJson).toList();
+    final ids = <int>{};
+    var lastIndex = 0;
+    for (final message in messages) {
+      if (message.cardId != cardId ||
+          message.conversationRoundId != conversationRoundId ||
+          !ids.add(message.globalMessageId) ||
+          message.cardMessageIndex <= lastIndex) {
+        throw const FormatException('Mismatched candidate identity or order');
+      }
+      lastIndex = message.cardMessageIndex;
+    }
+    final state = llmCardGenerationState(json['generation_state']);
+    if (state != ChatroomCardGenerationState.succeeded && messages.isNotEmpty) {
+      throw const FormatException('Incomplete card cannot have saved messages');
+    }
+    return ChatroomLlmCard(
+      cardId: cardId,
+      cardIndex: llmCardInt(json['card_index']),
+      isOriginal: _cardBool(json['is_original']),
+      generationState: state,
+      canEdit: _cardBool(json['can_edit']),
+      canDelete: _cardBool(json['can_delete']),
+      messages: List.unmodifiable(messages),
+      billing: ChatroomCardBilling.fromJson(json['billing']),
+      createdAt: json['created_at'] as String,
+      error: json['error'],
+      rawJson: Map.unmodifiable(json),
+    );
+  }
+}
+
+class ChatroomCardMutationResult {
+  const ChatroomCardMutationResult({
+    required this.conversationRoundId,
+    required this.card,
+  });
+  final int conversationRoundId;
+  final ChatroomLlmCard card;
+
+  factory ChatroomCardMutationResult.fromJson(Object? value) {
+    final json = llmCardMap(value);
+    final round = llmCardInt(json['conversation_round_id']);
+    return ChatroomCardMutationResult(
+      conversationRoundId: round,
+      card: ChatroomLlmCard.fromJson(json['card'], conversationRoundId: round),
+    );
+  }
+}
+
 class ChatroomLlmCardsResponse {
   const ChatroomLlmCardsResponse({
+    required this.conversationRoundId,
     required this.originalCardId,
     required this.selectedCardId,
     required this.activeCardId,
@@ -165,6 +292,7 @@ class ChatroomLlmCardsResponse {
     required this.total,
     required this.rawJson,
   });
+  final int conversationRoundId;
   final int originalCardId;
   final int selectedCardId;
   final int activeCardId;
@@ -172,9 +300,7 @@ class ChatroomLlmCardsResponse {
   final bool canRegenerate;
   final bool canConfirm;
 
-  /// The guide does not define the complete item/message schema. Preserve it
-  /// losslessly until its companion OpenAPI is available; do not create bubbles.
-  final List<Map<String, dynamic>> list;
+  final List<ChatroomLlmCard> list;
   final int total;
   final Map<String, dynamic> rawJson;
 
@@ -186,7 +312,9 @@ class ChatroomLlmCardsResponse {
     if (total != rawList.length || total > 10) {
       throw const FormatException('Invalid card total');
     }
+    final round = llmCardInt(json['conversation_round_id']);
     return ChatroomLlmCardsResponse(
+      conversationRoundId: round,
       originalCardId: llmCardInt(json['original_card_id'], allowZero: true),
       selectedCardId: llmCardInt(json['selected_card_id'], allowZero: true),
       activeCardId: llmCardInt(json['active_card_id'], allowZero: true),
@@ -195,7 +323,7 @@ class ChatroomLlmCardsResponse {
       canConfirm: _cardBool(json['can_confirm']),
       list: List.unmodifiable(
         rawList.map(
-          (item) => Map<String, dynamic>.unmodifiable(llmCardMap(item)),
+          (item) => ChatroomLlmCard.fromJson(item, conversationRoundId: round),
         ),
       ),
       total: total,

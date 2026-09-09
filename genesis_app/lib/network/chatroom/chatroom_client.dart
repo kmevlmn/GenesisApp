@@ -392,6 +392,64 @@ class ChatroomSession {
     );
   }
 
+  /// Start a new round without a user message. The ID correlates the receipt;
+  /// it is NOT a business idempotency key. An uncertain result is never retried.
+  Future<ChatroomGoOnReceipt> goOn({
+    required String locationId,
+    required int sourceConversationRoundId,
+    required String clientMsgId,
+  }) async {
+    _throwIfClosed();
+    if (protocolVersion != ChatroomProtocolVersion.v2) {
+      throw const ChatroomProtocolException('Go on requires a V2 connection');
+    }
+    final location = locationId.trim();
+    if (location.isEmpty ||
+        sourceConversationRoundId <= 0 ||
+        clientMsgId.trim().isEmpty) {
+      throw ArgumentError(
+        'Go on requires location, positive source round and request ID',
+      );
+    }
+    if (_joined?.locationId != location) {
+      throw const ChatroomProtocolException(
+        'Go on requires the joined location',
+      );
+    }
+    if (_pendingAcks.containsKey(clientMsgId)) {
+      throw StateError('clientMsgId is already in flight');
+    }
+    final ack = await _sendAckedClientMessage(
+      'go_on',
+      {
+        'payload': {
+          'location_id': location,
+          'source_conversation_round_id': sourceConversationRoundId,
+        },
+      },
+      clientMsgId: clientMsgId,
+      maxAttempts: 1,
+    );
+    final round = ack.receiptConversationRoundId;
+    if (ack.worldId != worldId ||
+        ack.locationId != location ||
+        round == null ||
+        round <= 0 ||
+        round == sourceConversationRoundId) {
+      throw const ChatroomProtocolException(
+        'Missing or mismatched Go on receipt',
+      );
+    }
+    return ChatroomGoOnReceipt(
+      worldId: worldId,
+      locationId: location,
+      sourceConversationRoundId: sourceConversationRoundId,
+      conversationRoundId: round,
+      clientMsgId: ack.clientMsgId,
+      billing: ack.billing,
+    );
+  }
+
   /// Request a private candidate over V2. The caller supplies an idempotency ID;
   /// no request, polling, stream replay or formal-history mutation is automatic.
   Future<ChatroomCardRegeneration> regenerateLlmCard({
@@ -612,6 +670,14 @@ class ChatroomSession {
   Future<void> _sendClientMessage(String type, Map<String, Object?> fields) {
     _throwIfClosed();
     if (protocolVersion == ChatroomProtocolVersion.v2) {
+      if (type == 'go_on') {
+        return _sendClientJson({
+          'type': type,
+          'world_id': worldId,
+          'client_msg_id': fields['client_msg_id'],
+          'payload': fields['payload'],
+        });
+      }
       if (type == 'regenerate_llm_card' || type == 'select_llm_card') {
         return _sendClientJson({
           'type': type,
@@ -979,6 +1045,8 @@ class ChatroomSession {
     if (error.conversationRoundId.isEmpty && error.senderId.isEmpty) return;
     final matches = _matchingStreams(
       ChatroomStreamIdentity(
+        worldId: error.worldId,
+        locationId: error.locationId,
         conversationRoundId: error.conversationRoundId,
         senderId: error.senderId,
       ),
@@ -991,6 +1059,8 @@ class ChatroomSession {
       _emitStreamAmbiguity(
         sourceType: error.sourceType,
         identity: ChatroomStreamIdentity(
+          worldId: error.worldId,
+          locationId: error.locationId,
           conversationRoundId: error.conversationRoundId,
           senderId: error.senderId,
         ),

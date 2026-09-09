@@ -29,6 +29,8 @@ import '../../components/world_new_badge.dart';
 import '../../network/chatroom/chatroom_connection_controller.dart';
 import '../../network/chatroom/chatroom_message_type.dart';
 import '../../network/chatroom/chatroom_models.dart';
+import '../../network/chatroom/chatroom_message_batch.dart';
+import '../../network/api_exception.dart';
 import '../../network/chatroom/chatroom_timeline_payload.dart';
 import '../../network/chatroom/world_chatroom_service.dart';
 import '../../network/genesis_api.dart';
@@ -54,6 +56,7 @@ import '../world/world_constants.dart' show worldCharacterAvatarLogicalSize;
 part 'location_chat_panel_connection.dart';
 part 'location_chat_message_reconciler.dart';
 part 'location_chat_send_actions.dart';
+part 'location_chat_reply_binding.dart';
 part 'location_chat_edit_page.dart';
 part 'location_chat_message_window.dart';
 part 'location_chat_mentions.dart';
@@ -167,6 +170,7 @@ class LocationChatPage extends StatefulWidget {
     this.backgroundImageUrl,
     this.backgroundPreviewImageUrl,
     this.renderBackgroundImage = true,
+    this.isMember = true,
     this.service,
     this.connection,
     this.onCharactersMovedLocationTap,
@@ -183,6 +187,7 @@ class LocationChatPage extends StatefulWidget {
   final String? backgroundImageUrl;
   final String? backgroundPreviewImageUrl;
   final bool renderBackgroundImage;
+  final bool isMember;
   final WorldChatroomService? service;
   final ChatroomConnectionController? connection;
   final ChatCharacterMovementTap? onCharactersMovedLocationTap;
@@ -270,6 +275,7 @@ class _LocationChatPageState extends State<LocationChatPage> {
       backgroundImageUrl: widget.backgroundImageUrl,
       backgroundPreviewImageUrl: widget.backgroundPreviewImageUrl,
       renderBackgroundImage: widget.renderBackgroundImage,
+      isMember: widget.isMember,
       service: widget.service,
       connection: widget.connection,
       active: true,
@@ -298,6 +304,7 @@ class LocationChatPanel extends StatefulWidget {
     this.backgroundImageUrl,
     this.backgroundPreviewImageUrl,
     this.renderBackgroundImage = true,
+    this.isMember = true,
     this.openingPreviewMessages = const <WorldChatroomMessage>[],
     this.openingPreviewEntities = const <WorldChatroomEntity>[],
     this.service,
@@ -340,6 +347,7 @@ class LocationChatPanel extends StatefulWidget {
   final String? backgroundImageUrl;
   final String? backgroundPreviewImageUrl;
   final bool renderBackgroundImage;
+  final bool isMember;
   final List<WorldChatroomMessage> openingPreviewMessages;
   final List<WorldChatroomEntity> openingPreviewEntities;
   final WorldChatroomService? service;
@@ -375,7 +383,12 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
   ScrollController get _scrollController => _scrollCoordinator.controller;
   late final LocationChatMentionEditingController _textController;
   final _composerFocusNode = FocusNode();
-  final _localMessageEdits = LocationChatLocalMessageEdits();
+  ChatroomReplyActionsController? _replyController;
+  final _restoredReplyLocations = <String>{};
+  bool _replyRebuildScheduled = false;
+  int _replyBindingGeneration = 0;
+  bool _preparingReplyAction = false;
+  ValueNotifier<LocationChatEditExternalState>? _replyEditorState;
   bool _replyEditorOpen = false;
   final Object _rosterTapRegionGroup = Object();
   final BackdropKey _surfaceBackdropKey = BackdropKey();
@@ -557,6 +570,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
     locationChatBubbleLayoutSettings.removeListener(
       _handleBubbleLayoutSettingsChanged,
     );
+    _detachReplyActions();
     _cancelOlderMessagesLoadSchedule();
     _selectedModelLoadGeneration++;
     _timelineVmCache.clear();
@@ -600,7 +614,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         oldWidget.service != widget.service ||
         oldWidget.worldId != widget.worldId ||
         oldWidget.locationId != widget.locationId;
-    if (changedChatTarget) _localMessageEdits.clear();
+    if (changedChatTarget) _detachReplyActions();
     final becameActive = !oldWidget.active && widget.active;
     final becameInactive = oldWidget.active && !widget.active;
     if (becameActive) {
@@ -842,30 +856,22 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
       backdropGroupKey: _surfaceBackdropKey,
     );
     final headerHeight = _locationChatHeaderHeight(style);
-    final displayMessages = _locationChatDisplayMessages()
-        .where((message) => !_localMessageEdits.isDeleted(message))
-        .map(_localMessageEdits.apply)
-        .toList(growable: false);
-    // A finished individual stream does not mean the whole round is finished.
-    // Only reveal the visual actions once all reply content is available.
-    final repliesInProgress =
+    final replyState = _replyController?.stateFor(widget.locationId);
+    final replyGoOnPending =
+        _replyController
+            ?.statesFor(widget.locationId)
+            .any((state) => state.goOnPending) ??
+        false;
+    final replyPresentation = _replyPresentation(replyState);
+    final displayMessages = replyPresentation.messages;
+    final replyBlocked =
         _sending ||
         _sendAwaitingResponse ||
         inputBlocked ||
         widget.worldTickInProgress ||
         _awaitingTickProgressMessage ||
-        displayMessages.any((message) => message.status == 'streaming');
-    final replyActionsMessageId = repliesInProgress
-        ? null
-        : displayMessages.reversed
-              .where(
-                (message) =>
-                    !message.isMe &&
-                    (!message.isSystem || message.isNarrator) &&
-                    !message.isTimelineEvent,
-              )
-              .firstOrNull
-              ?.localId;
+        replyGoOnPending ||
+        _preparingReplyAction;
     final managesKeyboardInset = locationChatManagesKeyboardInsetForTesting(
       platform: Theme.of(context).platform,
       androidSdkInt: _androidSdkInt,
@@ -879,22 +885,42 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         active: widget.active,
         messages: displayMessages,
         messageLayoutId: _locationChatMessageLayoutId,
-        replyActionsMessageId: replyActionsMessageId,
+        replyActionsIdentity: replyState == null
+            ? null
+            : '${widget.worldId}/${widget.locationId}/${replyState.roundId}',
+        replyActionsAnchorIndex: replyPresentation.anchorIndex,
+        replyPresentationRevision: replyState?.presentationRevision ?? 0,
+        replyStatus: _replyStatusWidget(replyState),
+        isMember: widget.isMember,
+        onRegenerate: () => unawaited(
+          _runReplyAction(
+            (controller) => controller.regenerate(widget.locationId),
+          ),
+        ),
+        onGoOn: () => unawaited(
+          _runReplyAction((controller) async {
+            await controller.goOn(widget.locationId);
+          }),
+        ),
+        regenerateEnabled:
+            !replyBlocked && (replyState?.canRegenerate ?? false),
+        goOnEnabled: !replyBlocked && (replyState?.canGoOn ?? false),
+        editEnabled: !replyBlocked && (replyState?.canEdit ?? false),
+        regenerateBusy: replyState?.generating ?? false,
+        goOnBusy: replyGoOnPending,
+        editBusy: _preparingReplyAction,
+        replyCardIndex: math.max(0, (replyState?.cardPosition ?? 1) - 1),
+        replyCardCount: replyState?.cardCount ?? 0,
+        replyCardsConfirmed: replyState?.confirmed ?? false,
+        onPreviousReplyCard: () => _browseReplyCard(-1),
+        onNextReplyCard: () => _browseReplyCard(1),
         onInspirationSend: (text) => unawaited(_send(textOverride: text)),
         onInspirationEdit: _editInspiration,
         onEditReply: () => unawaited(
-          _openReplyEditor(
-            LocationChatEditPageArgs(
-              messages: displayMessages,
-              style: style,
-              backgroundImageUrl: widget.backgroundImageUrl,
-              backgroundPreviewImageUrl: widget.backgroundPreviewImageUrl,
-              selfMessageBubbleMaxWidthCap:
-                  ordinaryMessageBubbleMaxWidthCaps.selfMessage,
-              otherMessageBubbleMaxWidthCap:
-                  ordinaryMessageBubbleMaxWidthCaps.otherMessage,
-              mentionCatalog: _textController.catalog,
-            ),
+          _editCurrentReply(
+            style,
+            ordinaryMessageBubbleMaxWidthCaps.selfMessage,
+            ordinaryMessageBubbleMaxWidthCaps.otherMessage,
           ),
         ),
         topTitle: '',

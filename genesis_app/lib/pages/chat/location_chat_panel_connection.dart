@@ -2,6 +2,7 @@ part of 'location_chat_page.dart';
 
 extension _LocationChatPanelConnection on _LocationChatPanelState {
   Future<void> _closeChatroom() async {
+    _detachReplyActions();
     final service = _service;
     final ownsService = _ownsService;
     _serviceGeneration++;
@@ -261,6 +262,7 @@ extension _LocationChatPanelConnection on _LocationChatPanelState {
   }
 
   Future<void> _deactivateConnection() async {
+    _detachReplyActions();
     _sending = false;
     final wasJoinedLocation = _joinedLocation;
     _joinedLocation = false;
@@ -744,6 +746,7 @@ extension _LocationChatPanelConnection on _LocationChatPanelState {
         'unseenIncomingCount': _unseenIncomingCount,
       },
     );
+    _bindReplyActions();
     if (nextSource.isNotEmpty) _notifyInitialContentReady();
     _maybeSendInitialMessage();
     if (changedMessages && wasFollowingLatest) {

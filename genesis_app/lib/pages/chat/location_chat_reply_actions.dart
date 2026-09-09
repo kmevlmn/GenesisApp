@@ -22,6 +22,20 @@ class LocationChatReplyActions extends StatefulWidget {
     this.onInspirationSend,
     this.onInspirationEdit,
     this.onEditReply,
+    this.onRegenerate,
+    this.onGoOn,
+    this.isMember = true,
+    this.regenerateEnabled = true,
+    this.goOnEnabled = true,
+    this.editEnabled = true,
+    this.regenerateBusy = false,
+    this.goOnBusy = false,
+    this.editBusy = false,
+    this.cardIndex = 0,
+    this.cardCount = 0,
+    this.cardsConfirmed = false,
+    this.onPreviousCard,
+    this.onNextCard,
     this.editPromptExpanded,
     this.onEditPromptExpandedChanged,
   });
@@ -29,6 +43,22 @@ class LocationChatReplyActions extends StatefulWidget {
   final ValueChanged<String>? onInspirationSend;
   final ValueChanged<String>? onInspirationEdit;
   final VoidCallback? onEditReply;
+  final VoidCallback? onRegenerate;
+  final VoidCallback? onGoOn;
+  final bool isMember;
+  final bool regenerateEnabled;
+  final bool goOnEnabled;
+  final bool editEnabled;
+  final bool regenerateBusy;
+  final bool goOnBusy;
+  final bool editBusy;
+
+  /// Zero-based position in the full card list, including in-flight/failed cards.
+  final int cardIndex;
+  final int cardCount;
+  final bool cardsConfirmed;
+  final VoidCallback? onPreviousCard;
+  final VoidCallback? onNextCard;
   final bool? editPromptExpanded;
   final ValueChanged<bool>? onEditPromptExpandedChanged;
   final ChatUiStyleConfig style;
@@ -81,6 +111,20 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
     }
   }
 
+  VoidCallback? _memberAction(VoidCallback? action, {bool enabled = true}) {
+    if (!widget.isMember) {
+      return () {
+        _setInspirationExpanded(false);
+        _setEditPromptExpanded(true);
+      };
+    }
+    if (!enabled || action == null) return null;
+    return () {
+      _setEditPromptExpanded(false);
+      action();
+    };
+  }
+
   ChatUiStyleConfig get style => widget.style;
 
   @override
@@ -89,18 +133,46 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          '<     1 / 2     >',
-          key: ValueKey('location-chat-reply-page-indicator'),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Color(0xFFF4F3F6),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            height: 1.4,
+        if (widget.cardCount > 1 && !widget.cardsConfirmed) ...[
+          Row(
+            key: const ValueKey('location-chat-reply-pagination'),
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                key: const ValueKey('location-chat-reply-previous-card'),
+                tooltip: 'Previous reply',
+                onPressed: widget.cardIndex > 0 ? widget.onPreviousCard : null,
+                icon: const Icon(Icons.chevron_left, size: 20),
+                color: const Color(0xF2FFFFFF),
+                disabledColor: const Color(0x73FFFFFF),
+              ),
+              Text(
+                '${widget.cardIndex + 1} / ${widget.cardCount}',
+                key: const ValueKey('location-chat-reply-page-indicator'),
+                semanticsLabel:
+                    'Reply ${widget.cardIndex + 1} of ${widget.cardCount}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xF2FFFFFF),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('location-chat-reply-next-card'),
+                tooltip: 'Next reply',
+                onPressed: widget.cardIndex < widget.cardCount - 1
+                    ? widget.onNextCard
+                    : null,
+                icon: const Icon(Icons.chevron_right, size: 20),
+                color: const Color(0xF2FFFFFF),
+                disabledColor: const Color(0x73FFFFFF),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
+        ],
         Padding(
           padding: EdgeInsets.only(
             left: style.avatarSize + style.avatarBubbleGap,
@@ -113,6 +185,11 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 key: const ValueKey(_ReplyActionIconType.regenerate),
                 label: 'Regenerate',
                 icon: _ReplyActionIconType.regenerate,
+                busy: widget.isMember && widget.regenerateBusy,
+                onTap: _memberAction(
+                  widget.onRegenerate,
+                  enabled: widget.regenerateEnabled && !widget.regenerateBusy,
+                ),
               ),
               const SizedBox(
                 width:
@@ -123,6 +200,11 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 key: const ValueKey(_ReplyActionIconType.goOn),
                 label: 'Go on',
                 icon: _ReplyActionIconType.goOn,
+                busy: widget.isMember && widget.goOnBusy,
+                onTap: _memberAction(
+                  widget.onGoOn,
+                  enabled: widget.goOnEnabled && !widget.goOnBusy,
+                ),
               ),
               const SizedBox(
                 width:
@@ -133,11 +215,16 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 key: const ValueKey(_ReplyActionIconType.edit),
                 label: 'Edit',
                 icon: _ReplyActionIconType.edit,
-                onTap: () {
-                  _setInspirationExpanded(false);
-                  _setEditPromptExpanded(true);
-                  widget.onEditReply?.call();
-                },
+                busy: widget.isMember && widget.editBusy,
+                onTap: _memberAction(
+                  widget.onEditReply == null
+                      ? null
+                      : () {
+                          _setInspirationExpanded(false);
+                          widget.onEditReply!();
+                        },
+                  enabled: widget.editEnabled && !widget.editBusy,
+                ),
               ),
               const SizedBox(
                 width:
@@ -149,19 +236,19 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 label: 'Inspiration',
                 icon: _ReplyActionIconType.inspiration,
                 expanded: _inspirationExpanded,
-                onTap: _toggleInspiration,
+                onTap: _memberAction(_toggleInspiration),
               ),
             ],
           ),
         ),
-        if (_editPromptExpanded) ...[
+        if (!widget.isMember && _editPromptExpanded) ...[
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.center,
             child: LocationChatSubscriptionPrompt(
               style: style,
               promptKey: const ValueKey('edit-subscription-prompt'),
-              semanticsLabel: 'Subscribe to edit messages',
+              semanticsLabel: 'Subscribe to use reply actions',
               message: const TextSpan(text: 'Members only.'),
               actionLabel: 'Subscribe >',
               singleLine: true,
@@ -518,40 +605,58 @@ class _ReplyActionIcon extends StatelessWidget {
     required this.icon,
     this.onTap,
     this.expanded,
+    this.busy = false,
   });
 
   final String label;
   final _ReplyActionIconType icon;
   final VoidCallback? onTap;
   final bool? expanded;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       label: label,
       enabled: onTap != null,
-      button: onTap != null,
+      button: true,
       expanded: expanded,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: SizedBox.square(
-          dimension: LocationChatReplyActions.buttonSize,
-          child: Center(
-            child: SvgPicture.asset(
-              switch (icon) {
-                _ReplyActionIconType.regenerate => regenerateIconAsset,
-                _ReplyActionIconType.goOn => goOnIconAsset,
-                _ReplyActionIconType.edit => editSquareIconAsset,
-                _ReplyActionIconType.inspiration => inspirationIconAsset,
-              },
-              width: LocationChatReplyActions.iconSize,
-              height: LocationChatReplyActions.iconSize,
-              colorFilter: const ColorFilter.mode(
-                Color(0xFFF4F3F6),
-                BlendMode.srcIn,
-              ),
-              excludeFromSemantics: true,
+      value: busy ? 'In progress' : null,
+      child: Tooltip(
+        message: label,
+        excludeFromSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: SizedBox.square(
+            dimension: LocationChatReplyActions.buttonSize,
+            child: Center(
+              child: busy
+                  ? const SizedBox.square(
+                      dimension: LocationChatReplyActions.iconSize,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: Color(0xF2FFFFFF),
+                      ),
+                    )
+                  : SvgPicture.asset(
+                      switch (icon) {
+                        _ReplyActionIconType.regenerate => regenerateIconAsset,
+                        _ReplyActionIconType.goOn => goOnIconAsset,
+                        _ReplyActionIconType.edit => editSquareIconAsset,
+                        _ReplyActionIconType.inspiration =>
+                          inspirationIconAsset,
+                      },
+                      width: LocationChatReplyActions.iconSize,
+                      height: LocationChatReplyActions.iconSize,
+                      colorFilter: ColorFilter.mode(
+                        onTap == null
+                            ? const Color(0x73FFFFFF)
+                            : const Color(0xF2FFFFFF),
+                        BlendMode.srcIn,
+                      ),
+                      excludeFromSemantics: true,
+                    ),
             ),
           ),
         ),

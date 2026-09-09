@@ -25,19 +25,8 @@ List<ChatMessageVm> locationChatLatestEditableRound(
         )
         .toList(growable: false);
   }
-  var start = end;
-  while (start > 0) {
-    final previous = messages[start - 1];
-    if (!_isEditableRoundMessage(previous) ||
-        previous.roundId.trim().isNotEmpty) {
-      break;
-    }
-    start--;
-  }
-  return messages
-      .sublist(start, end + 1)
-      .where(_isEditableRoundMessage)
-      .toList(growable: false);
+  // Without a server round identity there is no safe edit target.
+  return const [];
 }
 
 ChatMessageVm _copyLocationChatMessageText(
@@ -66,52 +55,6 @@ ChatMessageVm _copyLocationChatMessageText(
   createdAt: message.createdAt,
 )..error = message.error;
 
-/// Frontend-only changes; canonical messages and server caches remain separate.
-class LocationChatLocalMessageEdits {
-  final _edits = <String, ({String original, String text})>{};
-  final _deletedIds = <String>{};
-
-  bool isDeleted(ChatMessageVm message) =>
-      _deletedIds.contains(message.localId);
-
-  void clear() {
-    _edits.clear();
-    _deletedIds.clear();
-  }
-
-  void save(
-    List<ChatMessageVm> source,
-    Map<String, String> result, {
-    Set<String> deletedMessageIds = const {},
-  }) {
-    final sourceIds = source.map((message) => message.localId).toSet();
-    _deletedIds.addAll(deletedMessageIds.intersection(sourceIds));
-    for (final id in _deletedIds) {
-      _edits.remove(id);
-    }
-    for (final message in source) {
-      if (_deletedIds.contains(message.localId)) continue;
-      final text = result[message.localId];
-      if (text == null) continue;
-      if (text == message.text) {
-        _edits.remove(message.localId);
-      } else {
-        _edits[message.localId] = (original: message.text, text: text);
-      }
-    }
-  }
-
-  ChatMessageVm apply(ChatMessageVm message) {
-    final edit = _edits[message.localId];
-    if (edit == null) return message;
-    if (edit.original != message.text) {
-      _edits.remove(message.localId);
-      return message;
-    }
-    return _copyLocationChatMessageText(message, edit.text);
-  }
-}
-
 class LocationChatEditResult {
   const LocationChatEditResult({
     required this.texts,
@@ -121,10 +64,36 @@ class LocationChatEditResult {
   final Set<String> deletedMessageIds;
 }
 
+/// Signals an external round transition without coupling the editor to networking.
+class LocationChatEditExternalState {
+  const LocationChatEditExternalState({
+    this.frozen = false,
+    this.saving = false,
+    this.saved = false,
+    this.error,
+  });
+
+  final bool frozen;
+  final bool saving;
+  final bool saved;
+  final String? error;
+}
+
 class LocationChatEditPageArgs {
   const LocationChatEditPageArgs({
+    required this.worldId,
+    required this.locationId,
+    required this.roundId,
     required this.messages,
     required this.style,
+    required this.onSave,
+    this.cardId,
+    this.canEdit = true,
+    this.canDelete = true,
+    this.initialDraft,
+    this.onDraftChanged,
+    this.onCancel,
+    this.externalState,
     this.backgroundImageUrl,
     this.backgroundPreviewImageUrl,
     this.selfMessageBubbleMaxWidthCap,
@@ -132,7 +101,23 @@ class LocationChatEditPageArgs {
     this.mentionCatalog,
   });
 
+  final String worldId;
+  final String locationId;
+  final int roundId;
+  final int? cardId;
   final List<ChatMessageVm> messages;
+  final bool canEdit;
+  final bool canDelete;
+  final LocationChatEditResult? initialDraft;
+
+  /// Resolves only after authoritative persistence; throw to retain this draft.
+  /// Errors are shown inline here, so the caller need not display another toast.
+  final Future<void> Function(LocationChatEditResult result) onSave;
+  final ValueChanged<LocationChatEditResult>? onDraftChanged;
+
+  /// Called once when a normal edit is discarded, never for a frozen transition.
+  final VoidCallback? onCancel;
+  final ValueListenable<LocationChatEditExternalState>? externalState;
   final ChatUiStyleConfig style;
   final String? backgroundImageUrl;
   final String? backgroundPreviewImageUrl;
@@ -159,6 +144,83 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
   final _messageKeys = <String, GlobalKey>{};
   String? _activeMessageId;
   bool _revealScheduled = false;
+  bool _saving = false;
+  bool _completed = false;
+  bool _cancelNotified = false;
+  bool _completionScheduled = false;
+  String? _saveError;
+  LocationChatEditResult? _lastPublishedDraft;
+
+  LocationChatEditExternalState get _external =>
+      widget.args.externalState?.value ?? const LocationChatEditExternalState();
+  bool get _busy => _saving || _external.saving;
+  bool get _frozen => _external.frozen;
+  bool get _inputEnabled => !_busy && !_frozen;
+  bool get _canDelete =>
+      _inputEnabled &&
+      widget.args.canDelete &&
+      (widget.args.cardId == null || _messages.length > 1);
+
+  LocationChatEditResult _draft() => LocationChatEditResult(
+    texts: Map.unmodifiable({
+      for (final entry in _controllers.entries)
+        if (!_deletedMessageIds.contains(entry.key))
+          entry.key: entry.value.serializedText,
+    }),
+    deletedMessageIds: Set.unmodifiable(_deletedMessageIds),
+  );
+
+  void _draftChanged() {
+    if (_completed) return;
+    final draft = _draft();
+    if (mapEquals(draft.texts, _lastPublishedDraft?.texts) &&
+        setEquals(
+          draft.deletedMessageIds,
+          _lastPublishedDraft?.deletedMessageIds,
+        )) {
+      return;
+    }
+    _lastPublishedDraft = draft;
+    widget.args.onDraftChanged?.call(draft);
+  }
+
+  void _externalChanged() {
+    if (!mounted) return;
+    if (!_inputEnabled) FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {});
+    if (_external.saved && !_completionScheduled) {
+      _completionScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _completionScheduled = false;
+        if (mounted && _external.saved) _complete(_draft());
+      });
+    }
+  }
+
+  void _complete(LocationChatEditResult result) {
+    if (!mounted || _completed) return;
+    _completed = true;
+    final route = ModalRoute.of<LocationChatEditResult>(context);
+    final navigator = Navigator.of(context);
+    if (route?.isCurrent ?? true) {
+      navigator.pop(result);
+    } else if (route != null && route.isActive) {
+      // A later modal may be above this page; only close this editor.
+      navigator.removeRoute(route, result);
+    }
+  }
+
+  void _cancel() {
+    if (_cancelNotified || _completed || _frozen) return;
+    _cancelNotified = true;
+    widget.args.onCancel?.call();
+  }
+
+  void _back() {
+    if (_busy) return;
+    _cancel();
+    Navigator.of(context).pop();
+  }
 
   @override
   void didChangeMetrics() => _scheduleActiveMessageReveal();
@@ -188,21 +250,71 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _messages = locationChatLatestEditableRound(widget.args.messages)
+    final args = widget.args;
+    if (args.worldId.trim().isEmpty ||
+        args.locationId.trim().isEmpty ||
+        args.roundId <= 0 ||
+        (args.cardId != null && args.cardId! <= 0)) {
+      throw ArgumentError(
+        'The reply editor requires an explicit round target.',
+      );
+    }
+    _messages = args.messages
+        .where(
+          (message) =>
+              message.roundId == args.roundId.toString() &&
+              _isEditableRoundMessage(message),
+        )
         .map((message) => _copyLocationChatMessageText(message, message.text))
         .toList();
+    final initialDeleted =
+        args.initialDraft?.deletedMessageIds ?? const <String>{};
+    _deletedMessageIds.addAll(
+      initialDeleted.intersection(
+        _messages.map((message) => message.localId).toSet(),
+      ),
+    );
+    // Never restore a candidate draft that would remove every message.
+    if (args.cardId != null && _deletedMessageIds.length == _messages.length) {
+      _deletedMessageIds.clear();
+    }
     for (final message in _messages) {
       _messageKeys[message.localId] = GlobalKey();
       if (message.isImage) continue;
-      _controllers[message.localId] = LocationChatMentionEditingController(
-        catalog: widget.args.mentionCatalog,
-      )..setSerializedText(message.text);
+      _controllers[message.localId] =
+          LocationChatMentionEditingController(
+            catalog: widget.args.mentionCatalog,
+          )..setSerializedText(
+            args.initialDraft?.texts[message.localId] ?? message.text,
+          );
+      _controllers[message.localId]!.addListener(_draftChanged);
+    }
+    _messages.removeWhere(
+      (message) => _deletedMessageIds.contains(message.localId),
+    );
+    _lastPublishedDraft = _draft();
+    args.externalState?.addListener(_externalChanged);
+    if (_external.saved) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _externalChanged();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(LocationChatEditPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.args.externalState != widget.args.externalState) {
+      oldWidget.args.externalState?.removeListener(_externalChanged);
+      widget.args.externalState?.addListener(_externalChanged);
+      _externalChanged();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    widget.args.externalState?.removeListener(_externalChanged);
     _scrollCoordinator.dispose();
     for (final controller in _controllers.values) {
       controller.dispose();
@@ -211,6 +323,7 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
   }
 
   void _deleteMessage(String id) {
+    if (!_canDelete) return;
     if (_activeMessageId == id) {
       FocusManager.instance.primaryFocus?.unfocus();
       _activeMessageId = null;
@@ -219,146 +332,203 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
       _deletedMessageIds.add(id);
       _messages.removeWhere((message) => message.localId == id);
     });
+    _draftChanged();
   }
 
-  void _done() {
+  Future<void> _done() async {
+    if (!_inputEnabled) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    Navigator.of(context).pop(
-      LocationChatEditResult(
-        texts: {
-          for (final entry in _controllers.entries)
-            if (!_deletedMessageIds.contains(entry.key))
-              entry.key: entry.value.serializedText,
-        },
-        deletedMessageIds: Set.of(_deletedMessageIds),
-      ),
-    );
+    final result = _draft();
+    final hasChanges =
+        result.deletedMessageIds.isNotEmpty ||
+        widget.args.messages.any(
+          (message) =>
+              result.texts.containsKey(message.localId) &&
+              result.texts[message.localId] != message.text,
+        );
+    if (!hasChanges) {
+      _cancel();
+      _complete(result);
+      return;
+    }
+    if (widget.args.messages.any((message) {
+      final text = result.texts[message.localId];
+      return text != null && text != message.text && text.trim().isEmpty;
+    })) {
+      setState(() => _saveError = 'Message text cannot be empty.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    try {
+      await widget.args.onSave(result);
+      if (mounted) _complete(result);
+    } catch (error) {
+      if (mounted && !_completed) {
+        setState(() => _saveError = error.toString());
+      }
+    } finally {
+      if (mounted && !_completed) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final args = widget.args;
     final style = args.style;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: kChatDarkHeaderSystemUiOverlayStyle,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _LocationChatBackground(
-            imageUrl: args.backgroundImageUrl,
-            previewImageUrl: args.backgroundPreviewImageUrl,
-            color: style.conversationBackgroundColor,
-            enabled: true,
-          ),
-          Scaffold(
-            backgroundColor: Colors.transparent,
-            resizeToAvoidBottomInset: true,
-            body: Column(
-              children: [
-                ChatHeader(
-                  title: 'Edit Message',
-                  subtitle: '',
-                  connected: false,
-                  connecting: false,
-                  onBack: () => Navigator.of(context).pop(),
-                  showTitleIcon: false,
-                  showSubtitle: false,
-                  showMoreButton: false,
-                  alignContentLeft: true,
-                  trailingVerticallyCentered: true,
-                  style: style,
-                  trailing: Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: GenesisPrimaryButton(
-                      key: const ValueKey('location-chat-edit-done'),
-                      label: 'Save',
-                      onPressed: _done,
-                      width: 64,
-                      height: 32,
-                      fullWidth: false,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      foregroundColor: style.bubbleTextStyle.color,
+    return PopScope<LocationChatEditResult>(
+      canPop: !_busy || _completed,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop && !_completed) _cancel();
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: kChatDarkHeaderSystemUiOverlayStyle,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _LocationChatBackground(
+              imageUrl: args.backgroundImageUrl,
+              previewImageUrl: args.backgroundPreviewImageUrl,
+              color: style.conversationBackgroundColor,
+              enabled: true,
+            ),
+            Scaffold(
+              backgroundColor: Colors.transparent,
+              resizeToAvoidBottomInset: true,
+              body: Column(
+                children: [
+                  ChatHeader(
+                    title: 'Edit Message',
+                    subtitle: '',
+                    connected: false,
+                    connecting: false,
+                    onBack: _back,
+                    showTitleIcon: false,
+                    showSubtitle: false,
+                    showMoreButton: false,
+                    alignContentLeft: true,
+                    trailingVerticallyCentered: true,
+                    style: style,
+                    trailing: Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: GenesisPrimaryButton(
+                        key: const ValueKey('location-chat-edit-done'),
+                        label: 'Save',
+                        onPressed: _inputEnabled ? _done : null,
+                        isLoading: _busy,
+                        width: 64,
+                        height: 32,
+                        fullWidth: false,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        foregroundColor: style.bubbleTextStyle.color,
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: ChatMentionScope(
-                    catalog: args.mentionCatalog ?? ChatMentionCatalog.empty,
-                    child: ChatMessageEditorScope(
-                      controllers: _controllers,
-                      onEditorActivated: _activateEditor,
-                      onEditorDeactivated: (id) {
-                        if (_activeMessageId == id) _activeMessageId = null;
-                      },
-                      child: BackdropGroup(
-                        child: SizedBox(
-                          key: _viewportKey,
-                          child: ListView.builder(
-                            controller: _scrollCoordinator.controller,
-                            key: const ValueKey('location-chat-edit-messages'),
-                            keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior.onDrag,
-                            padding: style.messageListPadding.copyWith(
-                              bottom:
-                                  style.messageListPadding.bottom +
-                                  GenesisSafeAreaInsets.bottom(context),
-                            ),
-                            itemCount: _messages.length,
-                            itemBuilder: (context, index) => SizedBox(
-                              key: _messageKeys[_messages[index].localId],
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: ChatMessageRow(
-                                      key: ValueKey(
-                                        'location-chat-edit-row-${_messages[index].localId}',
-                                      ),
-                                      message: _messages[index],
-                                      showDateDivider: false,
-                                      style: style,
-                                      selfMessageBubbleMaxWidthCap:
-                                          args.selfMessageBubbleMaxWidthCap,
-                                      otherMessageBubbleMaxWidthCap:
-                                          args.otherMessageBubbleMaxWidthCap,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    right: _messages[index].isImage ? 4 : 0,
-                                    top: _messages[index].isImage ? 12 : 0,
-                                    child: BackdropGroup(
-                                      child: ChatStableBackdropSurface(
-                                        sigma: style
-                                            .composerSendButtonBackdropBlurSigma,
-                                        borderRadius: BorderRadius.circular(
-                                          style.composerSendButtonBorderRadius,
+                  if (_saveError != null || _external.error != null || _frozen)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                      child: Text(
+                        _saveError ??
+                            _external.error ??
+                            'This reply is being confirmed. Editing is paused.',
+                        key: const ValueKey('location-chat-edit-status'),
+                        style: style.bubbleTextStyle.copyWith(
+                          color: const Color(0xB8FFFFFF),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  Expanded(
+                    child: ChatMentionScope(
+                      catalog: args.mentionCatalog ?? ChatMentionCatalog.empty,
+                      child: ChatMessageEditorScope(
+                        controllers: args.canEdit ? _controllers : const {},
+                        onEditorActivated: _activateEditor,
+                        onEditorDeactivated: (id) {
+                          if (_activeMessageId == id) _activeMessageId = null;
+                        },
+                        child: BackdropGroup(
+                          child: SizedBox(
+                            key: _viewportKey,
+                            child: ListView.builder(
+                              controller: _scrollCoordinator.controller,
+                              key: const ValueKey(
+                                'location-chat-edit-messages',
+                              ),
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              padding: style.messageListPadding.copyWith(
+                                bottom:
+                                    style.messageListPadding.bottom +
+                                    GenesisSafeAreaInsets.bottom(context),
+                              ),
+                              itemCount: _messages.length,
+                              itemBuilder: (context, index) => SizedBox(
+                                key: _messageKeys[_messages[index].localId],
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: ExcludeFocus(
+                                        excluding: !_inputEnabled,
+                                        child: AbsorbPointer(
+                                          absorbing: !_inputEnabled,
+                                          child: ChatMessageRow(
+                                            key: ValueKey(
+                                              'location-chat-edit-row-${_messages[index].localId}',
+                                            ),
+                                            message: _messages[index],
+                                            showDateDivider: false,
+                                            style: style,
+                                            selfMessageBubbleMaxWidthCap: args
+                                                .selfMessageBubbleMaxWidthCap,
+                                            otherMessageBubbleMaxWidthCap: args
+                                                .otherMessageBubbleMaxWidthCap,
+                                          ),
                                         ),
-                                        child: CreateFormDeleteButton(
-                                          backgroundColor: style
-                                              .composerSendButtonDisabledColor,
-                                          iconColor:
-                                              style.bubbleTextStyle.color ??
-                                              const Color(0xFFF4F3F6),
-                                          borderSide: BorderSide.none,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: _messages[index].isImage ? 4 : 0,
+                                      top: _messages[index].isImage ? 12 : 0,
+                                      child: BackdropGroup(
+                                        child: ChatStableBackdropSurface(
+                                          sigma: style
+                                              .composerSendButtonBackdropBlurSigma,
                                           borderRadius: BorderRadius.circular(
                                             style
                                                 .composerSendButtonBorderRadius,
                                           ),
-                                          buttonKey: ValueKey(
-                                            'location-chat-edit-delete-${_messages[index].localId}',
-                                          ),
-                                          decorationKey: ValueKey(
-                                            'location-chat-edit-delete-decoration-${_messages[index].localId}',
-                                          ),
-                                          onPressed: () => _deleteMessage(
-                                            _messages[index].localId,
+                                          child: CreateFormDeleteButton(
+                                            enabled: _canDelete,
+                                            backgroundColor: style
+                                                .composerSendButtonDisabledColor,
+                                            iconColor:
+                                                style.bubbleTextStyle.color ??
+                                                const Color(0xFFF4F3F6),
+                                            borderSide: BorderSide.none,
+                                            borderRadius: BorderRadius.circular(
+                                              style
+                                                  .composerSendButtonBorderRadius,
+                                            ),
+                                            buttonKey: ValueKey(
+                                              'location-chat-edit-delete-${_messages[index].localId}',
+                                            ),
+                                            decorationKey: ValueKey(
+                                              'location-chat-edit-delete-decoration-${_messages[index].localId}',
+                                            ),
+                                            onPressed: () => _deleteMessage(
+                                              _messages[index].localId,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -366,11 +536,11 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -379,28 +549,15 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
 extension _LocationChatEditActions on _LocationChatPanelState {
   Future<void> _openReplyEditor(LocationChatEditPageArgs args) async {
     if (_replyEditorOpen || !widget.active) return;
-    final worldId = widget.worldId;
-    final locationId = widget.locationId;
     _replyEditorOpen = true;
     _composerFocusNode.unfocus();
     try {
-      final result = await Navigator.of(context, rootNavigator: true)
-          .pushNamed<LocationChatEditResult>(
-            RouteNames.locationChatEdit,
-            arguments: args,
-          );
-      if (!mounted ||
-          result == null ||
-          widget.worldId != worldId ||
-          widget.locationId != locationId) {
-        return;
-      }
-      _setLocationChatState(
-        () => _localMessageEdits.save(
-          _messages,
-          result.texts,
-          deletedMessageIds: result.deletedMessageIds,
-        ),
+      await Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushNamed<LocationChatEditResult>(
+        RouteNames.locationChatEdit,
+        arguments: args,
       );
     } finally {
       _replyEditorOpen = false;

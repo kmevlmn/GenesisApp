@@ -1508,20 +1508,34 @@ Query：
 
 本次继续只接入网络和同步能力，不连接编辑页 Save、删除按钮。后端事务、地点锁和 MySQL 原子性需在服务端工程验证，本地 mock 仅用于客户端契约与整批校验回归。
 
-### LLM 轮次卡片查询与最终选择（接口草案）
+### LLM 轮次卡片查询、候选修改与最终选择
 
-2026-09-08：依据 `llm-round-cards-client-guide.md`。该文档注明契约待确认、服务端接口/事件尚未接入运行时。本地仅提供协议入口，不启用业务或交互。
+2026-09-08：依据 `llm-round-cards-client-guide.md` 1.1 版。本地仅提供协议入口，不启用候选业务或交互；服务端部署状态另行联调确认。
 
 | 方法与路径 | 客户端入口 |
 | --- | --- |
 | GET `/aitown-chat/api/v1/worlds/{world_id}/locations/{location_id}/llm-messages/cards` | `ChatroomHttpApi.getLlmCards` |
 | POST `/aitown-chat/api/v1/worlds/{world_id}/locations/{location_id}/llm-messages/select` | `ChatroomHttpApi.selectLlmCard` |
+| POST 同基础路径 `/batch`，带正数 `card_id` | `ChatroomHttpApi.batchMutateLlmCardMessages` |
 
-不提供 HTTP `/regenerate`；重生成通过已认证 V2 WS 的 `regenerate_llm_card`。
+不提供 HTTP `/regenerate` 或 Go On；分别通过已认证 V2 WS 的 `regenerate_llm_card` 和 `go_on`。
 复用 Bearer / 现有 Gateway 签名，不发送操作者 UID。GET query 仅 `conversation_round_id`（正整数 int64），无 `pn/rn`，支持取消令牌。
 
-GET 不创建卡组。响应 data 包含 `original_card_id`、`selected_card_id`、`active_card_id`、`confirmed`、`can_regenerate`、`can_confirm`、`list`、`total`。无卡组为空列表及 0 值卡片 ID，全部卡片按 `card_index` 升序一次返回，`total=list.length`，最多 10 条（包含成功、失败和在途尝试）。
-配套 OpenAPI 未随指南提供，因此 `ChatroomLlmCardsResponse.list` 保留原始对象结构，未假设完整卡片条目及候选消息 schema；原始字段也保留在 `rawJson` 中。
+GET 不创建卡组。响应 data 包含 `conversation_round_id`、`original_card_id`、`selected_card_id`、`active_card_id`、`confirmed`、`can_regenerate`、`can_confirm`、`list`、`total`。无卡组为空列表及 0 值卡片 ID，全部卡片按 `card_index` 升序一次返回，`total=list.length`，最多 10 条（包含成功、失败和在途尝试）。
+`ChatroomLlmCardsResponse.list` 为类型化 `ChatroomLlmCard` 列表。每张卡包含 cardId/cardIndex/isOriginal/generationState/canEdit/canDelete/messages/billing/createdAt/error，并保留 rawJson。查询验证返回轮次与请求一致。
+`ChatroomLlmCardMessage.message` 复用 `ChatroomV2Message`，正文为 `payload.content`；外加固定 cardId/cardMessageIndex/globalMessageId，保留原始 JSON。候选查询不返回 message_id/location_message_id，连原卡也不例外；未成功卡 messages 为空。删除后索引可以为 1、3，不补位。数字 ID 严格按 Dart int 解析，拒绝字符串或浮点数；移动端大于 2^53 的 ID 保持无损。
+
+候选编辑复用 `/batch`：
+
+```json
+{"conversation_round_id":7358,"card_id":9902,"operations":[{"action":"edit","global_message_id":8701,"content":"修改后的正文"},{"action":"delete","global_message_id":8702}]}
+```
+
+仅 body 是否提供 card_id 决定分支：省略为正式消息，正整数为候选；null、0、负数、字符串不能回退。公开正式入口 `batchMutateLlmMessages` 及返回类型保持不变，候选入口要求正数 cardId，两者共享 1～100 个操作的校验及发送逻辑。edit 原样保存，delete 不带 content，目标 ID 不重复。
+
+候选成功 data 为 `{conversation_round_id, card}`，card 与 GET 卡片结构相同。返回 `ChatroomCardMutationResult` 并验证轮次/卡片匹配；不返回正式刷新范围，不修改缓存、不选卡或触发正式历史刷新。至少保留一条消息、权限及 confirmed 状态由后端校验，2020/2021/2025 等错误码按现有业务异常透传。
+
+候选批量写没有持久化请求幂等，不自动重试，包括 Gateway 响应后的重试；结果不明须由后续业务先 GET /cards 核对。重生成可显式复用请求 ID 恢复同一尝试；选卡可显式复用同卡及请求记录；Go On 不具备业务幂等，不能盲目重发。
 
 选卡请求：
 
@@ -1541,7 +1555,7 @@ GET 不创建卡组。响应 data 包含 `original_card_id`、`selected_card_id`
 已在指南中明确的业务码：2020 已固定其他卡；2021 卡组未确认时尝试批量编辑/删除；2023 重生成次数达到上限。完整错误码表在未附的 OpenAPI 中，客户端不猜测，所有非零码保留原始 code/message。
 HTTP 10001 沿用全局登录失效流程，其余非零业务错误通过现有全局 Toast 显示 err_msg。响应形状异常不能视为确认成功。
 
-本地 HTTP mock 的卡片查询返回空组；选卡返回 HTTP 501，明确未模拟生成/选卡后端，不伪造确认或计费成功。协议成功响应使用隔离 transport 测试验证。
+本地 HTTP mock 的卡片查询返回带轮次的空组；选卡和任何带 card_id 的 batch 返回 HTTP 501，明确未模拟生成/候选修改/选卡后端，不伪造确认或计费成功。协议成功响应使用隔离 transport 测试验证。
 
 ### GET `/aitown-chat/api/v2/messages`
 

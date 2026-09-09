@@ -153,6 +153,7 @@ extension _WorldChatroomMessageMutations on WorldChatroomService {
     int? start,
     int? end,
     bool preserveLive = false,
+    bool requireCurrent = false,
   }) {
     _throwIfDisposed();
     final location = locationId.trim();
@@ -190,18 +191,33 @@ extension _WorldChatroomMessageMutations on WorldChatroomService {
     }
     _historyRefreshes[location] = request;
     final ticket = _historyTicket(location);
-    return _runHistoryReplacement(location, request, ticket);
+    return _runHistoryReplacement(
+      location,
+      request,
+      ticket,
+      requireCurrent: requireCurrent,
+    );
   }
 
   Future<void> _runHistoryReplacement(
     String location,
     _LocationHistoryRefresh request,
-    _HistoryTicket ticket,
-  ) async {
-    bool current() =>
-        _historyIsCurrent(location, ticket) &&
-        identical(_historyRefreshes[location], request) &&
-        !request.token.isCancelled;
+    _HistoryTicket ticket, {
+    bool requireCurrent = false,
+  }) async {
+    bool current() {
+      final valid =
+          _historyIsCurrent(location, ticket) &&
+          identical(_historyRefreshes[location], request) &&
+          !request.token.isCancelled;
+      if (!valid && requireCurrent) {
+        throw StateError(
+          'Reply history refresh was superseded; check status before continuing',
+        );
+      }
+      return valid;
+    }
+
     try {
       var since = 0;
       var newest = 0;

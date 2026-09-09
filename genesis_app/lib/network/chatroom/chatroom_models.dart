@@ -8,6 +8,7 @@ import 'chatroom_timeline_payload.dart';
 
 export 'chatroom_llm_cards.dart';
 part 'chatroom_card_events.dart';
+part 'chatroom_go_on.dart';
 
 class ChatroomProtocolException implements Exception {
   const ChatroomProtocolException(this.message, {this.error});
@@ -132,12 +133,18 @@ class ChatroomV2Message {
                 (json['payload'] as Map).containsKey('selection')))) {
       llmCardInt(json['conversation_round_id']);
     }
+    if (type == 'error' && json['err_no'] is! int) {
+      throw const FormatException('V2 error requires a numeric err_no');
+    }
+    if (type == 'llm_card_stream') {
+      llmCardInt(json['global_message_id']);
+    }
+    if ((type == 'ack' || type == 'error') &&
+        json['conversation_round_id'] != null) {
+      llmCardInt(json['conversation_round_id'], allowZero: true);
+    }
     if (type == 'llm_card_stream' || type == 'llm_card_generation_end') {
-      for (final key in [
-        'global_message_id',
-        'message_id',
-        'location_message_id',
-      ]) {
+      for (final key in ['message_id', 'location_message_id']) {
         if (json[key] != null && (json[key] is! int || json[key] != 0)) {
           throw const FormatException(
             'Candidate event cannot have formal message IDs',
@@ -722,6 +729,7 @@ class ChatroomFailureEvent extends ChatroomEvent implements Exception {
     return ChatroomFailureEvent(
       code: error.code,
       message: error.message,
+      clientMsgId: error.clientMsgId,
       sourceType: error.sourceType,
       requestType: requestType,
       cause: error.cause ?? error,
@@ -805,10 +813,13 @@ class ChatroomAck extends ChatroomPayloadEvent {
     this.conversationRoundId = '',
     required this.clientMsgId,
     this.errorDetail = '',
-    this.cardConversationRoundId,
+    int? cardConversationRoundId,
+    int? receiptConversationRoundId,
+    this.billing,
     this.regeneration,
     this.selection,
-  });
+  }) : receiptConversationRoundId =
+           receiptConversationRoundId ?? cardConversationRoundId;
 
   final int globalMessageId;
   final int messageId;
@@ -816,7 +827,9 @@ class ChatroomAck extends ChatroomPayloadEvent {
   final String conversationRoundId;
   final String clientMsgId;
   final String errorDetail;
-  final int? cardConversationRoundId;
+  final int? receiptConversationRoundId;
+  int? get cardConversationRoundId => receiptConversationRoundId;
+  final ChatroomRoundBilling? billing;
   final ChatroomCardRegeneration? regeneration;
   final ChatroomCardSelection? selection;
 
@@ -875,7 +888,10 @@ class ChatroomAck extends ChatroomPayloadEvent {
       ts: asDateTime(message.ts),
       clientMsgId: message.clientMsgId,
       errorDetail: asString(message.payload['err_detail']),
-      cardConversationRoundId: message.conversationRoundId,
+      receiptConversationRoundId: message.conversationRoundId,
+      billing: message.payload['billing'] == null
+          ? null
+          : ChatroomRoundBilling.fromJson(message.payload['billing']),
       regeneration: regeneration,
       selection: selection,
     );
@@ -2119,6 +2135,11 @@ class ChatroomErrorEvent extends ChatroomEvent implements Exception {
     required this.code,
     required this.message,
     this.sessionId = '',
+    this.worldId = '',
+    this.locationId = '',
+    this.userId = '',
+    this.clientMsgId = '',
+    this.errNo,
     this.conversationRoundId = '',
     this.senderId = '',
     this.sourceType = 'error',
@@ -2126,12 +2147,29 @@ class ChatroomErrorEvent extends ChatroomEvent implements Exception {
   });
 
   final String sessionId;
+  final String worldId, locationId, userId, clientMsgId;
+  final int? errNo;
   final String conversationRoundId;
   final String senderId;
   final String sourceType;
   final String code;
   final String message;
   final Object? cause;
+
+  factory ChatroomErrorEvent.fromV2Message(ChatroomV2Message message) {
+    return ChatroomErrorEvent(
+      code: message.errNo.toString(),
+      errNo: message.errNo,
+      message: message.errMsg,
+      sessionId: message.sessionId,
+      worldId: message.worldId,
+      locationId: message.locationId,
+      userId: message.userId,
+      clientMsgId: message.clientMsgId,
+      conversationRoundId: _stringId(message.conversationRoundId),
+      senderId: message.senderId,
+    );
+  }
 
   factory ChatroomErrorEvent.fromPayload(
     Map<String, dynamic> payload, {
@@ -2345,6 +2383,8 @@ ChatroomEvent chatroomEventFromV2Message(ChatroomV2Message message) {
       return ChatroomConversationRangeUpdated.fromV2Message(message);
     case 'ack':
       return ChatroomAck.fromV2Message(message);
+    case 'error':
+      return ChatroomErrorEvent.fromV2Message(message);
     case 'user':
       return ChatroomUserMessage.fromV2Message(message);
     case 'character':

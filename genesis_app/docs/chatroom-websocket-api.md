@@ -188,9 +188,31 @@ LLM 流的外层 `type` 仍表示发送者业务类型，状态只看 `stream_ty
 
 V2 地点聊天不跟随控制通知中的 legacy `detail_url`：`world_new_message` 或 `characters_moved` 带 `location_id` 时只调用 `/aitown-chat/api/v2/messages` 刷新该地点；缺少地点时对当前世界的叶子地点做限并发 V2 刷新。这条 runtime 链路不调用 `/aitown-chat/internal/world/messages` 或 legacy `/aitown-chat/api/messages`。
 
-### LLM 轮次卡片命令与私有事件（接口草案）
+### Go On：创建新的续写轮次
 
-2026-09-08：依据 `llm-round-cards-client-guide.md`，服务端运行时尚未启用。本次只接入协议能力，不加入重生成按钮、自动选卡、候选拼装、轮询或本地待提交记录。
+2026-09-08：依据 `go-on-client-guide.md`。`ChatroomSession.goOn(locationId, sourceConversationRoundId, clientMsgId)` 只在已认证 V2、成功 join 目标地点后发送一次：
+
+```json
+{"type":"go_on","world_id":"world_001","client_msg_id":"go-on-001","payload":{"location_id":"loc_001","source_conversation_round_id":101}}
+```
+
+来源轮次为正整数 int64，不能放在外层 `conversation_round_id`；请求不带 content、message、card_id 或操作者 UID。请求 ID 必须非空，不能重复占用在途 ID。最新来源、本人归属、Tick 与计费资格由后端校验，客户端接口不判断按钮状态。
+
+```json
+{"type":"ack","world_id":"world_001","location_id":"loc_001","conversation_round_id":102,"client_msg_id":"go-on-001","payload":{"billing":{"price":1,"price_cent":120,"pricing_version":"round_v3"}},"err_no":0,"err_msg":""}
+```
+
+成功返回 `ChatroomGoOnReceipt`，包含世界、地点、来源轮次、新轮次、请求 ID 和可选 `ChatroomRoundBilling`。匹配世界/地点并验证新轮次后，ACK 即完成 Future；不等待用户消息回显或三层正式消息 ID。`receiptConversationRoundId` 与历史消息元数据分开，不改变 `hasCanonicalMessageMetadata`。billing 不要求候选专用 status；缺失价格不补造，精确费用取 price_cent（示例 1.20 Gem），接口不刷新或增减钱包。
+
+**Go On 的 client_msg_id 不提供业务幂等。** ACK 超时、发送异常、断线均返回异常且绝不自动重发/重连补发；超时代表结果不明，不能据此判断服务器未受理。迟到 ACK 仍通过 events 暴露。后续业务恢复须按新轮次查询历史，无 ACK 时没有按请求 ID 查询受理结果的接口。本次不加入自动查询或恢复记录。
+
+正式 waiting/character/narrator/end 事件按世界、地点、新轮次正常分发，可能先于 ACK 到达。`llm_stream_end` 只结束一条消息，`end_conversation_round.err_no=0` 也不保证整轮已成功持久化。接口不创建 Go On 用户气泡，不拼装候选到正式历史。
+
+V2 `type=error` 解析为 `ChatroomErrorEvent`，保留 world/location/round/user/client 请求上下文、数值 `errNo` 及兼容字符串 `code`。入队前失败为错误 ACK；ACK 后的 error 可能没有 client_msg_id，依靠新轮次关联。保留所有服务端错误码，不用英文提示文本作为枚举；仅 end 或流中断也不代表可自动重试。
+
+### LLM 轮次卡片命令与私有事件
+
+2026-09-08：依据 `llm-round-cards-client-guide.md` 1.1 版。本次只接入协议能力，不加入重生成按钮、自动选卡、候选拼装、轮询或本地待提交记录；服务端部署状态需另行联调确认。
 
 仅支持 V2（合法 `x-app-version > 0.3.3`），复用当前已认证连接。最新完成轮次、轮次发起人、次数上限和计费资格由服务端校验。
 
@@ -202,7 +224,7 @@ V2 地点聊天不跟随控制通知中的 legacy `detail_url`：`world_new_mess
 `ChatroomSession.regenerateLlmCard` 要求当前已加入目标地点；`selectLlmCard` 允许补报旧地点。两者要求调用方提供 1～128 字符幂等 ID，禁止重复占用在途请求 ID；不会自动重发，调用方负责用同一 ID 恢复请求。
 不携带操作者 UID，也不提供 HTTP 重生成接口。
 
-成功 ACK 保持 receipt-only，不带正式消息三层 ID。`ChatroomAck.cardConversationRoundId` 保存回显轮次，`regeneration` / `selection` 是独立类型，`hasCanonicalMessageMetadata` 不因此变为 true。
+成功 ACK 保持 receipt-only，不带正式消息三层 ID。`ChatroomAck.receiptConversationRoundId` 保存受理轮次（`cardConversationRoundId` 保留兼容别名），`regeneration` / `selection` 是独立类型，`hasCanonicalMessageMetadata` 不因此变为 true。
 
 - `ack.payload.regeneration`：`conversation_round_id`、`original_card_id`、`card_id`、`generation_state`、`billing`，失败已有候选还可包含 `error`。ACK 成功仅表示受理/恢复已有状态，不代表生成成功。
 - `ack.payload.selection`：与 HTTP select 的 `ChatroomCardSelection` 完全相同，含最终卡和刷新范围。接口仅返回结果，未接业务刷新或自动确认。
@@ -211,10 +233,10 @@ V2 地点聊天不跟随控制通知中的 legacy `detail_url`：`world_new_mess
 候选流：
 
 ```json
-{"type":"llm_card_stream","stream_type":"chunk","world_id":"world_001","location_id":"loc_1","conversation_round_id":7358,"user_id":"user_001","sender_type":"character","sender_id":"char_1","sender_name":"Alice","payload":{"card_id":9902,"card_message_index":1,"seq":1,"content":"Hello","current_time":"Day 1, 12:00"},"err_no":0,"err_msg":""}
+{"type":"llm_card_stream","stream_type":"chunk","world_id":"world_001","location_id":"loc_1","conversation_round_id":7358,"global_message_id":8701,"user_id":"user_001","sender_type":"character","sender_id":"char_1","sender_name":"Alice","payload":{"card_id":9902,"card_message_index":1,"seq":1,"content":"Hello","current_time":"Day 1, 12:00"},"err_no":0,"err_msg":""}
 ```
 
-`ChatroomLlmCardStream` 只接受 start/chunk/end；卡内序号从 1 开始，chunk 必须有正数 seq，content 是增量，end 是该条完整正文。与普通 `llm_stream_*` 路由隔离，候选没有正式消息 ID，不进入正式队列、持久化缓存或现有 AI 流拼装，也不发送客户端 ACK。当前仅分发事件，未来业务层按 `(conversation_round_id, card_id, card_message_index, seq)` 去重及拼装。
+`ChatroomLlmCardStream` 只接受 start/chunk/end；卡内序号从 1 开始，chunk 必须有正数 seq，content 是增量，end 是该条完整正文。与普通 `llm_stream_*` 路由隔离，每条候选携带正整数 `global_message_id`，从 start 到最终采用保持稳定；不携带正式 `message_id/location_message_id`。候选不进入正式队列、持久化缓存或现有 AI 流拼装，也不发送客户端 ACK。当前仅分发事件，未来业务层按 `(card_id, global_message_id, seq)` 去重、按固定 `card_message_index` 排序，不能使用数组下标定位编辑目标。
 
 整张卡终态：
 

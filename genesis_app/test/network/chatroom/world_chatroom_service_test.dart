@@ -7,6 +7,7 @@ import 'package:genesis_flutter_android/network/chatroom/chatroom_client.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_connection_controller.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_http_models.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_message_storage.dart';
+import 'package:genesis_flutter_android/network/chatroom/chatroom_reply_action_storage.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_models.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_socket_transport.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_timeline_payload.dart';
@@ -19,6 +20,7 @@ import 'package:genesis_flutter_android/platform/device/device_id_service.dart';
 import 'package:genesis_flutter_android/platform/session/memory_user_session_store.dart';
 
 void main() {
+  _replyCompletionTests();
   _messageMutationTests();
   test('WorldChatroomMessage defaults missing location message id to zero', () {
     final constructed = WorldChatroomMessage(
@@ -4860,6 +4862,7 @@ Future<WorldChatroomService> _service({
     api: api,
     client: client,
     messageStorage: messageStorage ?? MemoryChatroomMessageStorage(),
+    replyActionStorage: MemoryChatroomReplyActionStorage(),
     heartbeatInterval: heartbeatInterval,
     reconnectInterval: reconnectInterval,
     conversationRoundTimeout: conversationRoundTimeout,
@@ -6049,6 +6052,7 @@ void _messageMutationTests() {
           'location_id': 'loc-1',
           'user_id': 'user-1',
           'conversation_round_id': 10,
+          'global_message_id': 9007199254740994,
           'sender_type': 'character',
           'sender_id': 'char-1',
           'sender_name': 'Alice',
@@ -6581,4 +6585,114 @@ class _BlockingMutationStorage extends MemoryChatroomMessageStorage {
       maxMessagesPerLocation: maxMessagesPerLocation,
     );
   }
+}
+
+void _replyCompletionTests() {
+  test(
+    'Go on round end replaces unfinished streams with empty authoritative history',
+    () async {
+      final socket = _FakeChatroomSocket();
+      final http = _MutationHttpTransport()
+        ..messagesByLocation['loc-1'] = [
+          {..._mutationRow(1, 1, 10), 'user_id': 'user-1'},
+        ];
+      final service = await _service(
+        socketTransport: _FakeChatroomTransport(socket),
+        httpTransport: http,
+        useV2Protocol: true,
+        ackTimeout: const Duration(seconds: 1),
+        refreshInitialSnapshotOnConnect: false,
+      );
+      addTearDown(service.dispose);
+      await service.connect(worldId: 'world-1', identity: _identity());
+      service.applyWorldSnapshot(_worldSnapshot());
+      final joining = service.join(locationId: 'loc-1');
+      await _waitFor(() => socket.sentTypes.contains('join'));
+      final joinFrame =
+          jsonDecode(
+                socket.sent.lastWhere(
+                  (raw) => (jsonDecode(raw) as Map)['type'] == 'join',
+                ),
+              )
+              as Map;
+      socket.serverV2Ack(clientMsgId: joinFrame['client_msg_id'] as String);
+      await joining;
+      await service.refreshLocationHistory(locationId: 'loc-1');
+      final actions = service.replyActions!;
+      await actions.restore('loc-1');
+      expect(actions.stateFor('loc-1')!.canGoOn, isTrue);
+      final pending = actions.goOn('loc-1');
+      await _waitFor(() => socket.sentTypes.contains('go_on'));
+      final command =
+          jsonDecode(
+                socket.sent.lastWhere(
+                  (raw) => (jsonDecode(raw) as Map)['type'] == 'go_on',
+                ),
+              )
+              as Map;
+      socket.serverFrame('ack', {
+        'world_id': 'world-1',
+        'location_id': 'loc-1',
+        'user_id': 'user-1',
+        'client_msg_id': command['client_msg_id'],
+        'conversation_round_id': 20,
+        'payload': <String, Object?>{},
+        'err_no': 0,
+      });
+      await pending;
+      socket.serverV2StreamFrame(
+        streamType: 'llm_stream_start',
+        senderId: 'char-1',
+        messageId: 2,
+        locationMessageId: 2,
+        roundId: 20,
+      );
+      socket.serverV2StreamFrame(
+        streamType: 'llm_chunk',
+        senderId: 'char-1',
+        messageId: 2,
+        locationMessageId: 2,
+        roundId: 20,
+        seq: 1,
+        content: 'Not persisted',
+      );
+      await _waitFor(
+        () => service.state.messagesByLocation['loc-1']!.any(
+          (m) => m.content == 'Not persisted',
+        ),
+      );
+      socket.serverEndConversationRound(locationId: 'loc-1', roundId: 20);
+      await _waitFor(() => !actions.stateForRound('loc-1', 10)!.goOnPending);
+      expect(
+        service.state.messagesByLocation['loc-1']!.where(
+          (m) => m.conversationRoundNumber == 20,
+        ),
+        isEmpty,
+      );
+      expect(
+        service.state.streamMessagesByKey.values.where(
+          (m) => m.conversationRoundNumber == 20,
+        ),
+        isEmpty,
+      );
+      expect(actions.stateForRound('loc-1', 20)!.error, isNotNull);
+      // A late single-message end cannot resurrect content after authoritative recovery.
+      socket.serverV2StreamFrame(
+        streamType: 'llm_stream_end',
+        senderId: 'char-1',
+        messageId: 2,
+        locationMessageId: 2,
+        roundId: 20,
+        content: 'Late reply',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        service.state.messagesByLocation['loc-1']!.where(
+          (m) => m.conversationRoundNumber == 20,
+        ),
+        isEmpty,
+      );
+      expect(socket.sentTypes.where((type) => type == 'go_on'), hasLength(1));
+    },
+  );
 }

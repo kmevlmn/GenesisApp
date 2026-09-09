@@ -47,13 +47,51 @@ extension _LocationChatSendActions on _LocationChatPanelState {
         _chatroomState.joinedLocationId != widget.locationId ||
         _chatroomState.inputBlocked ||
         _sendAwaitingResponse ||
+        _preparingReplyAction ||
         _sending) {
       return;
     }
+    final draftAtSubmit = _textController.serializedText;
     final text = normalizeGenesisUgcTextForDisplay(
-      textOverride ?? _textController.serializedText,
+      textOverride ?? draftAtSubmit,
     );
     if (isGenesisUgcTextBlank(text)) return;
+
+    final controller = _replyController;
+    if (controller != null) {
+      final location = widget.locationId;
+      final bindingGeneration = _replyBindingGeneration;
+      _setLocationChatState(() => _sending = true);
+      try {
+        await controller.finalizeBeforeSend(location);
+      } catch (error) {
+        if (mounted &&
+            bindingGeneration == _replyBindingGeneration &&
+            widget.locationId == location &&
+            identical(service, _service)) {
+          _setLocationChatState(() => _sending = false);
+          if (error is! ApiException ||
+              error.kind != ApiExceptionKind.business) {
+            showGenesisToast(context, '$error');
+          }
+        }
+        return;
+      }
+      if (!mounted ||
+          bindingGeneration != _replyBindingGeneration ||
+          !widget.active ||
+          location != widget.locationId ||
+          !identical(service, _service)) {
+        return;
+      }
+      if (_chatroomState.joinedLocationId != location ||
+          _chatroomState.inputBlocked ||
+          _sendAwaitingResponse ||
+          widget.worldTickInProgress) {
+        _setLocationChatState(() => _sending = false);
+        return;
+      }
+    }
 
     final clientMsgId = _nextClientMsgId();
     final localMessage = ChatMessageVm(
@@ -74,8 +112,12 @@ extension _LocationChatSendActions on _LocationChatPanelState {
     _setLocationChatState(() {
       _sending = true;
       _messages.add(localMessage);
-      _hasDraftText = false;
-      _textController.clear();
+      if (_textController.serializedText == draftAtSubmit) {
+        _hasDraftText = false;
+        _textController.clear();
+      } else {
+        _hasDraftText = !isGenesisUgcTextBlank(_textController.serializedText);
+      }
     });
     _recordPanelDebug(
       action: 'optimisticSend',
@@ -105,8 +147,45 @@ extension _LocationChatSendActions on _LocationChatPanelState {
         _chatroomState.joinedLocationId != widget.locationId ||
         _chatroomState.inputBlocked ||
         _sendAwaitingResponse ||
+        _preparingReplyAction ||
         _sending) {
       return;
+    }
+
+    final controller = _replyController;
+    if (controller != null) {
+      final location = widget.locationId;
+      final bindingGeneration = _replyBindingGeneration;
+      _setLocationChatState(() => _sending = true);
+      try {
+        await controller.finalizeBeforeSend(location);
+      } catch (error) {
+        if (mounted &&
+            bindingGeneration == _replyBindingGeneration &&
+            widget.locationId == location &&
+            identical(service, _service)) {
+          _setLocationChatState(() => _sending = false);
+          if (error is! ApiException ||
+              error.kind != ApiExceptionKind.business) {
+            showGenesisToast(context, '$error');
+          }
+        }
+        return;
+      }
+      if (!mounted ||
+          bindingGeneration != _replyBindingGeneration ||
+          !widget.active ||
+          location != widget.locationId ||
+          !identical(service, _service)) {
+        return;
+      }
+      if (_chatroomState.joinedLocationId != location ||
+          _chatroomState.inputBlocked ||
+          _sendAwaitingResponse ||
+          widget.worldTickInProgress) {
+        _setLocationChatState(() => _sending = false);
+        return;
+      }
     }
 
     final clientMsgId = _nextClientMsgId();

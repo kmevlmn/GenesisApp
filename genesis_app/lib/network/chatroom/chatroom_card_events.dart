@@ -7,6 +7,7 @@ class ChatroomLlmCardStream extends ChatroomEvent {
       locationId = message.locationId,
       userId = message.userId,
       conversationRoundId = llmCardInt(message.conversationRoundId),
+      globalMessageId = llmCardInt(message.globalMessageId),
       cardId = llmCardInt(message.payload['card_id']),
       cardMessageIndex = llmCardInt(message.payload['card_message_index']),
       streamType = message.streamType,
@@ -31,7 +32,7 @@ class ChatroomLlmCardStream extends ChatroomEvent {
     }
   }
   final String worldId, locationId, userId, senderType, senderId, senderName;
-  final int conversationRoundId, cardId, cardMessageIndex;
+  final int conversationRoundId, cardId, cardMessageIndex, globalMessageId;
   final int? seq, ts;
   final String streamType, content, currentTime;
   final int errNo;
@@ -78,9 +79,7 @@ void _validateCardEnvelope(ChatroomV2Message message) {
       message.userId.trim().isEmpty) {
     throw const FormatException('Missing private candidate identity');
   }
-  if ((message.globalMessageId ?? 0) != 0 ||
-      (message.messageId ?? 0) != 0 ||
-      (message.locationMessageId ?? 0) != 0) {
+  if ((message.messageId ?? 0) != 0 || (message.locationMessageId ?? 0) != 0) {
     throw const FormatException(
       'Candidate event cannot have formal message IDs',
     );

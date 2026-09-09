@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/network/websocket_capture.dart';
+import 'package:genesis_flutter_android/network/devtools_websocket_profile.dart';
 import 'package:genesis_flutter_android/network/websocket_transport.dart';
+import 'package:http_profile/http_profile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -60,4 +63,95 @@ void main() {
       });
     },
   );
+
+  for (final logFrames in [false, true]) {
+    test(
+      'DevTools receives regeneration frames with logFrames=$logFrames',
+      () async {
+        final previousProfiling = HttpClientRequestProfile.profilingEnabled;
+        HttpClientRequestProfile.profilingEnabled = true;
+        addTearDown(
+          () => HttpClientRequestProfile.profilingEnabled = previousProfiling,
+        );
+        final profiles = <HttpClientRequestProfile>[];
+        final recorded = Completer<void>();
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(server.close);
+        final requestBody = jsonEncode({
+          'type': 'regenerate_llm_card',
+          'client_msg_id': 'regen-1',
+        });
+        final frames = [
+          jsonEncode({
+            'type': 'llm_card_stream',
+            'payload': {'content': '新的分片'},
+          }),
+          jsonEncode({
+            'type': 'llm_card_generation_end',
+            'payload': {'content': '完成'},
+          }),
+        ];
+        final serverTask = server.first.then((request) async {
+          final socket = await WebSocketTransformer.upgrade(request);
+          expect(await socket.first, requestBody);
+          for (final frame in frames) {
+            socket.add(frame);
+          }
+          await socket.close();
+        });
+        final transport = IoWebSocketTransport(
+          logFrames: logFrames,
+          frameLogSink: (_, _) => throw StateError('broken diagnostic sink'),
+          frameProfileFactory: (uri) => DevToolsWebSocketProfile(
+            uri,
+            profileFactory:
+                ({
+                  required requestStartTime,
+                  required requestMethod,
+                  required requestUri,
+                }) {
+                  final profile = HttpClientRequestProfile.profile(
+                    requestStartTime: requestStartTime,
+                    requestMethod: requestMethod,
+                    requestUri: requestUri,
+                  )!;
+                  profiles.add(profile);
+                  unawaited(
+                    profile.responseData.bodySink.done.then((_) {
+                      if (profiles.length == 3 && !recorded.isCompleted) {
+                        recorded.complete();
+                      }
+                    }),
+                  );
+                  return profile;
+                },
+          ),
+        );
+        final socket = await transport.connect(
+          Uri.parse(
+            'ws://127.0.0.1:${server.port}/aitown-chat/ws?world_id=test',
+          ),
+        );
+        addTearDown(socket.close);
+        final received = socket.messages.toList();
+        await socket.send(requestBody);
+        expect(await received, frames);
+        await serverTask;
+        await recorded.future.timeout(const Duration(seconds: 5));
+        expect(profiles.map((profile) => profile.requestMethod), [
+          'WS_SEND',
+          'WS_RECV',
+          'WS_RECV',
+        ]);
+        expect(utf8.decode(profiles.first.requestData.bodyBytes), requestBody);
+        for (var i = 0; i < frames.length; i++) {
+          expect(
+            utf8.decode(profiles[i + 1].responseData.bodyBytes),
+            frames[i],
+          );
+          expect(profiles[i + 1].requestUri, contains('type=llm_card_'));
+        }
+      },
+    );
+  }
 }

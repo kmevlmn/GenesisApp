@@ -17,6 +17,10 @@ import 'chatroom_http_models.dart';
 import 'chatroom_message_type.dart';
 import 'chatroom_message_storage.dart';
 import 'chatroom_models.dart';
+import 'chatroom_reply_actions_controller.dart';
+import 'chatroom_reply_action_storage.dart';
+
+export 'chatroom_reply_actions_controller.dart';
 import 'chatroom_timeline_payload.dart';
 
 part 'world_chatroom_connection.dart';
@@ -154,13 +158,120 @@ class WorldChatroomService {
     Duration reconnectInterval = const Duration(seconds: 5),
     Duration conversationRoundTimeout = conversationRoundFallbackTimeout,
     bool refreshInitialSnapshotOnConnect = true,
+    ChatroomReplyActionStorage? replyActionStorage,
   }) : _api = api,
        _client = client,
+       _replyActionStorage = replyActionStorage,
        _messageStorage = messageStorage,
        _heartbeatInterval = heartbeatInterval,
        _reconnectInterval = reconnectInterval,
        _conversationRoundTimeout = conversationRoundTimeout,
        _refreshInitialSnapshotOnConnect = refreshInitialSnapshotOnConnect;
+
+  final ChatroomReplyActionStorage? _replyActionStorage;
+  ChatroomReplyActionsController? _replyActionsController;
+  final _completedReplyRounds = <String>{};
+  Future<void> Function()? _replyWalletRefresher;
+
+  void setReplyWalletRefresher(Future<void> Function() refresh) {
+    _replyWalletRefresher = refresh;
+  }
+
+  /// Lazily owns candidate state; ordinary history never stores candidates.
+  ChatroomReplyActionsController? get replyActions {
+    if (_disposed || _worldId.isEmpty || _storageOwnerUid.isEmpty) return null;
+    final existing = _replyActionsController;
+    if (existing != null) return existing;
+    final controller = ChatroomReplyActionsController(
+      worldId: _worldId,
+      ownerUid: _storageOwnerUid,
+      httpApi: _api.chatroomHttp,
+      session: () => _session,
+      isReady: (location) =>
+          !_disposed && _state.connected && _state.joinedLocationId == location,
+      isTickLocked: () => _state.inputBlocked,
+      refreshFormalRange: (location, start, end) => _requestHistoryReplacement(
+        locationId: location,
+        start: start,
+        end: end,
+        requireCurrent: true,
+      ),
+      replaceCompletedRound: _replaceCompletedReplyRound,
+      onGoOnAccepted: (location, round) => _bindWaitingConversationRound(
+        locationId: location,
+        conversationRoundId: '$round',
+      ),
+      refreshLatestHistory: (location) =>
+          refreshLocationHistory(locationId: location),
+      refreshWallet: () async {
+        await _replyWalletRefresher?.call();
+      },
+      storage: _replyActionStorage,
+    );
+    _replyActionsController = controller;
+    _observeReplyHistory();
+    return controller;
+  }
+
+  Future<void> _replaceCompletedReplyRound(String location, int round) async {
+    final world = _worldId;
+    final owner = _storageOwnerUid;
+    _completedReplyRounds.add('$location:$round');
+    // Events already queued before the round end must settle before replacement.
+    await _eventQueue;
+    if (_disposed || world != _worldId || owner != _storageOwnerUid) {
+      throw StateError('The active chat changed during reply recovery');
+    }
+    bool inRound(WorldChatroomMessage message) =>
+        message.locationId == location &&
+        message.conversationRoundNumber == round;
+    _streamAccumulators.removeWhere((_, value) => inRound(value.message));
+    _setState(
+      _state.copyWith(
+        streamMessagesByKey: {
+          for (final entry in _state.streamMessagesByKey.entries)
+            if (!inRound(entry.value)) entry.key: entry.value,
+        },
+        messagesByLocation: {
+          ..._state.messagesByLocation,
+          location: [
+            for (final message
+                in _state.messagesByLocation[location] ??
+                    const <WorldChatroomMessage>[])
+              if (!inRound(message) || !message.streaming) message,
+          ],
+        },
+        worldMessages: [
+          for (final message in _state.worldMessages)
+            if (!inRound(message) || !message.streaming) message,
+        ],
+      ),
+    );
+    await _requestHistoryReplacement(
+      locationId: location,
+      start: round,
+      end: round,
+      requireCurrent: true,
+    );
+  }
+
+  void _observeReplyHistory() {
+    final controller = _replyActionsController;
+    if (controller == null) return;
+    for (final entry in _state.messagesByLocation.entries) {
+      final round = int.tryParse(
+        _state
+                .conversationRoundStatesByLocation[entry.key]
+                ?.conversationRoundId ??
+            '',
+      );
+      controller.observeMessages(
+        entry.key,
+        entry.value,
+        activeRoundIds: {if (round != null && round > 0) round},
+      );
+    }
+  }
 
   final GenesisApi _api;
   final ChatroomClient _client;
@@ -559,6 +670,9 @@ class WorldChatroomService {
     final nextWorldId = worldId.trim();
     if (_worldId != nextWorldId ||
         (_identity != null && _identity!.userId != identity.userId)) {
+      _replyActionsController?.dispose();
+      _replyActionsController = null;
+      _completedReplyRounds.clear();
       _cancelHistoryRefreshes();
       _deletedMessageIds.clear();
       _publishedContentUpdateOccurrences.clear();
@@ -1199,6 +1313,8 @@ class WorldChatroomService {
     if (_disposed) return;
     _clearAllConversationRounds();
     _disposed = true;
+    _replyActionsController?.dispose();
+    _replyActionsController = null;
     final disposeFailure = const ChatroomFailureEvent(
       code: 'service_disposed',
       message: 'Chatroom service was disposed',

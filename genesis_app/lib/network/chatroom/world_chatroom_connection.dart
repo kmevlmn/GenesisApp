@@ -157,6 +157,10 @@ extension _WorldChatroomConnection on WorldChatroomService {
           refreshLocationHistory(locationId: joinedLocationId),
         );
       }
+      final replyController = _replyActionsController;
+      if (replyController != null) {
+        unawaited(replyController.reconnect().catchError((Object _) {}));
+      }
       return joined;
     } catch (_) {
       _setState(_state.copyWith(joining: false, joinedLocationId: ''));
@@ -180,6 +184,7 @@ extension _WorldChatroomConnection on WorldChatroomService {
       'event received type=${chatroomEventType(event)} '
       'world=$_worldId joined=${_state.joinedLocationId}',
     );
+    _replyActionsController?.receiveEvent(event);
     _prepareWorldRefreshForQueuedEvent(event);
     _eventQueue = _eventQueue.then((_) => _handleEvent(event)).catchError((
       Object error,

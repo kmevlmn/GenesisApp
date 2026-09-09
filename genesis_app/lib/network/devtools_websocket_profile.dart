@@ -1,12 +1,10 @@
 import 'dart:convert';
-import 'dart:developer' as developer;
 
 import 'package:http_profile/http_profile.dart';
 
 import 'devtools_http_profile.dart';
 
 const kDevToolsWebSocketProfileMaxBodyBytes = 64 * 1024;
-const kDevToolsWebSocketProfileMaxFramesPerConnection = 1000;
 
 const _redactedValue = '[REDACTED]';
 const _sensitiveFieldNames = <String>{
@@ -37,29 +35,15 @@ class DevToolsWebSocketProfile {
   final GenesisHttpProfileFactory _profileFactory;
   final String _connectionId;
   int _nextSequence = 1;
-  int _recordedFrameCount = 0;
-  int _droppedFrameCount = 0;
-  bool _dropSummaryRecorded = false;
 
   Future<void> recordFrame({
     required String direction,
     required String message,
   }) async {
     if (const bool.fromEnvironment('dart.vm.product')) return;
-    if (_recordedFrameCount >=
-        kDevToolsWebSocketProfileMaxFramesPerConnection) {
-      _droppedFrameCount += 1;
-      if (!_dropSummaryRecorded) {
-        _dropSummaryRecorded = true;
-        developer.log(
-          'WebSocket synthetic profile limit reached; '
-          'droppedFrames=$_droppedFrameCount connection=$_connectionId',
-          name: 'DevToolsWebSocketProfile',
-        );
-      }
-      return;
-    }
-    _recordedFrameCount += 1;
+    // The Network recording toggle controls profiling. A lifetime frame quota
+    // would permanently hide later business traffic on long-lived sockets.
+    if (!HttpClientRequestProfile.profilingEnabled) return;
 
     final isOutgoing = direction == '=>';
     final sequence = _nextSequence++;
@@ -208,19 +192,8 @@ Uri _profileUri(
 }
 
 _WebSocketProfilePayload _profilePayload(String message) {
-  if (devToolsWebSocketFrameExceedsBodyLimit(message)) {
-    return _WebSocketProfilePayload(
-      contentType: 'text/plain; charset=utf-8',
-      bodyBytes: utf8.encode(
-        '[websocket frame omitted: ${message.length} code units exceeds '
-        '$kDevToolsWebSocketProfileMaxBodyBytes-byte profile limit]',
-      ),
-      messageType: null,
-      globalMessageId: null,
-      messageId: null,
-      locationMessageId: null,
-    );
-  }
+  // Extract metadata and redact the complete JSON before limiting the stored
+  // preview, so large stream/end frames still match the Network type filter.
   String sanitized;
   var contentType = 'text/plain; charset=utf-8';
   String? messageType;
@@ -253,7 +226,9 @@ _WebSocketProfilePayload _profilePayload(String message) {
     sanitized = _redactRawSecrets(message);
   }
   return _WebSocketProfilePayload(
-    contentType: contentType,
+    contentType: devToolsWebSocketFrameExceedsBodyLimit(sanitized)
+        ? 'text/plain; charset=utf-8'
+        : contentType,
     bodyBytes: _truncateUtf8(sanitized),
     messageType: messageType,
     globalMessageId: globalMessageId,
