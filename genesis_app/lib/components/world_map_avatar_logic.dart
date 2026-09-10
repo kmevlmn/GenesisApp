@@ -3,12 +3,9 @@ import 'package:flutter/material.dart';
 import 'chat/shared/chat_scene_plate_tokens.dart';
 import 'world_point.dart';
 
-Color? worldMapAvatarBorderColor({
-  required bool isPlayerControlledRole,
-  required bool showAiMarker,
-}) {
+Color? worldMapAvatarBorderColor({required bool isPlayerControlledRole}) {
   if (isPlayerControlledRole) return kChatScenePlatePlayerRoleBorderColor;
-  return showAiMarker ? const Color(0xFFDDDDDD) : null;
+  return null;
 }
 
 String worldMapAvatarStableId(UserAvatar avatar) {

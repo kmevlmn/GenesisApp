@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
 import 'package:genesis_flutter_android/app/debug_floating_button_visibility.dart';
 import 'package:genesis_flutter_android/components/developer_debug_floating_button.dart';
 import 'package:genesis_flutter_android/pages/me/developer_page.dart';
@@ -60,6 +61,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: GenesisTheme.dark(),
         navigatorKey: navigatorKey,
         home: AnnotatedRegion<SystemUiOverlayStyle>(
           value: transparentPageStyle,
@@ -77,6 +79,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final developerSheet = find.byType(DeveloperPageSheet);
+    expect(
+      Theme.of(tester.element(find.byType(DeveloperPageContent))).brightness,
+      Brightness.light,
+    );
     final sheetSize = tester.getSize(developerSheet);
     expect(sheetSize.height, closeTo(600, 0.01));
     expect(tester.getTopLeft(developerSheet).dy, closeTo(0, 0.01));

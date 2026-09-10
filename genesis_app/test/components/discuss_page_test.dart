@@ -128,7 +128,14 @@ void main() {
       ),
     );
 
+    // Pagination requires a user drag near the end, not programmatic scrolling.
     await tester.ensureVisible(find.text('Discuss item 20'));
+    await tester.pumpAndSettle();
+    final list = tester.widget<ListView>(find.byType(ListView).first);
+    final scrollController = list.controller!;
+    scrollController.jumpTo(scrollController.position.maxScrollExtent - 300);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -200));
     await tester.pumpAndSettle();
 
     expect(find.text('View More >'), findsNothing);

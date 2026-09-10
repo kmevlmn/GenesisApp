@@ -145,7 +145,7 @@ HTTP 映射层的图片规则：
 头像和非头像要分开处理：
 
 - 用户/通用头像共享 `GenesisAvatar`。
-- 角色头像共享 `GenesisCharacterAvatar`，带红星角色标识。
+- 角色头像共享 `GenesisCharacterAvatar`；已移除旧红星标记和 showStar 参数。玩家角色边框保持独立，不恢复旧星标。
 - 当前头像默认 top-center crop；不要把头像裁剪规则扩散到 cover、location image、map、list thumbnail 等非头像图片。
 - `CharactersList` 和 `OriginWorldPage` 的部分角色肖像有页面级尺寸例外，修改前先确认是否应走共享头像组件。
 
@@ -158,6 +158,17 @@ HTTP 映射层的图片规则：
 - 标准页面 Header 标题统一引用 `GenesisTypography.pageTitle`，通过 `GenesisUiTheme.pageTitleStyle` 使用：字号 20、字重 600、行高 1.4；不得在页面重复硬编码同一字号。
 - 标准标题默认左对齐：无返回按钮时沿用左右 16px 页面边距；有返回按钮时与返回图标保持 12px 间距。深浅色只覆盖标题颜色，保留公共排版参数；长标题单行省略，不通过缩小字号适配宽度。
 - Home、Inbox、Notifications / Followers / Comments 通知内页、已登录 Me、Profile 和 Follow 页的正文左右边距统一为 16 个逻辑像素；Header 两端的内容或图标区域也对齐到 16。带返回按钮时，返回图标从 x=16 开始，标题保留其后的 12 间距；右侧按钮需计入自身内边距，使图标区域距右边为 16，不能把触摸区外边距与图标留白重复叠加。
+
+## 深色文字 Tab
+
+- 标准下划线文字 Tab 复用 `GenesisTabBar` / `SecendTabs`；选中文字及图标使用 `darkTextPrimary`（95% 白），未选中使用 `darkTextSecondary`（72% 白），下划线使用 `redPrimary`。`GenesisDarkTheme` 提供这些默认值；自定义标签与图标插值同样引用这一对文字 token。
+- 本规则适用于文字 Tab，不改变主导航、胶囊选择器、地图专用控件或 Sheet 分页 Handle 的独立规范；Handle 未选中仍用 `darkHandleInactive`（45% 白）。
+
+## 深色卡片表面
+
+- 普通深色信息卡片使用 `GenesisColors.darkCardBackground`（`darkRaisedBackground` 的 80% 不透明度），1px 描边使用 `GenesisColors.darkCardBorder`（6% 白），默认圆角 8px；不添加 Blur。不得在调用处重复写透明度或色值。
+- 透明度仅作用于卡片填充，文字继续使用公共文字 token，不对整个卡片加 Opacity。同类卡片在页面与 Sheet 中使用同一套 token，最终底色随容器背景合成。
+- 选中、促销等有明确语义的卡片保留对应强调色；输入框、图标圆底和加载骨架继续使用各自的规范，不因卡片表面调整而替换 `darkFaintFill`。
 
 ## 公共浮层底色
 
@@ -196,6 +207,10 @@ HTTP 映射层的图片规则：
 
 ## 深色界面颜色规范
 
+- App 固定使用 `GenesisTheme.dark()` 作为全局默认，不随系统切换浅色。Material 默认背景、文字、Tab、输入提示／光标、按钮禁用态、加载圆环以及 `GenesisUiTheme` 均由公共深色主题管理；局部 `GenesisDarkTheme` 复用同一 `GenesisTheme.asDark()` 实现，不维护第二套颜色。
+- 根 builder 的文字与状态栏图标也使用深色默认，覆盖页面 Material 之外的浮层。输入框填充 token 由主题提供，同类组件仍负责布局与填充，不给已有外层填充重复叠底。
+- 用户明确保留的开发页面／Sheet、调试解锁使用 `GenesisLightTheme` 局部隔离，保持原有浅色设计；地图调试设置和独立推送 Banner 保持自身样式。公共操作弹窗等已有独立深色规则继续生效。
+
 颜色统一定义在 `lib/ui/tokens/genesis_colors.dart` 的 `GenesisColors` 中。以下五个 token 是对应标准颜色的唯一色值来源：
 
 | 用途 | Token | 精确值 |
@@ -210,7 +225,7 @@ HTTP 映射层的图片规则：
 - 页面或组件已有的语义别名可以保留，但必须引用上述 token。例如 Worldo Detail 和 Discuss 的颜色别名只做映射，不再自行定义色值。
 - 现有代码的 token 迁移只替换与上述标准颜色对应的色值写法，不改变视觉颜色；其他颜色或不同透明度保持原样，不因数值接近而强行归入这五个 token。
 - `GenesisColors.darkInputPlaceholder` 独立定义为 32% 白（`0x52FFFFFF`），不与 45% 白的 `darkTextTertiary` 共用色值；深色光标引用 `darkTextPrimary`。后续调整占位文字只修改公共 placeholder token。
-- 需要透明度变体时，从对应 token 派生，例如 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.8)`；不得用变体替代规定的三级文字颜色。
+- 需要透明度变体时，从对应 token 派生，若已有对应语义 token（如 `darkCardBackground`），直接引用该 token；不得用变体替代规定的三级文字颜色。
 - 不创建肉眼接近的背景色或文字透明度。纯白 `#FFFFFF` 不作为深色内容区常规文字颜色，除非设计明确要求更高强调层级；输入区域和浮动操作菜单按后文专项规范执行。
 
 - 深色页面的命名路由和直接 `Navigator.push` 统一使用 `GenesisDarkPageRoute<T>`（`lib/ui/navigation/genesis_dark_page_route.dart`）。它为 Android 进入、退出和被覆盖时的转场显式提供 `darkBackground`，避免转场读取页面局部 Theme 之外的浅色背景；保留平台返回手势及路由结果类型。

@@ -62,7 +62,6 @@ class UserAvatar {
     this.id = '',
     this.name,
     this.avatarUrl = '',
-    this.showStar = false,
     this.isPlayerControlledRole = false,
     this.isNew = false,
   });
@@ -71,7 +70,6 @@ class UserAvatar {
   final String id;
   final String? name;
   final String avatarUrl;
-  final bool showStar;
   final bool isPlayerControlledRole;
   final bool isNew;
 }

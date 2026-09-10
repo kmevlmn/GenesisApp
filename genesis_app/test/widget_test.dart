@@ -56,6 +56,7 @@ import 'package:genesis_flutter_android/components/ai_content_disclaimer.dart';
 import 'package:genesis_flutter_android/components/auth/login_guard.dart';
 import 'package:genesis_flutter_android/app/gems/daily_check_in_coordinator.dart';
 import 'package:genesis_flutter_android/components/chat/shared/chat_ui.dart';
+import 'package:genesis_flutter_android/components/page_header.dart';
 import 'package:genesis_flutter_android/components/common/copyable_id_label.dart';
 import 'package:genesis_flutter_android/components/common/list_loading_skeleton.dart';
 import 'package:genesis_flutter_android/components/common/genesis_action_box.dart';
@@ -3837,6 +3838,16 @@ void main() {
     genesisNavigatorKey.currentState!.overlay!.insert(entry);
     await tester.pump();
     expectInterText(tester, find.text('Root overlay font probe'));
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).theme?.brightness,
+      Brightness.dark,
+    );
+    expect(
+      DefaultTextStyle.of(
+        tester.element(find.text('Root overlay font probe')),
+      ).style.color,
+      GenesisColors.darkTextPrimary,
+    );
     entry.remove();
     entry.dispose();
 
@@ -3873,7 +3884,7 @@ void main() {
     expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 1);
     expect(
       Theme.of(tester.element(find.byType(BottomTabs))).brightness,
-      Brightness.light,
+      Brightness.dark,
     );
     expect(find.text('Worldo'), findsOneWidget);
     expect(
@@ -3893,7 +3904,7 @@ void main() {
     expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 0);
     expect(
       Theme.of(tester.element(find.byType(BottomTabs))).brightness,
-      Brightness.light,
+      Brightness.dark,
     );
     expect(
       _pageStatusBarStyle(tester).statusBarIconBrightness,
@@ -3944,7 +3955,7 @@ void main() {
     expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 1);
     expect(
       Theme.of(tester.element(find.byType(BottomTabs))).brightness,
-      Brightness.light,
+      Brightness.dark,
     );
     expect(find.text('For you'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
@@ -17078,7 +17089,7 @@ void main() {
     );
     expect(
       Theme.of(tester.element(find.byType(BottomTabs))).brightness,
-      Brightness.light,
+      Brightness.dark,
     );
     await tester.pump(const Duration(seconds: 1));
     AppStartupCoordinator.resetForTesting();
@@ -27896,6 +27907,40 @@ void main() {
 
     expect(find.text('24 Following'), findsOneWidget);
     expect(find.text('24 Followers'), findsOneWidget);
+  });
+
+  testWidgets('private chat stays dark inside a light app theme', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.light(),
+        home: AppServicesScope(
+          services: await _testServices(),
+          child: const ChatPage(peerUid: '', peerName: 'Private chat'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scaffoldFinder = find.byType(Scaffold);
+    expect(
+      tester.widget<Scaffold>(scaffoldFinder).backgroundColor,
+      GenesisColors.darkBackground,
+    );
+    expect(
+      Theme.of(tester.element(scaffoldFinder)).brightness,
+      Brightness.dark,
+    );
+    expect(find.byType(GenesisBackAppBar), findsOneWidget);
+    final input = tester.widget<TextField>(find.byType(TextField));
+    expect(input.cursorColor, GenesisColors.darkTextPrimary);
+    expect(input.style?.color, GenesisColors.darkTextPrimary);
+    expect(
+      input.decoration?.hintStyle?.color,
+      GenesisColors.darkInputPlaceholder,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
   });
 
   testWidgets('chat page renders cached direct messages then syncs', (

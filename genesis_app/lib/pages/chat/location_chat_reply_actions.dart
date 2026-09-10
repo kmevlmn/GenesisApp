@@ -123,8 +123,8 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                 tooltip: 'Previous reply',
                 onPressed: widget.cardIndex > 0 ? widget.onPreviousCard : null,
                 icon: const Icon(Icons.chevron_left, size: 20),
-                color: const Color(0xF2FFFFFF),
-                disabledColor: const Color(0x73FFFFFF),
+                color: GenesisColors.darkTextPrimary,
+                disabledColor: GenesisColors.darkTextTertiary,
               ),
               Text(
                 '${widget.cardIndex + 1} / ${widget.cardCount}',
@@ -133,7 +133,7 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                     'Reply ${widget.cardIndex + 1} of ${widget.cardCount}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: Color(0xF2FFFFFF),
+                  color: GenesisColors.darkTextPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   height: 1.4,
@@ -146,8 +146,8 @@ class _LocationChatReplyActionsState extends State<LocationChatReplyActions> {
                     ? widget.onNextCard
                     : null,
                 icon: const Icon(Icons.chevron_right, size: 20),
-                color: const Color(0xF2FFFFFF),
-                disabledColor: const Color(0x73FFFFFF),
+                color: GenesisColors.darkTextPrimary,
+                disabledColor: GenesisColors.darkTextTertiary,
               ),
             ],
           ),

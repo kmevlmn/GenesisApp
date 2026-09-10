@@ -108,26 +108,15 @@ extension _GemWalletDataActions on _GemWalletPageState {
     final taskCode = task.taskCode.trim();
     if (taskCode.isEmpty || _loadingTaskCodes.contains(taskCode)) return;
 
-    var status = _taskStatus(task);
-    if (taskCode == dailyCheckInTaskCode &&
-        (status == 'in_progress' || status == 'claimable')) {
-      if (!_beginTaskAction(taskCode)) return;
-      final bool confirmed;
-      try {
-        confirmed = await showDailyCheckInDialog(
-          context,
-          status: status == 'claimable'
-              ? DailyCheckInDialogStatus.claim
-              : DailyCheckInDialogStatus.checkIn,
-          rewardGemsCent: task.rewardGemsCent,
-        );
-      } finally {
-        _endTaskAction(taskCode);
-      }
-      if (!mounted || !confirmed) return;
-      status = _taskStatus(task);
-    }
+    final status = _taskStatus(task);
     if (status == 'claimed') return;
+    if (taskCode == dailyCheckInTaskCode) {
+      if (status == 'in_progress' || status == 'claimable') {
+        await _openDailyCheckInTask(task);
+      }
+      return;
+    }
+
     if (status == 'claimable') {
       await _claimTaskReward(taskCode, rewardGemsCent: task.rewardGemsCent);
       return;
@@ -171,12 +160,34 @@ extension _GemWalletDataActions on _GemWalletPageState {
           'Open your playing World, then tap Tick Now.',
         );
         return;
-      case 'daily_checkin':
-        await _reportTaskAction(taskCode, rewardGemsCent: task.rewardGemsCent);
-        return;
       case 'discord_follow':
         await Future.wait<void>([_openDiscord(), _reportTaskAction(taskCode)]);
         return;
+    }
+  }
+
+  Future<void> _openDailyCheckInTask(GemTask task) async {
+    final taskCode = task.taskCode.trim();
+    if (!_beginTaskAction(taskCode)) return;
+    bool confirmed;
+    try {
+      confirmed = await showDailyCheckInDialog(
+        context,
+        status: _taskStatus(task) == 'claimable'
+            ? DailyCheckInDialogStatus.claim
+            : DailyCheckInDialogStatus.checkIn,
+        rewardGemsCent: task.rewardGemsCent,
+      );
+    } finally {
+      _endTaskAction(taskCode);
+    }
+    if (!mounted || !confirmed) return;
+    // Read current status after the dialog; opening it must not claim a reward.
+    switch (_taskStatus(task)) {
+      case 'claimable':
+        await _claimTaskReward(taskCode, rewardGemsCent: task.rewardGemsCent);
+      case 'in_progress':
+        await _reportTaskAction(taskCode, rewardGemsCent: task.rewardGemsCent);
     }
   }
 

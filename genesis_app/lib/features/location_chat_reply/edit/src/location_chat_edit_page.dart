@@ -383,137 +383,129 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
   Widget build(BuildContext context) {
     final args = widget.args;
     final style = args.style;
-    return PopScope<LocationChatEditResult>(
-      canPop: !_busy || _completed,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop && !_completed) _cancel();
-      },
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: kChatDarkHeaderSystemUiOverlayStyle,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            _LocationChatBackground(
-              imageUrl: args.backgroundImageUrl,
-              previewImageUrl: args.backgroundPreviewImageUrl,
-              color: style.conversationBackgroundColor,
-              enabled: true,
-            ),
-            Scaffold(
-              backgroundColor: Colors.transparent,
-              resizeToAvoidBottomInset: true,
-              body: Column(
-                children: [
-                  ChatHeader(
-                    title: 'Edit Message',
-                    subtitle: '',
-                    connected: false,
-                    connecting: false,
-                    onBack: _back,
-                    showTitleIcon: false,
-                    showSubtitle: false,
-                    showMoreButton: false,
-                    alignContentLeft: true,
-                    trailingVerticallyCentered: true,
-                    style: style,
-                    trailing: Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: GenesisPrimaryButton(
-                        key: const ValueKey('location-chat-edit-done'),
-                        label: 'Save',
-                        onPressed: _inputEnabled ? _done : null,
-                        isLoading: _busy,
-                        width: 64,
-                        height: 32,
-                        fullWidth: false,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        foregroundColor: style.bubbleTextStyle.color,
+    return GenesisDarkTheme(
+      child: PopScope<LocationChatEditResult>(
+        canPop: !_busy || _completed,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop && !_completed) _cancel();
+        },
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: kChatDarkHeaderSystemUiOverlayStyle,
+          child: Scaffold(
+            backgroundColor: GenesisColors.darkBackground,
+            resizeToAvoidBottomInset: true,
+            body: Column(
+              children: [
+                ChatHeader(
+                  title: 'Edit Message',
+                  subtitle: '',
+                  connected: false,
+                  connecting: false,
+                  onBack: _back,
+                  showTitleIcon: false,
+                  showSubtitle: false,
+                  showMoreButton: false,
+                  alignContentLeft: true,
+                  trailingVerticallyCentered: true,
+                  style: style,
+                  trailing: Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: GenesisPrimaryButton(
+                      key: const ValueKey('location-chat-edit-done'),
+                      label: 'Save',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      backgroundColor: GenesisColors.redPrimary,
+                      onPressed: _inputEnabled ? _done : null,
+                      isLoading: _busy,
+                      width: 64,
+                      height: 32,
+                      fullWidth: false,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      foregroundColor: GenesisColors.darkTextPrimary,
+                    ),
+                  ),
+                ),
+                if (_saveError != null || _external.error != null || _frozen)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Text(
+                      _saveError ??
+                          _external.error ??
+                          'This reply is being confirmed. Editing is paused.',
+                      key: const ValueKey('location-chat-edit-status'),
+                      style: style.bubbleTextStyle.copyWith(
+                        color: GenesisColors.darkTextSecondary,
+                        fontSize: 13,
                       ),
                     ),
                   ),
-                  if (_saveError != null || _external.error != null || _frozen)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                      child: Text(
-                        _saveError ??
-                            _external.error ??
-                            'This reply is being confirmed. Editing is paused.',
-                        key: const ValueKey('location-chat-edit-status'),
-                        style: style.bubbleTextStyle.copyWith(
-                          color: const Color(0xB8FFFFFF),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  Expanded(
-                    child: ChatMentionScope(
-                      catalog: args.mentionCatalog ?? ChatMentionCatalog.empty,
-                      child: ChatMessageEditorScope(
-                        controllers: args.canEdit ? _controllers : const {},
-                        onEditorActivated: _activateEditor,
-                        onEditorDeactivated: (id) {
-                          if (_activeMessageId == id) _activeMessageId = null;
-                        },
-                        child: BackdropGroup(
-                          child: SizedBox(
-                            key: _viewportKey,
-                            child: ListView.builder(
-                              controller: _scrollCoordinator.controller,
-                              key: const ValueKey(
-                                'location-chat-edit-messages',
-                              ),
-                              keyboardDismissBehavior:
-                                  ScrollViewKeyboardDismissBehavior.onDrag,
-                              padding: style.messageListPadding.copyWith(
-                                bottom:
-                                    style.messageListPadding.bottom +
-                                    GenesisSafeAreaInsets.bottom(context),
-                              ),
-                              itemCount: _messages.length,
-                              itemBuilder: (context, index) => SizedBox(
-                                key: _messageKeys[_messages[index].localId],
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: ExcludeFocus(
-                                        excluding: !_inputEnabled,
-                                        child: AbsorbPointer(
-                                          absorbing: !_inputEnabled,
-                                          child: ChatMessageRow(
-                                            key: ValueKey(
-                                              'location-chat-edit-row-${_messages[index].localId}',
-                                            ),
-                                            message: _messages[index],
-                                            showDateDivider: false,
-                                            style: style,
-                                            selfMessageBubbleMaxWidthCap: args
-                                                .selfMessageBubbleMaxWidthCap,
-                                            otherMessageBubbleMaxWidthCap: args
-                                                .otherMessageBubbleMaxWidthCap,
+                Expanded(
+                  child: ChatMentionScope(
+                    catalog: args.mentionCatalog ?? ChatMentionCatalog.empty,
+                    child: ChatMessageEditorScope(
+                      controllers: args.canEdit ? _controllers : const {},
+                      onEditorActivated: _activateEditor,
+                      onEditorDeactivated: (id) {
+                        if (_activeMessageId == id) _activeMessageId = null;
+                      },
+                      child: BackdropGroup(
+                        child: SizedBox(
+                          key: _viewportKey,
+                          child: ListView.builder(
+                            controller: _scrollCoordinator.controller,
+                            key: const ValueKey('location-chat-edit-messages'),
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            padding: style.messageListPadding.copyWith(
+                              bottom:
+                                  style.messageListPadding.bottom +
+                                  GenesisSafeAreaInsets.bottom(context),
+                            ),
+                            itemCount: _messages.length,
+                            itemBuilder: (context, index) => SizedBox(
+                              key: _messageKeys[_messages[index].localId],
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: ExcludeFocus(
+                                      excluding: !_inputEnabled,
+                                      child: AbsorbPointer(
+                                        absorbing: !_inputEnabled,
+                                        child: ChatMessageRow(
+                                          key: ValueKey(
+                                            'location-chat-edit-row-${_messages[index].localId}',
                                           ),
+                                          message: _messages[index],
+                                          showDateDivider: false,
+                                          style: style,
+                                          selfMessageBubbleMaxWidthCap:
+                                              args.selfMessageBubbleMaxWidthCap,
+                                          otherMessageBubbleMaxWidthCap: args
+                                              .otherMessageBubbleMaxWidthCap,
                                         ),
                                       ),
                                     ),
-                                    Positioned(
-                                      right: _messages[index].isImage ? 4 : 0,
-                                      top: _messages[index].isImage ? 12 : 0,
-                                      child: GenesisDeleteButton(
-                                        enabled: _canDelete,
-                                        buttonKey: ValueKey(
-                                          'location-chat-edit-delete-${_messages[index].localId}',
-                                        ),
-                                        decorationKey: ValueKey(
-                                          'location-chat-edit-delete-decoration-${_messages[index].localId}',
-                                        ),
-                                        onPressed: () => _deleteMessage(
-                                          _messages[index].localId,
-                                        ),
+                                  ),
+                                  Positioned(
+                                    right: _messages[index].isImage ? 4 : 0,
+                                    top: _messages[index].isImage ? 12 : 0,
+                                    child: GenesisDeleteButton(
+                                      enabled: _canDelete,
+                                      buttonKey: ValueKey(
+                                        'location-chat-edit-delete-${_messages[index].localId}',
+                                      ),
+                                      decorationKey: ValueKey(
+                                        'location-chat-edit-delete-decoration-${_messages[index].localId}',
+                                      ),
+                                      onPressed: () => _deleteMessage(
+                                        _messages[index].localId,
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -521,10 +513,10 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

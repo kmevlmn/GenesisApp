@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_catalog_cache.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/app/membership/membership_catalog.dart';
 import 'package:genesis_flutter_android/app/membership/membership_purchase_service.dart';
 import 'package:genesis_flutter_android/components/gems/pro_subscription_content.dart';
@@ -253,43 +254,46 @@ void main() {
     },
   );
 
-  testWidgets('selected API product supplies the heading and benefit rows', (
-    tester,
-  ) async {
-    final products = MembershipProductList.fromJson({
-      'list': [
-        for (final yearly in [true, false])
-          membershipProduct(
-            yearly: yearly,
-            title: yearly ? 'Annual VIP' : 'Monthly VIP',
-            benefits: [
-              MembershipBenefit(
-                code: 'same_code_in_each_plan',
-                title: yearly ? 'Annual benefit' : 'Monthly benefit',
-                iconKey: 'blue_gem',
-                displayType: MembershipBenefitDisplay.included,
-              ),
-            ],
-          ).toJson(),
-      ],
-    });
-    final catalog = MembershipCatalog(
-      provider: MembershipProvider.google,
-      loadProducts: (_) async => products,
-    );
-    await tester.pumpWidget(page(catalog.load));
-    await tester.pumpAndSettle();
-    expect(find.text('Annual VIP'), findsOneWidget);
-    expect(find.text('Annual benefit'), findsOneWidget);
-    expect(find.text('Pro'), findsNothing);
-    expect(find.text('Monthly VIP'), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('pro-plan-monthly')));
-    await tester.pumpAndSettle();
-    expect(find.text('Monthly VIP'), findsOneWidget);
-    expect(find.text('Monthly benefit'), findsOneWidget);
-    expect(find.text('Annual VIP'), findsNothing);
-    expect(find.text('Annual benefit'), findsNothing);
-  });
+  testWidgets(
+    'Premium heading stays fixed while selected API benefits change',
+    (tester) async {
+      final products = MembershipProductList.fromJson({
+        'list': [
+          for (final yearly in [true, false])
+            membershipProduct(
+              yearly: yearly,
+              title: yearly ? 'Annual VIP' : 'Monthly VIP',
+              benefits: [
+                MembershipBenefit(
+                  code: 'same_code_in_each_plan',
+                  title: yearly ? 'Annual benefit' : 'Monthly benefit',
+                  iconKey: 'blue_gem',
+                  displayType: MembershipBenefitDisplay.included,
+                ),
+              ],
+            ).toJson(),
+        ],
+      });
+      final catalog = MembershipCatalog(
+        provider: MembershipProvider.google,
+        loadProducts: (_) async => products,
+      );
+      await tester.pumpWidget(page(catalog.load));
+      await tester.pumpAndSettle();
+      expect(find.text('Premium'), findsOneWidget);
+      expect(find.text('Annual VIP'), findsNothing);
+      expect(find.text('Annual benefit'), findsOneWidget);
+      expect(find.text('Pro'), findsNothing);
+      expect(find.text('Monthly VIP'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('pro-plan-monthly')));
+      await tester.pumpAndSettle();
+      expect(find.text('Premium'), findsOneWidget);
+      expect(find.text('Monthly VIP'), findsNothing);
+      expect(find.text('Monthly benefit'), findsOneWidget);
+      expect(find.text('Annual VIP'), findsNothing);
+      expect(find.text('Annual benefit'), findsNothing);
+    },
+  );
 
   testWidgets('a single unpriced monthly product supplies its own display', (
     tester,
@@ -306,7 +310,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Monthly VIP'), findsOneWidget);
+    expect(find.text('Premium'), findsOneWidget);
+    expect(find.text('Monthly VIP'), findsNothing);
     expect(find.text('Monthly bonus Gems'), findsOneWidget);
     expect(find.text('Pro'), findsNothing);
     expect(find.text('Monthly: '), findsOneWidget);
@@ -353,7 +358,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Subscripting'), findsOneWidget);
+      expect(find.text('Subscribed'), findsOneWidget);
       expect(
         tester.widget<FilledButton>(filledButton).style,
         originalButtonStyle,
@@ -372,7 +377,7 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
       await tester.tap(find.byKey(const ValueKey('pro-plan-monthly')));
       await tester.pumpAndSettle();
-      expect(find.text('Subscripting'), findsNothing);
+      expect(find.text('Subscribed'), findsNothing);
       expect(await pixels(tester), originalMonthlyPixels);
       await tester.tap(find.byKey(buttonKey));
       await tester.pump(const Duration(milliseconds: 300));
@@ -519,7 +524,7 @@ void main() {
     );
     expect(
       tester.widget<Text>(find.text('Server locked')).style?.color,
-      const Color(0xFF999999),
+      GenesisColors.darkTextTertiary,
     );
     await tester.tap(find.byKey(const ValueKey('pro-plan-monthly')));
     await tester.pumpAndSettle();

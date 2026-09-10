@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../components/common/genesis_center_toast.dart';
-import '../../components/gems/gem_colors.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../components/page_header.dart';
 import '../../network/models/gem_records.dart';
 import '../../utils/gem_amount.dart';
@@ -176,31 +177,28 @@ class _GemRecordsPageState extends State<GemRecordsPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: const GenesisBackAppBar(
-        pageName: 'Gem Records',
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _GemRecordTabs(
-              controller: _tabController,
-              labels: _tabs.map((tab) => tab.label).toList(growable: false),
-              onSelected: _selectTab,
-            ),
-            Expanded(
-              child: TabBarView(
+    return GenesisDarkTheme(
+      child: Scaffold(
+        backgroundColor: GenesisColors.darkBackground,
+        appBar: const GenesisBackAppBar(pageName: 'Gem Records'),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _GemRecordTabs(
                 controller: _tabController,
-                children: [
-                  for (var i = 0; i < _tabs.length; i += 1) _buildBody(i),
-                ],
+                labels: _tabs.map((tab) => tab.label).toList(growable: false),
+                onSelected: _selectTab,
               ),
-            ),
-          ],
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    for (var i = 0; i < _tabs.length; i += 1) _buildBody(i),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -218,7 +216,6 @@ class _GemRecordsPageState extends State<GemRecordsPage>
     }
     if (state.records.isEmpty) {
       return GenesisRefreshIndicator(
-        color: kGemAccentColor,
         onRefresh: () => _loadFirstPage(index: index, refreshing: true),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -227,12 +224,11 @@ class _GemRecordsPageState extends State<GemRecordsPage>
       );
     }
     return GenesisRefreshIndicator(
-      color: kGemAccentColor,
       onRefresh: () => _loadFirstPage(index: index, refreshing: true),
       child: ListView.separated(
         controller: state.scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         itemCount: state.records.length + (state.isLoadingMore ? 1 : 0),
         separatorBuilder: (_, __) => const SizedBox.shrink(),
         itemBuilder: (context, itemIndex) {
@@ -294,8 +290,9 @@ class _GemRecordTabs extends StatelessWidget {
         height: 20 / 14,
         fontWeight: FontWeight.w400,
       ),
-      labelColor: const Color(0xFF333333),
-      unselectedLabelColor: const Color(0xFF999999),
+      labelColor: GenesisColors.darkTextPrimary,
+      unselectedLabelColor: GenesisColors.darkTextSecondary,
+      indicatorColor: GenesisColors.redPrimary,
       verticalPadding: 0,
       expanded: true,
       onTap: onSelected,
@@ -333,7 +330,7 @@ class _GemRecordTile extends StatelessWidget {
                     fontSize: 14,
                     height: 17 / 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF111111),
+                    color: GenesisColors.darkTextPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -355,7 +352,9 @@ class _GemRecordTile extends StatelessWidget {
               fontSize: 14,
               height: 20 / 14,
               fontWeight: FontWeight.w600,
-              color: isIncome ? kGemAccentColor : const Color(0xFF111111),
+              color: isIncome
+                  ? GenesisColors.redSecondary
+                  : GenesisColors.darkTextPrimary,
             ),
           ),
         ],
@@ -371,7 +370,7 @@ class _GemRecordDetailLine extends StatelessWidget {
     fontSize: 12,
     height: 14 / 12,
     fontWeight: FontWeight.w400,
-    color: Color(0xFF999999),
+    color: GenesisColors.darkTextTertiary,
   );
 
   final String text;
@@ -424,10 +423,7 @@ class _GemRecordsLoading extends StatelessWidget {
       child: SizedBox(
         width: 24,
         height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.5,
-          color: kGemAccentColor,
-        ),
+        child: GenesisLoadingIndicator(strokeWidth: 2.5),
       ),
     );
   }
@@ -444,10 +440,7 @@ class _GemRecordsMoreLoading extends StatelessWidget {
         child: SizedBox(
           width: 18,
           height: 18,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: kGemAccentColor,
-          ),
+          child: GenesisLoadingIndicator(strokeWidth: 2),
         ),
       ),
     );
@@ -466,7 +459,7 @@ class _GemRecordsEmpty extends StatelessWidget {
           fontSize: 12,
           height: 18 / 12,
           fontWeight: FontWeight.w400,
-          color: Color(0xFF999999),
+          color: GenesisColors.darkTextTertiary,
         ),
       ),
     );
@@ -499,11 +492,17 @@ class _GemRecordsMessage extends StatelessWidget {
                 fontSize: 14,
                 height: 20 / 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF333333),
+                color: GenesisColors.darkTextTertiary,
               ),
             ),
             const SizedBox(height: 12),
-            FilledButton(onPressed: onAction, child: Text(actionLabel)),
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(
+                foregroundColor: GenesisColors.darkTextSecondary,
+              ),
+              child: Text(actionLabel),
+            ),
           ],
         ),
       ),

@@ -221,7 +221,7 @@ class _DiscussPageState extends State<DiscussPage> {
                                 child: Center(
                                   child: SizedBox.square(
                                     dimension: 18,
-                                    child: CircularProgressIndicator(
+                                    child: GenesisLoadingIndicator(
                                       strokeWidth: 2,
                                     ),
                                   ),

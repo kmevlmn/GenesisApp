@@ -52,9 +52,9 @@ void main() {
         .widgetList<GenesisCharacterAvatar>(find.byType(GenesisCharacterAvatar))
         .toList(growable: false);
     expect(avatars, hasLength(2));
-    expect(avatars[0].showStar, isFalse);
+
     expect(avatars[0].border, isNull);
-    expect(avatars[1].showStar, isFalse);
+
     final playerBorder = avatars[1].border! as Border;
     expect(playerBorder.top.color, const Color(0xFFFF2442));
     expect(playerBorder.top.width, 2);

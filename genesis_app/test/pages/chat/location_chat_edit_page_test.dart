@@ -89,6 +89,23 @@ Future<void> openEditor(
 }
 
 void main() {
+  testWidgets('ordinary narrator bubble has no editor outline', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatNarratorMessageBubble(
+            message: message('normal', type: 'narrator'),
+            style: kLocationChatStyle,
+          ),
+        ),
+      ),
+    );
+    final bubble = tester.widget<Container>(
+      find.byKey(const ValueKey('chat-system-message-bubble')),
+    );
+    expect((bubble.decoration! as BoxDecoration).border, isNull);
+  });
+
   test(
     'latest round selection keeps AI replies and narrator but excludes users',
     () {
@@ -281,7 +298,7 @@ void main() {
       );
       expect(
         find.byKey(const ValueKey('location-chat-background-overlay')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         tester.getSize(find.byType(ChatHeader)).height,
@@ -310,12 +327,48 @@ void main() {
         (replyBubble.decoration! as BoxDecoration).color,
         kLocationChatStyle.otherBubbleColor,
       );
+      final save = find.byKey(const ValueKey('location-chat-edit-done'));
+      expect(tester.getSize(save), const Size(64, 32));
+      final saveButton = tester.widget<FilledButton>(
+        find.descendant(of: save, matching: find.byType(FilledButton)),
+      );
+      expect(saveButton.style?.textStyle?.resolve({})?.fontSize, 14);
+      expect(
+        saveButton.style?.textStyle?.resolve({})?.fontWeight,
+        FontWeight.w600,
+      );
+      expect(
+        saveButton.style?.backgroundColor?.resolve({WidgetState.disabled}),
+        GenesisColors.darkButtonDisabledBackground,
+      );
+      expect(
+        saveButton.style?.foregroundColor?.resolve({WidgetState.disabled}),
+        GenesisColors.darkButtonDisabledForeground,
+      );
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold).last).backgroundColor,
+        GenesisColors.darkBackground,
+      );
+      expect(
+        tester.getSize(find.byType(Scaffold).last).width -
+            tester.getTopRight(save).dx,
+        16,
+      );
       final narratorBubble = tester.widget<Container>(
         find.byKey(const ValueKey('chat-system-message-bubble')),
       );
       expect(
         (narratorBubble.decoration! as BoxDecoration).color,
         chatNarratorMessageBackgroundColor(kLocationChatStyle),
+      );
+      expect(
+        (narratorBubble.decoration! as BoxDecoration).border,
+        chatNarratorEditorBorder,
+      );
+      expect(chatNarratorEditorBorder.top.width, 1);
+      expect(
+        chatNarratorEditorBorder.top.color,
+        GenesisColors.darkFaintFill.withValues(alpha: 0.06),
       );
 
       await tester.enterText(

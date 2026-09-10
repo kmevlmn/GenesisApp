@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/network/models/gem_records.dart';
 import 'package:genesis_flutter_android/pages/gems/gem_records_page.dart';
 
@@ -115,7 +116,7 @@ void main() {
       closeTo(85, 0.1),
     );
     final messageWorldId = tester.widget<Text>(find.text('w_moonlit'));
-    expect(messageWorldId.style?.color, const Color(0xFF999999));
+    expect(messageWorldId.style?.color, GenesisColors.darkTextTertiary);
     expect(find.text('Daily task'), findsNothing);
     expect(find.text('Moonlit Market'), findsNothing);
     expect(find.text('ID: order-1'), findsNothing);

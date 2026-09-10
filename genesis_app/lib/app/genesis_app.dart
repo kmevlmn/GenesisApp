@@ -29,7 +29,7 @@ class GenesisApp extends StatelessWidget {
         child: MaterialApp(
           title: 'Worldo',
           debugShowCheckedModeBanner: false,
-          theme: GenesisTheme.light(),
+          theme: GenesisTheme.dark(),
           scrollBehavior: const GenesisScrollBehavior(),
           initialRoute: RouteNames.home,
           navigatorKey: genesisNavigatorKey,
@@ -57,9 +57,9 @@ class GenesisApp extends StatelessWidget {
             // Root overlays and builder decorations sit outside page Material
             // widgets, so they also need the application's default font.
             return DefaultTextStyle(
-              style: GenesisTypography.body,
+              style: Theme.of(context).textTheme.bodyMedium!,
               child: AnnotatedRegion<SystemUiOverlayStyle>(
-                value: kGenesisDefaultSystemUiOverlayStyle,
+                value: kGenesisLightStatusIconsSystemUiOverlayStyle,
                 child: GenesisTelemetryTapRegion(
                   child: GenesisBottomSystemBarBoundary(
                     child: InternalBuildIndicator(

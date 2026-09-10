@@ -11,6 +11,7 @@ class ChatSystemMessage extends StatelessWidget {
     this.textAlign = TextAlign.center,
     this.leadingIconAsset,
     this.backgroundColor,
+    this.border,
     this.textStyle,
     this.leadingIconColor,
     this.softItalic = false,
@@ -28,6 +29,7 @@ class ChatSystemMessage extends StatelessWidget {
   final TextAlign textAlign;
   final String? leadingIconAsset;
   final Color? backgroundColor;
+  final BoxBorder? border;
   final TextStyle? textStyle;
   final Color? leadingIconColor;
   final bool softItalic;
@@ -60,6 +62,7 @@ class ChatSystemMessage extends StatelessWidget {
                 padding: style.systemMessagePadding,
                 decoration: BoxDecoration(
                   color: backgroundColor ?? style.systemMessageBackgroundColor,
+                  border: border,
                   borderRadius: BorderRadius.circular(
                     style.systemMessageBorderRadius,
                   ),

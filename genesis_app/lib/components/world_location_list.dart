@@ -863,32 +863,16 @@ class _PointCharacterGroups extends StatelessWidget {
     final namedUsers = users
         .where((user) => _characterName(user).isNotEmpty)
         .toList(growable: false);
-    final aiUsers = <UserAvatar>[
-      ...namedUsers.where((user) => user.showStar && !user.isNew),
-      ...namedUsers.where((user) => user.showStar && user.isNew),
+    final sortedUsers = <UserAvatar>[
+      ...namedUsers.where((user) => !user.isNew),
+      ...namedUsers.where((user) => user.isNew),
     ];
-    final nonAiUsers = <UserAvatar>[
-      ...namedUsers.where((user) => !user.showStar && !user.isNew),
-      ...namedUsers.where((user) => !user.showStar && user.isNew),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (aiUsers.isNotEmpty)
-          _PointCharacterGroupRow(
+    return sortedUsers.isEmpty
+        ? const SizedBox.shrink()
+        : _PointCharacterGroupRow(
             iconAsset: characterStatIconAsset,
-            users: aiUsers,
-          ),
-        if (aiUsers.isNotEmpty && nonAiUsers.isNotEmpty)
-          const SizedBox(height: 2),
-        if (nonAiUsers.isNotEmpty)
-          _PointCharacterGroupRow(
-            iconAsset: characterStatIconAsset,
-            users: nonAiUsers,
-          ),
-      ],
-    );
+            users: sortedUsers,
+          );
   }
 
   String _characterName(UserAvatar user) {

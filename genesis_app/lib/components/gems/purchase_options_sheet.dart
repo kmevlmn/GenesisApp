@@ -6,6 +6,7 @@ import '../common/genesis_modal_routes.dart';
 import '../page_header.dart';
 import 'pro_subscription_content.dart';
 import 'wallet_purchase_tabs.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 
 enum PurchaseSheetTab { subscription, buyGems }
 
@@ -68,54 +69,56 @@ class _PurchaseOptionsSheetState extends State<PurchaseOptionsSheet>
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) => GenesisBottomSheetPanel(
-        title: '',
-        height: constraints.maxHeight,
-        // Retain the existing close center (32px) and body start (64px).
-        padding: const EdgeInsets.fromLTRB(0, 7, 0, 10),
-        titleBottomSpacing: 7,
-        titleWidget: SizedBox(
-          height: kGenesisTopBarHeight,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 56),
-                child: Center(child: WalletPurchaseTabs(controller: _tabs)),
-              ),
-              Positioned(
-                right: 20,
-                child: GenesisBottomSheetCloseButton(
-                  buttonKey: const ValueKey('gem-purchase-sheet-close'),
-                  onPressed: () => Navigator.of(context).pop(),
+    return GenesisDarkTheme(
+      child: LayoutBuilder(
+        builder: (context, constraints) => GenesisBottomSheetPanel(
+          title: '',
+          height: constraints.maxHeight,
+          // Retain the existing close center (32px) and body start (64px).
+          padding: const EdgeInsets.fromLTRB(0, 7, 0, 10),
+          titleBottomSpacing: 7,
+          titleWidget: SizedBox(
+            height: kGenesisTopBarHeight,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 56),
+                  child: Center(child: WalletPurchaseTabs(controller: _tabs)),
                 ),
+                Positioned(
+                  right: 20,
+                  child: GenesisBottomSheetCloseButton(
+                    buttonKey: const ValueKey('gem-purchase-sheet-close'),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          child: TabBarView(
+            key: const ValueKey('purchase-sheet-pages'),
+            controller: _tabs,
+            children: [
+              _PurchaseSheetPage(
+                child: _subscriptionVisited
+                    ? ProSubscriptionContent(
+                        productsLoader: widget.membershipProductsLoader,
+                        closeOnPurchaseSuccess: true,
+                      )
+                    : const SizedBox.expand(),
               ),
+              if (widget.showBuyGems)
+                _PurchaseSheetPage(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _gemsVisited
+                        ? Builder(builder: widget.gemsBuilder)
+                        : const SizedBox.expand(),
+                  ),
+                ),
             ],
           ),
-        ),
-        child: TabBarView(
-          key: const ValueKey('purchase-sheet-pages'),
-          controller: _tabs,
-          children: [
-            _PurchaseSheetPage(
-              child: _subscriptionVisited
-                  ? ProSubscriptionContent(
-                      productsLoader: widget.membershipProductsLoader,
-                      closeOnPurchaseSuccess: true,
-                    )
-                  : const SizedBox.expand(),
-            ),
-            if (widget.showBuyGems)
-              _PurchaseSheetPage(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _gemsVisited
-                      ? Builder(builder: widget.gemsBuilder)
-                      : const SizedBox.expand(),
-                ),
-              ),
-          ],
         ),
       ),
     );

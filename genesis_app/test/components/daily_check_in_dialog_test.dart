@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/components/gems/daily_check_in_dialog.dart';
 import 'package:genesis_flutter_android/components/gems/pro_subscription_content.dart';
 import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
@@ -34,6 +35,10 @@ void main() {
       expect(find.text('Daily Check-in'), findsOneWidget);
       expect(find.text('+50'), findsOneWidget);
       expect(
+        tester.widget<Text>(find.text('+50')).style?.color,
+        GenesisColors.darkTextSecondary,
+      );
+      expect(
         find.byKey(const ValueKey<String>('gem-task-reward-icon')),
         findsOneWidget,
       );
@@ -46,11 +51,11 @@ void main() {
       );
       expect(
         tester.widget<Text>(find.text('Get 100')).style?.color,
-        const Color(0xFFFF2442),
+        GenesisColors.redSecondary,
       );
       expect(
         tester.widget<Text>(find.text('Check in')).style?.color,
-        const Color(0xFF111111),
+        GenesisColors.darkTextPrimary,
       );
       expect(
         tester.getCenter(find.text('Get 100')).dy,
@@ -68,6 +73,10 @@ void main() {
 
       expect(find.text('Check in successful!'), findsOneWidget);
       expect(find.text('+50'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.text('+50')).style?.color,
+        GenesisColors.darkTextSecondary,
+      );
 
       await tester.pump(const Duration(milliseconds: 2999));
       expect(find.text('Check in successful!'), findsOneWidget);

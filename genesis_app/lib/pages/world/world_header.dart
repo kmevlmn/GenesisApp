@@ -429,7 +429,7 @@ class WorldInfoHeader extends StatelessWidget {
                             : null,
                         height: usesCompactProgressButton ? 34 : 35,
                         width: usesCompactProgressButton ? 92 : 140,
-                        backgroundColor: const Color(0xFFFF2442),
+                        backgroundColor: GenesisColors.redPrimary,
                         disabledBackgroundColor:
                             GenesisColors.darkButtonDisabledBackground,
                         disabledForegroundColor:

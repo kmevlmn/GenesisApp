@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
+
 import '../../components/discuss/discuss_dark_style.dart';
 import 'dart:math' as math;
 
@@ -219,7 +221,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
             if (item == null) {
               return widget.item == null
                   ? const Center(child: Text('Post unavailable'))
-                  : const Center(child: CircularProgressIndicator());
+                  : const Center(child: GenesisLoadingIndicator());
             }
 
             final bottomPadding =
@@ -353,7 +355,7 @@ class _PostDetailReplies extends StatelessWidget {
           const Center(
             child: SizedBox.square(
               dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: GenesisLoadingIndicator(strokeWidth: 2),
             ),
           )
         else
@@ -383,7 +385,7 @@ class _PostDetailReplies extends StatelessWidget {
                 child: controller.isReplyLoading(item.discussId)
                     ? const SizedBox.square(
                         dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: GenesisLoadingIndicator(strokeWidth: 2),
                       )
                     : Text(
                         'View all ${controller.replyButtonCount(item)} replies',

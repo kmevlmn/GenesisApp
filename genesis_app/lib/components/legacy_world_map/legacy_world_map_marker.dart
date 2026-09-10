@@ -18,21 +18,15 @@ import 'legacy_world_map_bubble.dart';
 @visibleForTesting
 Color? worldMapAvatarBorderColorForTesting({
   required bool isPlayerControlledRole,
-  bool showAiMarker = false,
 }) {
   return legacyWorldMapAvatarBorderColor(
     isPlayerControlledRole: isPlayerControlledRole,
-    showAiMarker: showAiMarker,
   );
 }
 
-Color? legacyWorldMapAvatarBorderColor({
-  required bool isPlayerControlledRole,
-  required bool showAiMarker,
-}) {
+Color? legacyWorldMapAvatarBorderColor({required bool isPlayerControlledRole}) {
   return worldMapAvatarBorderColor(
     isPlayerControlledRole: isPlayerControlledRole,
-    showAiMarker: showAiMarker,
   );
 }
 
@@ -737,7 +731,6 @@ class _PositionedMapAvatar extends StatelessWidget {
             key: ValueKey<String>('map-avatar-$stableId'),
             url: user.avatarUrl,
             name: (user.name ?? user.initials).trim(),
-            showStar: user.showStar,
             isPlayerControlledRole: user.isPlayerControlledRole,
           ),
         ],
@@ -849,13 +842,11 @@ class _MapAvatarImage extends StatelessWidget {
     super.key,
     required this.url,
     required this.name,
-    required this.showStar,
     required this.isPlayerControlledRole,
   });
 
   final String url;
   final String name;
-  final bool showStar;
   final bool isPlayerControlledRole;
 
   static const double _size = legacyWorldMapAvatarImageLogicalSize;
@@ -864,14 +855,12 @@ class _MapAvatarImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final borderColor = legacyWorldMapAvatarBorderColor(
       isPlayerControlledRole: isPlayerControlledRole,
-      showAiMarker: showStar,
     );
     return GenesisCharacterAvatar(
       url: url,
       name: name,
       size: _size,
       borderRadius: GenesisAvatarRadii.character,
-      showStar: showStar,
       showFallbackWhileLoading: false,
       showFallbackWhenUnavailable: true,
       boxShadow: [

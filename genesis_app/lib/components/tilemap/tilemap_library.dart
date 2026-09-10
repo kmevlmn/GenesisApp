@@ -2201,7 +2201,6 @@ class _TilemapState extends State<Tilemap> with WidgetsBindingObserver {
       avatar.initials,
       avatar.name,
       avatar.avatarUrl,
-      avatar.showStar,
       avatar.isPlayerControlledRole,
       avatar.isNew,
     );

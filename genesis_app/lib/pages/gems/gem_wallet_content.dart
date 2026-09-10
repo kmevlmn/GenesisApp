@@ -57,14 +57,17 @@ class _GemWalletContent extends StatelessWidget {
             return GemPurchaseCatalogSection(
               balanceCent: walletState.balanceCent ?? 0,
               catalog: products == null
-                  ? _GemSectionStatePanel(
-                      isLoading: productsLoading,
-                      hasError: productsError != null,
-                      errorMessage: 'Unable to load gem packs.',
-                      onRetry: onRetryProducts,
-                    )
+                  ? productsLoading || productsError == null
+                        ? const GemProductGridSkeleton()
+                        : GemPurchaseState(
+                            message: 'Unable to load gem packs.',
+                            onRetry: onRetryProducts,
+                          )
                   : products!.isEmpty
-                  ? const _GemEmptyPanel(message: 'No gem packs available.')
+                  ? const GemPurchaseState(
+                      message: 'No gem packs available.',
+                      height: 96,
+                    )
                   : GemProductGrid(
                       products: products!,
                       billingStateListenable: billingStateListenable,
@@ -127,7 +130,7 @@ class _TaskGroupSection extends StatelessWidget {
             fontSize: 16,
             height: 20 / 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF111111),
+            color: GenesisColors.darkTextPrimary,
           ),
         ),
         const SizedBox(height: 10),
@@ -180,9 +183,9 @@ class _JoinUsTaskRow extends StatelessWidget {
         child: Row(
           children: [
             SvgPicture.asset(
-              'assets/custom-icons/svg/discord-svgrepo-com.svg',
-              width: 22,
-              height: 22,
+              'assets/custom-icons/svg/discord-clyde-white.svg',
+              width: 14,
+              height: 14,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -194,7 +197,7 @@ class _JoinUsTaskRow extends StatelessWidget {
                   fontSize: 14,
                   height: 16 / 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF111111),
+                  color: GenesisColors.darkTextPrimary,
                 ),
               ),
             ),
@@ -212,7 +215,7 @@ class _JoinUsTaskRow extends StatelessWidget {
                       fontSize: 14,
                       height: 16 / 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF111111),
+                      color: GenesisColors.darkTextPrimary,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -265,9 +268,9 @@ class _TaskRow extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 62),
       padding: const EdgeInsets.fromLTRB(12, 11, 10, 11),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: GenesisColors.darkCardBackground,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFEBEBEB)),
+        border: Border.all(color: GenesisColors.darkCardBorder),
       ),
       child: Row(
         children: [
@@ -284,7 +287,7 @@ class _TaskRow extends StatelessWidget {
                     fontSize: 14,
                     height: 16 / 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF111111),
+                    color: GenesisColors.darkTextPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -294,7 +297,7 @@ class _TaskRow extends StatelessWidget {
                     fontSize: 12,
                     height: 14 / 12,
                     fontWeight: FontWeight.w400,
-                    color: Color(0xFF888888),
+                    color: GenesisColors.darkTextTertiary,
                   ),
                 ),
               ],
@@ -316,7 +319,7 @@ class _TaskRow extends StatelessWidget {
                         fontSize: 14,
                         height: 16 / 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF111111),
+                        color: GenesisColors.darkTextPrimary,
                       ),
                     ),
                     const SizedBox(width: 2),

@@ -39,9 +39,9 @@ void main() {
     final playerAvatar = avatarFor('player');
     expect(aiAvatar.size, 36);
     expect(playerAvatar.size, 36);
-    expect(aiAvatar.showStar, isFalse);
+
     expect(aiAvatar.border, isNull);
-    expect(playerAvatar.showStar, isFalse);
+
     final playerBorder = playerAvatar.border! as Border;
     expect(playerBorder.top.color, const Color(0xFFFF2442));
     expect(playerBorder.top.width, 2);

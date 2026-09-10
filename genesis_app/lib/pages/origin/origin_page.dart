@@ -1369,10 +1369,7 @@ class _OriginFeedState extends State<_OriginFeed>
                           child: Center(
                             child: SizedBox.square(
                               dimension: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: GenesisColors.darkTextSecondary,
-                              ),
+                              child: GenesisLoadingIndicator(strokeWidth: 2),
                             ),
                           ),
                         ),

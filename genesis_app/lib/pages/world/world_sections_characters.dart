@@ -188,7 +188,6 @@ class WorldCharacterRow extends StatelessWidget {
         GenesisCharacterAvatar(
           url: avatarUrl,
           name: name,
-          showStar: false,
           border: isCharacterRole
               ? null
               : Border.all(

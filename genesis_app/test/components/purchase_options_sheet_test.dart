@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
+import 'package:genesis_flutter_android/ui/components/genesis_dark_close_button.dart';
 import 'package:genesis_flutter_android/components/gems/gem_purchase_bottom_sheet.dart';
 import 'package:genesis_flutter_android/app/gems/gem_wallet_store.dart';
 import 'package:genesis_flutter_android/network/models/gem_wallet.dart';
@@ -199,6 +201,23 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(WalletPurchaseTabs), findsOneWidget);
+    expect(
+      Theme.of(tester.element(find.byType(WalletPurchaseTabs))).brightness,
+      Brightness.dark,
+    );
+    expect(find.byType(GenesisDarkCloseButton), findsOneWidget);
+    final panel = tester.widget<Container>(
+      find.byKey(const ValueKey('pro-benefits-card')),
+    );
+    expect(
+      (panel.decoration as BoxDecoration).color,
+      GenesisColors.darkCardBackground,
+    );
+    expect(
+      tester.widget<Text>(find.text('Subscription')).style?.color,
+      GenesisColors.darkTextPrimary,
+    );
+
     expect(find.byType(ProSubscriptionContent), findsOneWidget);
     expect(gemsBuilds, 0);
     final subscription = tester.getRect(

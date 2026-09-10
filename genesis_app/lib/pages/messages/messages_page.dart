@@ -13,6 +13,7 @@ import '../../network/api_client.dart';
 import '../../network/direct_message_conversation_store.dart';
 import '../../network/models/unread_summary.dart';
 import '../../routers/app_router.dart';
+import '../../ui/navigation/genesis_dark_page_route.dart';
 import '../../ui/components/genesis_avatar.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/components/genesis_unread_badge.dart';
@@ -385,7 +386,7 @@ class _MessageMenuButton extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
+          GenesisDarkPageRoute<void>(
             settings: RouteSettings(name: routeName),
             builder: (_) => MessageCategoryListPage(
               title: label,

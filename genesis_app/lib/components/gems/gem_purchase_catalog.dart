@@ -9,6 +9,8 @@ import '../../ui/tokens/genesis_typography.dart';
 import 'gem_assets.dart';
 import 'gem_balance_text.dart';
 import 'gem_colors.dart';
+import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/components/genesis_primary_button.dart';
 
 const double kGemProductCardHeight = 140;
 const double kGemPriceButtonHeight = 24;
@@ -74,7 +76,7 @@ class GemBalancePanel extends StatelessWidget {
                     fontSize: 14,
                     height: 18 / 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF666666),
+                    color: GenesisColors.darkTextSecondary,
                   ),
                 ),
               ],
@@ -87,7 +89,7 @@ class GemBalancePanel extends StatelessWidget {
                 fontSize: 30,
                 height: 40 / 30,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF333333),
+                color: GenesisColors.darkTextPrimary,
                 letterSpacing: 0,
               ),
             ),
@@ -179,7 +181,7 @@ class GemProductCard extends StatelessWidget {
       textDirection: TextDirection.ltr,
     )..layout();
     final tagWidth = (tagPainter.width + 8).clamp(46.0, 86.0).toDouble();
-    final enabled = product.canPurchase && !isPurchaseInProgress;
+    final enabled = product.canPurchase && !isPurchaseInProgress && !isBuying;
     return Semantics(
       button: true,
       enabled: enabled,
@@ -197,9 +199,9 @@ class GemProductCard extends StatelessWidget {
             child: Container(
               clipBehavior: Clip.none,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: GenesisColors.darkCardBackground,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFEBEBEB)),
+                border: Border.all(color: GenesisColors.darkCardBorder),
               ),
               child: Stack(
                 clipBehavior: Clip.none,
@@ -253,7 +255,7 @@ class GemProductCard extends StatelessWidget {
                           fontSize: 14,
                           height: 20 / 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF111111),
+                          color: GenesisColors.darkTextPrimary,
                         ),
                       ),
                     ),
@@ -273,9 +275,9 @@ class GemProductCard extends StatelessWidget {
                             fontSize: 12,
                             height: 14 / 12,
                             fontWeight: FontWeight.w400,
-                            color: Color(0xFF888888),
+                            color: GenesisColors.darkTextTertiary,
                             decoration: TextDecoration.lineThrough,
-                            decorationColor: Color(0xFF888888),
+                            decorationColor: GenesisColors.darkTextTertiary,
                           ),
                         ),
                       ),
@@ -285,49 +287,41 @@ class GemProductCard extends StatelessWidget {
                     right: 10,
                     bottom: 10,
                     height: kGemPriceButtonHeight,
-                    child: Container(
+                    child: GenesisPrimaryButton(
                       key: ValueKey<String>(
                         'gem-product-price-${product.productId}',
                       ),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: isSoldOut ? Colors.transparent : Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isSoldOut
-                              ? kGemSoldOutBorderColor
-                              : kGemAccentColor,
-                        ),
-                      ),
-                      child: isBuying && !isSoldOut
-                          ? const SizedBox(
-                              width: 13,
-                              height: 13,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 1.8,
-                                color: kGemAccentColor,
-                              ),
-                            )
-                          : FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                isSoldOut
-                                    ? 'Sold Out'
-                                    : formatGemPrice(
-                                        product.priceAmount,
-                                        product.priceCurrencyCode,
-                                      ),
-                                maxLines: 1,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  height: 16 / 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: isSoldOut
-                                      ? kGemSoldOutForegroundColor
-                                      : kGemAccentColor,
-                                ),
-                              ),
+                      label: isSoldOut
+                          ? 'Sold Out'
+                          : formatGemPrice(
+                              product.priceAmount,
+                              product.priceCurrencyCode,
                             ),
+                      onPressed: enabled ? onPurchase : null,
+                      height: kGemPriceButtonHeight,
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      borderRadius: BorderRadius.circular(14),
+                      backgroundColor: GenesisColors.redPrimary,
+                      foregroundColor: GenesisColors.darkTextPrimary,
+                      // Loading only blocks duplicate purchases; keep its color.
+                      disabledBackgroundColor: isSoldOut
+                          ? Colors.transparent
+                          : GenesisColors.redPrimary,
+                      disabledForegroundColor: isSoldOut
+                          ? kGemSoldOutForegroundColor
+                          : GenesisColors.darkTextPrimary,
+                      side: BorderSide(
+                        color: isSoldOut
+                            ? kGemSoldOutBorderColor
+                            : GenesisColors.redPrimary,
+                      ),
+                      isLoading: isBuying && !isSoldOut,
+                      loadingSize: 13,
+                      loadingStrokeWidth: 1.8,
                     ),
                   ),
                 ],

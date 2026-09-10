@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../../ui/tokens/genesis_blur.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/bootstrap/service_registry.dart';
 import '../../app/config/genesis_image_config.dart';
