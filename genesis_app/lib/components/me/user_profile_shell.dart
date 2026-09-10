@@ -781,8 +781,9 @@ class _GemsBalanceEntry extends StatelessWidget {
 
 /// One labelled figure in the gems entry — icon, caption, amount.
 class _GemBalance extends StatelessWidget {
-  /// 9k specifies 15; the page's own scale puts the follow counts at 16.
-  static const double _figureSize = 16;
+  /// 9k specifies 15; the wallet figure is pitched one step above the
+  /// page's 16 so the balance reads first inside the card.
+  static const double _figureSize = 18;
 
   const _GemBalance({
     required this.iconAsset,
@@ -840,7 +841,7 @@ class _GemBalance extends StatelessWidget {
                   fontSize: _figureSize,
                   height: 1,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.16,
+                  letterSpacing: -0.18,
                   fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),

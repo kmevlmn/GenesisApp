@@ -85,12 +85,12 @@ void main() {
     final figure = tester.widget<Text>(
       find.byKey(const ValueKey('user-profile-gems-balance')),
     );
-    expect(figure.style?.fontSize, 16);
+    expect(figure.style?.fontSize, 18);
     expect(figure.style?.fontWeight, FontWeight.w800);
     expect(figure.textSpan!.toPlainText(), '3,072.2');
     // The decimal is set smaller than the integer part.
     final parts = (figure.textSpan! as TextSpan).children!.cast<TextSpan>();
-    expect(parts.last.style!.fontSize, lessThan(16));
+    expect(parts.last.style!.fontSize, lessThan(18));
   });
 
   testWidgets('9k membership card offers the plan at 82 high', (tester) async {
