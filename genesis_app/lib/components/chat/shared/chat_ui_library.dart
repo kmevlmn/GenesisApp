@@ -132,17 +132,40 @@ final ChatUiStyleConfig kChatWhiteHeaderStyle = ChatUiStyleConfig.standard
     .copyWith(headerBackgroundColor: Colors.white);
 
 final ChatUiStyleConfig kPrivateChatStyle = ChatUiStyleConfig.standard.copyWith(
-  headerBackgroundColor: Colors.white,
+  conversationBackgroundColor: GenesisColors.darkBackground,
+  headerBackgroundColor: GenesisColors.darkBackground,
+  headerTitleTextStyle: GenesisTypography.pageTitle.copyWith(
+    color: GenesisColors.darkTextPrimary,
+  ),
   clearHeaderBackgroundGradient: true,
   headerBackdropBlurSigma: 0,
-  composerBackgroundColor: const Color(0xF2F6F6F6),
+  composerBackgroundColor: GenesisColors.darkBackground,
   clearComposerBackgroundGradient: true,
-  composerBackdropBlurSigma: GenesisBlur.strong,
-  composerSendButtonColor: const Color(0xFF338960),
-  composerSendButtonDisabledColor: const Color(0xFFBFD8CD),
-  senderNameTextStyle: ChatUiStyleConfig.standard.senderNameTextStyle.copyWith(
-    color: const Color(0xFF111111),
+  composerBackdropBlurSigma: 0,
+  composerSendButtonColor: GenesisColors.redPrimary,
+  composerSendButtonDisabledColor: GenesisColors.darkFaintFill,
+  composerSendButtonIconColor: GenesisColors.darkTextPrimary,
+  inputBackgroundColor: GenesisColors.darkFaintFill,
+  inputHintStyle: const TextStyle(color: GenesisColors.darkInputPlaceholder),
+  inputTextStyle: ChatUiStyleConfig.standard.inputTextStyle.copyWith(
+    color: GenesisColors.darkTextPrimary,
+    height: 1.4,
   ),
+  selfBubbleColor: GenesisColors.redPrimary.withValues(alpha: 0.4),
+  otherBubbleColor: GenesisColors.darkFaintFill,
+  bubbleTextStyle: ChatUiStyleConfig.standard.bubbleTextStyle.copyWith(
+    color: GenesisColors.darkTextPrimary,
+  ),
+  senderNameTextStyle: ChatUiStyleConfig.standard.senderNameTextStyle.copyWith(
+    color: GenesisColors.darkTextSecondary,
+  ),
+  statusTextStyle: ChatUiStyleConfig.standard.statusTextStyle.copyWith(
+    color: GenesisColors.darkTextTertiary,
+  ),
+  dateDividerTextStyle: ChatUiStyleConfig.standard.dateDividerTextStyle
+      .copyWith(color: GenesisColors.darkTextTertiary),
+  sendingBadgeColor: GenesisColors.darkTextSecondary,
+  failedBadgeIconColor: GenesisColors.darkTextPrimary,
   showSenderNameAboveOtherBubble: false,
 );
 
@@ -172,12 +195,12 @@ ChatUiStyleConfig get kLocationChatStyle => ChatUiStyleConfig.standard.copyWith(
   composerSendButtonWidth: 40,
   composerSendButtonHeight: 40,
   composerSendButtonBorderRadius: 8,
-  composerSendButtonColor: const Color(0xFFFF2442),
+  composerSendButtonColor: GenesisColors.redPrimary,
   composerSendButtonDisabledColor: const Color(0x21FFFFFF),
   composerSendButtonBackdropBlurSigma: GenesisBlur.strong,
   composerSendButtonIconSize: 17,
   composerActionGap: 9,
-  inputBackgroundColor: const Color(0x1FFFFFFF),
+  inputBackgroundColor: GenesisColors.darkFaintFill,
   inputBackdropBlurSigma: GenesisBlur.light,
   inputBorderRadius: 8,
   inputHintStyle: const TextStyle(color: GenesisColors.darkInputPlaceholder),

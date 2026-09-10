@@ -1835,7 +1835,6 @@ void main() {
       ),
     );
 
-    expect(avatar.showStar, isFalse);
     expect(avatar.isPlayerControlledRole, isFalse);
   });
 

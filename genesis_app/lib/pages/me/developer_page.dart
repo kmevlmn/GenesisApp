@@ -105,7 +105,10 @@ class DeveloperPage extends StatelessWidget {
   final OriginDebugRandomAction? randomAction;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      GenesisLightTheme(child: _buildContent(context));
+
+  Widget _buildContent(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: DeveloperPageContent(
@@ -130,7 +133,10 @@ class DeveloperPageSheet extends StatelessWidget {
   final OriginDebugRandomAction? randomAction;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      GenesisLightTheme(child: _buildContent(context));
+
+  Widget _buildContent(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return GenesisBottomSheetPanel(

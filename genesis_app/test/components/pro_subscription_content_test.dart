@@ -270,7 +270,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Subscripting'), findsOneWidget);
+      expect(find.text('Subscribed'), findsOneWidget);
       expect(
         tester.widget<FilledButton>(filledButton).style,
         originalButtonStyle,
@@ -289,7 +289,7 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
       await tester.tap(find.byKey(const ValueKey('pro-plan-monthly')));
       await tester.pumpAndSettle();
-      expect(find.text('Subscripting'), findsNothing);
+      expect(find.text('Subscribed'), findsNothing);
       expect(await pixels(tester), originalMonthlyPixels);
       await tester.tap(find.byKey(buttonKey));
       await tester.pump(const Duration(milliseconds: 300));

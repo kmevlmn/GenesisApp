@@ -29,11 +29,32 @@ class _JumpRecordingScrollController extends ScrollController {
 }
 
 void main() {
-  test('private chat keeps its legacy green send button', () {
-    expect(kPrivateChatStyle.composerSendButtonColor, const Color(0xFF338960));
+  test('private chat uses dark surfaces and standard input tokens', () {
+    expect(kPrivateChatStyle.composerSendButtonColor, GenesisColors.redPrimary);
     expect(
       kPrivateChatStyle.composerSendButtonDisabledColor,
-      const Color(0xFFBFD8CD),
+      GenesisColors.darkFaintFill,
+    );
+    expect(
+      kPrivateChatStyle.conversationBackgroundColor,
+      GenesisColors.darkBackground,
+    );
+    expect(kPrivateChatStyle.otherBubbleColor, GenesisColors.darkFaintFill);
+    expect(
+      kPrivateChatStyle.bubbleTextStyle.color,
+      GenesisColors.darkTextPrimary,
+    );
+    expect(
+      kPrivateChatStyle.inputHintStyle?.color,
+      GenesisColors.darkInputPlaceholder,
+    );
+    expect(
+      kPrivateChatStyle.inputTextStyle.color,
+      GenesisColors.darkTextPrimary,
+    );
+    expect(
+      kPrivateChatStyle.dateDividerTextStyle.color,
+      GenesisColors.darkTextTertiary,
     );
   });
 

@@ -1,3 +1,5 @@
+import '../../../ui/tokens/genesis_colors.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -41,8 +43,8 @@ class LocationChatReplyFeatureButton extends StatelessWidget {
               height: iconSize,
               colorFilter: ColorFilter.mode(
                 onTap == null
-                    ? const Color(0x73FFFFFF)
-                    : const Color(0xF2FFFFFF),
+                    ? GenesisColors.darkTextTertiary
+                    : GenesisColors.darkTextPrimary,
                 BlendMode.srcIn,
               ),
               excludeFromSemantics: true,

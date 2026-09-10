@@ -323,7 +323,7 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
                       selectedProduct?.canPurchase == false &&
                           selectedProduct?.purchaseBlockReason ==
                               'already_subscribed'
-                      ? 'Subscripting'
+                      ? 'Subscribed'
                       : '${_plan.label}: ${_offerFor(_plan)?.price?.formattedPrice ?? ''}',
                   height: 44,
                   fontSize: 18,

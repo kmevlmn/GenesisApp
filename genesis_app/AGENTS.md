@@ -145,7 +145,7 @@ HTTP 映射层的图片规则：
 头像和非头像要分开处理：
 
 - 用户/通用头像共享 `GenesisAvatar`。
-- 角色头像共享 `GenesisCharacterAvatar`，带红星角色标识。
+- 角色头像共享 `GenesisCharacterAvatar`；已移除旧红星标记和 showStar 参数。玩家角色边框保持独立，不恢复旧星标。
 - 当前头像默认 top-center crop；不要把头像裁剪规则扩散到 cover、location image、map、list thumbnail 等非头像图片。
 - `CharactersList` 和 `OriginWorldPage` 的部分角色肖像有页面级尺寸例外，修改前先确认是否应走共享头像组件。
 
@@ -206,6 +206,10 @@ HTTP 映射层的图片规则：
 - 页面可以继续使用 `ClampingScrollPhysics`、`PageScrollPhysics`、`AlwaysScrollableScrollPhysics` 和下拉刷新。不要为了关闭拉伸效果而破坏横向分页、纵向滚动、RefreshIndicator 或既有边缘手势。
 
 ## 深色界面颜色规范
+
+- App 固定使用 `GenesisTheme.dark()` 作为全局默认，不随系统切换浅色。Material 默认背景、文字、Tab、输入提示／光标、按钮禁用态、加载圆环以及 `GenesisUiTheme` 均由公共深色主题管理；局部 `GenesisDarkTheme` 复用同一 `GenesisTheme.asDark()` 实现，不维护第二套颜色。
+- 根 builder 的文字与状态栏图标也使用深色默认，覆盖页面 Material 之外的浮层。输入框填充 token 由主题提供，同类组件仍负责布局与填充，不给已有外层填充重复叠底。
+- 用户明确保留的开发页面／Sheet、调试解锁使用 `GenesisLightTheme` 局部隔离，保持原有浅色设计；地图调试设置和独立推送 Banner 保持自身样式。公共操作弹窗等已有独立深色规则继续生效。
 
 颜色统一定义在 `lib/ui/tokens/genesis_colors.dart` 的 `GenesisColors` 中。以下五个 token 是对应标准颜色的唯一色值来源：
 

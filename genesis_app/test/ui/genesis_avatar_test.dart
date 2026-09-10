@@ -206,7 +206,7 @@ void main() {
               url: 'https://cdn.example.com/character.webp',
               name: 'Iris',
               size: 40,
-              showStar: true,
+
               showFallbackWhileLoading: false,
               boxShadow: const [BoxShadow(color: Colors.black, blurRadius: 4)],
               border: Border.all(color: Colors.red, width: 1),
@@ -216,7 +216,7 @@ void main() {
       );
 
       expect(find.text('I'), findsNothing);
-      expect(find.byIcon(MyFlutterApp.redstarCharIcon), findsOneWidget);
+      expect(find.byIcon(MyFlutterApp.redstarCharIcon), findsNothing);
 
       final decoratedBoxes = tester.widgetList<DecoratedBox>(
         find.byType(DecoratedBox),

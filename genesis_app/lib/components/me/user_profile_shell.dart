@@ -750,7 +750,7 @@ class _GemsBalanceEntry extends StatelessWidget {
                                         fontSize: 18,
                                         height: 22 / 18,
                                         fontWeight: FontWeight.w600,
-                                        color: Color(0xF2FFFFFF),
+                                        color: GenesisColors.darkTextPrimary,
                                       ),
                                     ),
                                   ),

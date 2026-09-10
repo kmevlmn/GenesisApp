@@ -356,15 +356,14 @@ class ChatUiStyleConfig {
       fontWeight: FontWeight.w400, // Avatar font weight.
     ),
     aiBadgeSize: 16, // AI badge size.
-    aiBadgeColor: Color(0xFFFF2442), // AI badge color.
+    aiBadgeColor: GenesisColors.redPrimary, // AI badge color.
     sendingBadgeSize: 22, // Sending indicator badge size.
     sendingBadgePadding: 2, // Sending indicator badge padding.
     sendingBadgeStrokeWidth: 2, // Sending indicator stroke width.
     sendingBadgeColor: Color(0xFF777777), // Sending indicator color.
     failedBadgeSize: 22, // Failed red exclamation badge size.
-    failedBadgeColor: Color(
-      0xFFFF2442,
-    ), // Failed red exclamation badge background color.
+    failedBadgeColor: GenesisColors
+        .redPrimary, // Failed red exclamation badge background color.
     failedBadgeIconColor: Colors.white, // Failed exclamation icon color.
     failedBadgeIconSize: 17, // Failed exclamation icon size.
     dateDividerBottomPadding: 12, // Date divider bottom spacing.
@@ -581,6 +580,10 @@ class ChatUiStyleConfig {
   final TextStyle systemMessageTextStyle;
 
   ChatUiStyleConfig copyWith({
+    TextStyle? statusTextStyle,
+    TextStyle? dateDividerTextStyle,
+    Color? sendingBadgeColor,
+    Color? failedBadgeIconColor,
     Color? conversationBackgroundColor,
     double? headerHeight,
     Color? headerBackgroundColor,
@@ -725,7 +728,7 @@ class ChatUiStyleConfig {
           avatarSideSpacerWidth ?? this.avatarSideSpacerWidth,
       senderNameBottomGap: senderNameBottomGap ?? this.senderNameBottomGap,
       statusTextTopGap: statusTextTopGap,
-      statusTextStyle: statusTextStyle,
+      statusTextStyle: statusTextStyle ?? this.statusTextStyle,
       senderNameTextStyle: senderNameTextStyle ?? this.senderNameTextStyle,
       showSenderNameAboveOtherBubble:
           showSenderNameAboveOtherBubble ?? this.showSenderNameAboveOtherBubble,
@@ -751,13 +754,13 @@ class ChatUiStyleConfig {
       sendingBadgeSize: sendingBadgeSize,
       sendingBadgePadding: sendingBadgePadding,
       sendingBadgeStrokeWidth: sendingBadgeStrokeWidth,
-      sendingBadgeColor: sendingBadgeColor,
+      sendingBadgeColor: sendingBadgeColor ?? this.sendingBadgeColor,
       failedBadgeSize: failedBadgeSize,
       failedBadgeColor: failedBadgeColor,
-      failedBadgeIconColor: failedBadgeIconColor,
+      failedBadgeIconColor: failedBadgeIconColor ?? this.failedBadgeIconColor,
       failedBadgeIconSize: failedBadgeIconSize,
       dateDividerBottomPadding: dateDividerBottomPadding,
-      dateDividerTextStyle: dateDividerTextStyle,
+      dateDividerTextStyle: dateDividerTextStyle ?? this.dateDividerTextStyle,
       systemMessageMargin: systemMessageMargin ?? this.systemMessageMargin,
       systemMessagePadding: systemMessagePadding ?? this.systemMessagePadding,
       systemMessageBackgroundColor:

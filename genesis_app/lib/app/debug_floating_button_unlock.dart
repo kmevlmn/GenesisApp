@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../components/common/genesis_center_toast.dart';
 import '../ui/tokens/genesis_typography.dart';
+import '../ui/theme/genesis_theme.dart';
 import 'debug_floating_button_visibility.dart';
 
 const String _debugFloatingButtonPassword = '6688';
@@ -20,7 +21,7 @@ Future<void> requestGenesisDebugFloatingButtonUnlock(
   final unlocked = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const _DebugPasswordDialog(),
+    builder: (_) => const GenesisLightTheme(child: _DebugPasswordDialog()),
   );
   if (!context.mounted || unlocked != true) return;
   showGenesisDebugFloatingButton();

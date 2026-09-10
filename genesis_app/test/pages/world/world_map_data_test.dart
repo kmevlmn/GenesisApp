@@ -52,7 +52,7 @@ void main() {
 
     expect(avatars['loc-1'], hasLength(1));
     expect(avatars['loc-1']?.single.name, 'Other');
-    expect(avatars['loc-1']?.single.showStar, isFalse);
+
     expect(avatars['loc-1']?.single.isPlayerControlledRole, isTrue);
     expect(avatars['loc-1']?.single.isNew, isTrue);
   });

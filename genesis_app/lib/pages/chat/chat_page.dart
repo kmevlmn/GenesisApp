@@ -9,6 +9,10 @@ import '../../app/bootstrap/polling_scheduler.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/auth/login_guard.dart';
 import '../../components/chat/shared/chat_ui.dart';
+import '../../components/page_header.dart';
+import '../../ui/components/genesis_refresh_indicator.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../network/api_client.dart';
 import '../../network/api_exception.dart';
 import '../../network/direct_message_conversation_store.dart';
@@ -20,7 +24,6 @@ import '../../ui/components/genesis_safe_area.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/genesis_ugc_text.dart';
 
-const Color _privateChatHeaderBackgroundColor = Color(0xFFEDEDED);
 const String _privateChatReplyGateHint = 'Wait for a reply to send more';
 
 class ChatPage extends StatefulWidget {
@@ -597,67 +600,59 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       formatUidForDisplay(_peerUid),
       'Direct message',
     ]);
-    final headerStyle = kPrivateChatStyle.copyWith(
-      headerBackgroundColor: _privateChatHeaderBackgroundColor,
-    );
-    return GenesisBottomSystemBarStyleScope(
-      style: GenesisBottomSystemBarStyle(
-        color: kPrivateChatStyle.composerBackgroundColor,
-      ),
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: kChatTransparentLightSystemUiOverlayStyle,
-        child: Scaffold(
-          backgroundColor: kPrivateChatStyle.conversationBackgroundColor,
-          resizeToAvoidBottomInset: true,
-          body: Stack(
-            children: [
-              Stack(
-                children: [
-                  Positioned.fill(child: _buildMessages()),
-                  if (_unseenIncomingCount > 0)
-                    Positioned(
-                      right: 16,
-                      bottom: _privateChatComposerHeight() + 12,
-                      child: _NewIncomingMessageNotice(
-                        count: _unseenIncomingCount,
-                        onTap: _openUnseenIncomingMessages,
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: GenesisBottomSystemBarStyle(
+          color: kPrivateChatStyle.composerBackgroundColor,
+        ),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: kChatDarkHeaderSystemUiOverlayStyle,
+          child: Scaffold(
+            backgroundColor: kPrivateChatStyle.conversationBackgroundColor,
+            resizeToAvoidBottomInset: true,
+            body: Stack(
+              children: [
+                Stack(
+                  children: [
+                    Positioned.fill(child: _buildMessages()),
+                    if (_unseenIncomingCount > 0)
+                      Positioned(
+                        right: 16,
+                        bottom: _privateChatComposerHeight() + 12,
+                        child: _NewIncomingMessageNotice(
+                          count: _unseenIncomingCount,
+                          onTap: _openUnseenIncomingMessages,
+                        ),
                       ),
-                    ),
-                ],
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: ChatHeader(
-                  title: peerTitle,
-                  subtitle: '',
-                  connected: !_syncing,
-                  connecting: _syncing,
-                  onBack: () => Navigator.of(context).maybePop(),
-                  showTitleIcon: false,
-                  showSubtitle: false,
-                  showMoreButton: false,
-                  style: headerStyle,
+                  ],
                 ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: ChatComposer(
-                  controller: _textController,
-                  inputEnabled: _peerUid.isNotEmpty,
-                  sendEnabled: _peerUid.isNotEmpty && !_sending,
-                  sending: _sending,
-                  onSend: _send,
-                  sendLabel: 'Send',
-                  hintText: _composerHintText(),
-                  style: kPrivateChatStyle,
-                  onHeightChanged: _handleComposerHeightChanged,
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: SizedBox(
+                    height: _privateChatHeaderHeight(),
+                    child: GenesisBackAppBar(pageName: peerTitle),
+                  ),
                 ),
-              ),
-            ],
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: ChatComposer(
+                    controller: _textController,
+                    inputEnabled: _peerUid.isNotEmpty,
+                    sendEnabled: _peerUid.isNotEmpty && !_sending,
+                    sending: _sending,
+                    onSend: _send,
+                    sendLabel: 'Send',
+                    hintText: _composerHintText(),
+                    style: kPrivateChatStyle,
+                    onHeightChanged: _handleComposerHeightChanged,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -697,7 +692,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (context, messageIds, _) {
         final renderIds = _renderMessageIds(messageIds);
         if (!_loadedLocalMessages && renderIds.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: GenesisLoadingIndicator(strokeWidth: 4));
         }
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -714,7 +709,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             bottom: style.dateDividerBottomPadding,
                           ),
                           child: const Center(
-                            child: CircularProgressIndicator(),
+                            child: GenesisLoadingIndicator(strokeWidth: 4),
                           ),
                         )
                       : const SizedBox.shrink();
@@ -800,7 +795,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _capitalizedSentence(_latestSendFailureMessage),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: Color(0xFF999999),
+                      color: GenesisColors.darkTextTertiary,
                       fontSize: 12,
                       height: 1.35,
                     ),
@@ -823,7 +818,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   double _privateChatHeaderHeight() {
     final topInset = GenesisSafeAreaInsets.top(context);
-    return topInset + kPrivateChatStyle.headerHeight;
+    return topInset + kGenesisTopBarHeight;
   }
 
   double _privateChatComposerHeight() {
@@ -929,8 +924,11 @@ class _NewIncomingMessageNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black.withValues(alpha: 0.72),
-      borderRadius: BorderRadius.circular(16),
+      color: GenesisColors.darkRaisedBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: GenesisColors.darkFaintFill),
+      ),
       child: InkWell(
         key: const ValueKey('chat-new-message-notice'),
         borderRadius: BorderRadius.circular(16),
@@ -940,7 +938,7 @@ class _NewIncomingMessageNotice extends StatelessWidget {
           child: Text(
             '$count new ${count == 1 ? 'message' : 'messages'}',
             style: const TextStyle(
-              color: Colors.white,
+              color: GenesisColors.darkTextPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),

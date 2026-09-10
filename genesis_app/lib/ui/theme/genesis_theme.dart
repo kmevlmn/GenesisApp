@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../system/genesis_system_ui.dart';
 import '../tokens/genesis_colors.dart';
@@ -24,13 +25,148 @@ class GenesisScrollBehavior extends MaterialScrollBehavior {
 // GenesisTheme is the single entry point for app-level ThemeData.
 // This class connects the Flutter Material theme with the custom Genesis UI component theme.
 abstract final class GenesisTheme {
-  // Only the light theme is currently defined. A future dark theme can add dark() and reuse the same token and extension structure.
+  /// Production defaults. Light remains available for developer tools.
+  static ThemeData dark() => asDark(light());
+
+  /// Shared by the root theme and existing local dark scopes.
+  static ThemeData asDark(ThemeData base) {
+    final baseUi = base.extension<GenesisUiTheme>() ?? GenesisUiTheme.light();
+    final ui = baseUi.copyWith(
+      pageTitleStyle: baseUi.pageTitleStyle.copyWith(
+        color: GenesisColors.darkTextPrimary,
+      ),
+      bodyStyle: baseUi.bodyStyle.copyWith(
+        color: GenesisColors.darkTextPrimary,
+      ),
+      bodyStrongStyle: baseUi.bodyStrongStyle.copyWith(
+        color: GenesisColors.darkTextPrimary,
+      ),
+      tabSelectedColor: GenesisColors.darkTextPrimary,
+      tabUnselectedColor: GenesisColors.darkTextSecondary,
+      tabIndicatorColor: GenesisColors.redPrimary,
+      searchBackgroundColor: GenesisColors.darkFaintFill,
+      searchIconColor: GenesisColors.darkTextSecondary,
+      searchHintStyle: baseUi.searchHintStyle.copyWith(
+        color: GenesisColors.darkInputPlaceholder,
+      ),
+      searchTextStyle: baseUi.searchTextStyle.copyWith(
+        color: GenesisColors.darkTextPrimary,
+      ),
+    );
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: GenesisColors.redPrimary,
+          brightness: Brightness.dark,
+        ).copyWith(
+          primary: GenesisColors.redPrimary,
+          onPrimary: GenesisColors.darkTextPrimary,
+          surface: GenesisColors.darkBackground,
+          surfaceDim: GenesisColors.darkBackground,
+          surfaceBright: GenesisColors.darkRaisedBackground,
+          surfaceContainerLowest: GenesisColors.darkBackground,
+          surfaceContainerLow: GenesisColors.darkRaisedBackground,
+          surfaceContainer: GenesisColors.darkRaisedBackground,
+          surfaceContainerHigh: GenesisColors.darkRaisedBackground,
+          surfaceContainerHighest: GenesisColors.darkFaintSurface,
+          onSurface: GenesisColors.darkTextPrimary,
+          onSurfaceVariant: GenesisColors.darkTextSecondary,
+          outline: GenesisColors.darkFaintFill,
+          outlineVariant: GenesisColors.darkCardBorder,
+        );
+    return base.copyWith(
+      brightness: Brightness.dark,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: GenesisColors.darkBackground,
+      canvasColor: GenesisColors.darkBackground,
+      cardColor: GenesisColors.darkRaisedBackground,
+      disabledColor: GenesisColors.darkTextTertiary,
+      hintColor: GenesisColors.darkInputPlaceholder,
+      dividerColor: GenesisColors.darkFaintFill,
+      textTheme: base.textTheme
+          .apply(
+            bodyColor: GenesisColors.darkTextPrimary,
+            displayColor: GenesisColors.darkTextPrimary,
+          )
+          .copyWith(
+            bodySmall: base.textTheme.bodySmall?.copyWith(
+              color: GenesisColors.darkTextTertiary,
+            ),
+            labelMedium: base.textTheme.labelMedium?.copyWith(
+              color: GenesisColors.darkTextSecondary,
+            ),
+          ),
+      iconTheme: base.iconTheme.copyWith(
+        color: GenesisColors.darkTextSecondary,
+      ),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: GenesisColors.darkBackground,
+        foregroundColor: GenesisColors.darkTextPrimary,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: kGenesisLightStatusIconsSystemUiOverlayStyle,
+      ),
+      dialogTheme: base.dialogTheme.copyWith(
+        backgroundColor: GenesisColors.darkRaisedBackground,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: base.bottomSheetTheme.copyWith(
+        backgroundColor: GenesisColors.darkRaisedBackground,
+        modalBackgroundColor: GenesisColors.darkRaisedBackground,
+        surfaceTintColor: Colors.transparent,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: (base.filledButtonTheme.style ?? const ButtonStyle()).copyWith(
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? GenesisColors.darkButtonDisabledBackground
+                : GenesisColors.redPrimary,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? GenesisColors.darkButtonDisabledForeground
+                : GenesisColors.darkTextPrimary,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: (base.textButtonTheme.style ?? const ButtonStyle()).copyWith(
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? GenesisColors.darkTextTertiary
+                : GenesisColors.darkTextSecondary,
+          ),
+        ),
+      ),
+      progressIndicatorTheme: base.progressIndicatorTheme.copyWith(
+        color: GenesisColors.darkTextSecondary,
+      ),
+      tabBarTheme: base.tabBarTheme.copyWith(
+        labelColor: GenesisColors.darkTextPrimary,
+        unselectedLabelColor: GenesisColors.darkTextSecondary,
+        indicatorColor: GenesisColors.redPrimary,
+      ),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        fillColor: GenesisColors.darkFaintFill,
+        hintStyle: (base.inputDecorationTheme.hintStyle ?? const TextStyle())
+            .copyWith(color: GenesisColors.darkInputPlaceholder),
+      ),
+      textSelectionTheme: base.textSelectionTheme.copyWith(
+        cursorColor: GenesisColors.darkTextPrimary,
+        selectionHandleColor: GenesisColors.darkTextPrimary,
+        selectionColor: GenesisColors.darkFaintFill,
+      ),
+      extensions: [
+        ...base.extensions.values.where((value) => value is! GenesisUiTheme),
+        ui,
+      ],
+    );
+  }
+
   static ThemeData light() {
     // The base palette for Material components; seedColor determines derived Material colors such as default button and state colors.
     final colorScheme = ColorScheme.fromSeed(
       // Use the shared brand color as the seed for Material component defaults.
       seedColor: GenesisColors.brandBright,
-      // The current product uses light backgrounds, so Brightness.light is fixed here.
+      // Retained for explicitly excluded developer tools.
       brightness: Brightness.light,
     ).copyWith(primary: GenesisColors.brand);
 
@@ -151,4 +287,22 @@ abstract final class GenesisTheme {
       extensions: <ThemeExtension<dynamic>>[GenesisUiTheme.light()],
     );
   }
+}
+
+/// Keeps explicitly excluded developer tools in their original light appearance.
+class GenesisLightTheme extends StatelessWidget {
+  const GenesisLightTheme({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Theme(
+    data: GenesisTheme.light(),
+    child: DefaultTextStyle(
+      style: GenesisTypography.body,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: kGenesisDefaultSystemUiOverlayStyle,
+        child: child,
+      ),
+    ),
+  );
 }

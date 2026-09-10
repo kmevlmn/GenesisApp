@@ -1,3 +1,5 @@
+import '../../ui/tokens/genesis_colors.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -119,7 +121,8 @@ class ProfileMembershipCard extends StatelessWidget {
                                       child: const Text(
                                         'Expired',
                                         style: TextStyle(
-                                          color: Color(0xB8FFFFFF),
+                                          color:
+                                              GenesisColors.darkTextSecondary,
                                           fontSize: 11,
                                           height: 14 / 11,
                                           fontWeight: FontWeight.w500,
@@ -137,7 +140,7 @@ class ProfileMembershipCard extends StatelessWidget {
                             maxLines: 1,
                             textAlign: TextAlign.right,
                             style: const TextStyle(
-                              color: Color(0xB8FFFFFF),
+                              color: GenesisColors.darkTextSecondary,
                               fontSize: 11,
                               height: 1.4,
                             ),
@@ -170,7 +173,7 @@ class ProfileMembershipCard extends StatelessWidget {
                       const Text(
                         'Monthly Blue Gems included',
                         style: TextStyle(
-                          color: Color(0xB8FFFFFF),
+                          color: GenesisColors.darkTextSecondary,
                           fontSize: 12,
                           height: 1.4,
                         ),
@@ -208,7 +211,7 @@ class ProfileMembershipCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: Color(0xF2FFFFFF),
+                                color: GenesisColors.darkTextPrimary,
                                 fontSize: 18,
                                 height: 22 / 18,
                                 fontWeight: FontWeight.w600,

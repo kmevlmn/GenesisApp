@@ -580,7 +580,7 @@ sealed class AppRouter {
         );
       case RouteNames.chat:
         final args = _ChatRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => ChatPage(
             peerUid: args.peerUid,

@@ -94,7 +94,6 @@ class _TilemapLocationAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final borderColor = worldMapAvatarBorderColor(
       isPlayerControlledRole: avatar.isPlayerControlledRole,
-      showAiMarker: avatar.showStar,
     );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -109,7 +108,6 @@ class _TilemapLocationAvatar extends StatelessWidget {
               name: (avatar.name ?? avatar.initials).trim(),
               size: tilemapLocationAvatarSize,
               borderRadius: GenesisAvatarRadii.character,
-              showStar: avatar.showStar,
               showFallbackWhileLoading: false,
               showFallbackWhenUnavailable: true,
               maxDevicePixelRatio:

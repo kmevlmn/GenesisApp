@@ -813,7 +813,7 @@ class _LocationChatMentionSheetState extends State<LocationChatMentionSheet>
                             padding: EdgeInsets.zero,
                             minimumSize: const Size(24, 24),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            backgroundColor: const Color(0x1FFFFFFF),
+                            backgroundColor: GenesisColors.darkFaintFill,
                             foregroundColor:
                                 _locationChatMentionPrimaryForeground,
                             shape: const CircleBorder(),
@@ -1135,7 +1135,7 @@ class _LocationChatMentionThumbnail extends StatelessWidget {
       size: _locationChatAvatarLogicalSize,
       borderRadius: 8,
       border: entry.isPlayerControlled
-          ? Border.all(color: const Color(0xFFFF2442), width: 2)
+          ? Border.all(color: GenesisColors.redPrimary, width: 2)
           : null,
     );
   }

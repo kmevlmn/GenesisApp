@@ -105,7 +105,6 @@ void main() {
           'AA',
           name: 'Ada',
           avatarUrl: 'assets/images/default_list_image.png',
-          showStar: true,
         ),
         UserAvatar(
           'BB',
@@ -127,7 +126,7 @@ void main() {
       tester.widget<GenesisCharacterAvatar>(avatars.first).boxShadow,
       isNotEmpty,
     );
-    expect(find.byIcon(MyFlutterApp.redstarCharIcon), findsOneWidget);
+    expect(find.byIcon(MyFlutterApp.redstarCharIcon), findsNothing);
 
     final first = tester.getTopLeft(avatars.at(0));
     final second = tester.getTopLeft(avatars.at(1));
@@ -693,13 +692,6 @@ void main() {
       worldMapAvatarBorderColorForTesting(isPlayerControlledRole: false),
       isNull,
     );
-    expect(
-      worldMapAvatarBorderColorForTesting(
-        isPlayerControlledRole: false,
-        showAiMarker: true,
-      ),
-      const Color(0xFFDDDDDD),
-    );
   });
 
   testWidgets('world map AI avatar is plain and player role has a red border', (
@@ -722,9 +714,9 @@ void main() {
         .widgetList<GenesisCharacterAvatar>(find.byType(GenesisCharacterAvatar))
         .toList(growable: false);
     expect(avatars, hasLength(2));
-    expect(avatars[0].showStar, isFalse);
+
     expect(avatars[0].border, isNull);
-    expect(avatars[1].showStar, isFalse);
+
     final playerBorder = avatars[1].border! as Border;
     expect(playerBorder.top.color, const Color(0xFFFF2442));
     expect(playerBorder.top.width, 2);
@@ -1343,8 +1335,8 @@ void main() {
           type: WorldPointType.shop,
           position: _pointPosition,
           users: [
-            UserAvatar('AA', name: 'Ada', showStar: true),
-            UserAvatar('BB', name: 'Bert', showStar: true),
+            UserAvatar('AA', name: 'Ada'),
+            UserAvatar('BB', name: 'Bert'),
             UserAvatar('CC', name: 'Cara'),
             UserAvatar('DD', name: 'Drew'),
           ],
@@ -1385,11 +1377,10 @@ void main() {
     expect(levelTwoTitle, findsOneWidget);
     expect(find.byType(Divider), findsNWidgets(2));
     expect(find.byIcon(Icons.place_outlined), findsNWidgets(3));
-    expect(_assetSvgFinder(characterStatIconAsset), findsNWidgets(2));
+    expect(_assetSvgFinder(characterStatIconAsset), findsOneWidget);
     expect(_assetSvgFinder(userStatIconAsset), findsNothing);
     expect(find.byIcon(Icons.schedule), findsNothing);
-    expect(find.text('Ada, Bert'), findsOneWidget);
-    expect(find.text('Cara, Drew'), findsOneWidget);
+    expect(find.text('Ada, Bert, Cara, Drew'), findsOneWidget);
     expect(find.text('Gate checkpoint description.'), findsOneWidget);
     expect(find.text('Gate checkpoint summary.'), findsNothing);
     expect(
@@ -1451,7 +1442,7 @@ void main() {
                         name: 'Level Three',
                         type: WorldPointType.camp,
                         position: _pointPosition,
-                        users: [UserAvatar('AA', name: 'Ari', showStar: true)],
+                        users: [UserAvatar('AA', name: 'Ari')],
                       ),
                     ),
                   ],

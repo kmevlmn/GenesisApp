@@ -156,7 +156,7 @@ class WorldBottomTagContent extends StatelessWidget {
                 width: 7,
                 height: 7,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFF2442),
+                  color: GenesisColors.redPrimary,
                   shape: BoxShape.circle,
                 ),
               ),
