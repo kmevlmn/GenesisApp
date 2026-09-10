@@ -8,9 +8,7 @@ import 'package:genesis_flutter_android/network/api_client.dart';
 import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/network/http_transport.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_http_api.dart';
-import 'package:genesis_flutter_android/network/chatroom/chatroom_inspiration.dart';
-import 'package:genesis_flutter_android/network/chatroom/chatroom_inspiration_controller.dart';
-import 'package:genesis_flutter_android/network/chatroom/chatroom_inspiration_storage.dart';
+import 'package:genesis_flutter_android/features/location_chat_reply/inspiration/inspiration.dart';
 
 const _round = 9007199254740993;
 ChatroomInspirationSource _source({
@@ -113,7 +111,7 @@ void main() {
   );
 
   test(
-    'request fixes refresh=false, preserves int64, headers and a 120-second timeout',
+    'request omits refresh, preserves int64, headers and a 120-second timeout',
     () async {
       final http = _Http();
       final result = await _api(http).getInspirations(
@@ -130,7 +128,6 @@ void main() {
       expect(jsonDecode(utf8.decode(request.bodyBytes!)), {
         'conversation_round_id': _round,
         'card_id': _round + 1,
-        'refresh': false,
       });
       expect(request.timeoutMs, 120000);
       expect(request.headers['x-system-language'], 'zh-CN');
@@ -142,10 +139,9 @@ void main() {
         locationId: 'l',
         conversationRoundId: _round,
       );
-      expect(
-        jsonDecode(utf8.decode(http.requests.last.bodyBytes!)),
-        isNot(contains('card_id')),
-      );
+      expect(jsonDecode(utf8.decode(http.requests.last.bodyBytes!)), {
+        'conversation_round_id': _round,
+      });
     },
   );
 

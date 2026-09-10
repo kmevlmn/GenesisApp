@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'chatroom_inspiration.dart';
+import '../../features/location_chat_reply/inspiration/inspiration.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -11,6 +11,10 @@ import 'chatroom_http_models.dart';
 import 'chatroom_models.dart';
 import 'chatroom_reply_action_storage.dart';
 import 'world_chatroom_service.dart' show WorldChatroomMessage;
+
+part '../../features/location_chat_reply/regenerate/src/chatroom_regenerate_action.dart';
+part '../../features/location_chat_reply/go_on/src/chatroom_go_on_action.dart';
+part '../../features/location_chat_reply/edit/src/chatroom_edit_action.dart';
 
 /// A stable editor identity; the messages are an authoritative, complete snapshot.
 class ChatroomReplyEditorTarget {
@@ -75,6 +79,10 @@ class ChatroomReplyRoundState {
   String? _regenerationRequestId;
   Object? _error;
   ChatroomLlmCardsResponse? _cardsResponse;
+  ChatroomLlmCardsResponse? _cachedCards;
+  int? _cardsCachedAt;
+  int _cardsCacheVersion = 0;
+  Future<ChatroomLlmCardsResponse>? _cardsFetch;
   final _cards = <ChatroomLlmCard>[];
   List<WorldChatroomMessage> _formal = const [];
   final _drafts = <int, List<ChatroomLlmMessageOperation>>{};
@@ -189,7 +197,12 @@ class ChatroomReplyRoundState {
     if (!showCandidates || _viewedCardId == 0) {
       return formalReplyMessages;
     }
-    final card = viewedCard;
+    return messagesForCard(_viewedCardId);
+  }
+
+  /// Read-only preview; browsing and persistence are deliberately separate.
+  List<WorldChatroomMessage> messagesForCard(int cardId) {
+    final card = _card(cardId);
     if (card == null ||
         card.generationState == ChatroomCardGenerationState.failed) {
       return const [];
@@ -250,6 +263,7 @@ class ChatroomReplyActionsController extends ChangeNotifier {
     Future<void> Function(String locationId)? refreshLatestHistory,
     Future<void> Function()? refreshWallet,
     ChatroomReplyActionStorage? storage,
+    DateTime Function()? now,
   }) : _http = httpApi,
        _session = session,
        _isReady = isReady,
@@ -259,7 +273,11 @@ class ChatroomReplyActionsController extends ChangeNotifier {
        _onGoOnAccepted = onGoOnAccepted,
        _refreshLatestHistory = refreshLatestHistory,
        _refreshWallet = refreshWallet,
-       _storage = storage ?? SqfliteChatroomReplyActionStorage();
+       _storage = storage ?? SqfliteChatroomReplyActionStorage(),
+       _now = now ?? DateTime.now;
+
+  final DateTime Function() _now;
+  static const cardsCacheMaxAge = Duration(hours: 24);
 
   final String worldId, ownerUid;
   final ChatroomHttpApi _http;
@@ -303,7 +321,16 @@ class ChatroomReplyActionsController extends ChangeNotifier {
       );
 
   void _notify() {
-    if (!_disposed) notifyListeners();
+    if (_disposed) return;
+    // Waiting/Go On can advance the latest round before formal history arrives.
+    for (final location in locationIds.toList()) {
+      for (final state in statesFor(location)) {
+        if (!state.isLatest && state._cachedCards != null) {
+          _invalidateCardsCache(state);
+        }
+      }
+    }
+    notifyListeners();
   }
 
   void _checkCurrent() {
@@ -363,6 +390,12 @@ class ChatroomReplyActionsController extends ChangeNotifier {
     if (rounds.isNotEmpty) {
       rounds.sort();
       _latest[locationId] = rounds.last;
+      for (final state in statesFor(locationId)) {
+        if (state.roundId < rounds.last &&
+            (state._cachedCards != null || state._cardsFetch != null)) {
+          _invalidateCardsCache(state);
+        }
+      }
     }
     final target = stateFor(locationId);
     if (target != null &&
@@ -441,6 +474,27 @@ class ChatroomReplyActionsController extends ChangeNotifier {
       _latest[locationId] = (_latest[locationId] ?? 0) > round
           ? _latest[locationId]!
           : round;
+      final cachedAt = json['cards_cached_at'];
+      if (json['cards_cache'] != null) {
+        if (state._cardsCacheVersion == 0 &&
+            state.isLatest &&
+            cachedAt is int &&
+            _validCardsCacheTime(cachedAt)) {
+          try {
+            final cached = ChatroomLlmCardsResponse.fromJson(
+              json['cards_cache'],
+            );
+            if (cached.conversationRoundId == round &&
+                cached.list.every((card) => _terminal(card.generationState))) {
+              state._cachedCards = cached;
+              state._cardsCachedAt = cachedAt;
+            }
+          } on FormatException {
+            // A malformed cache must not prevent recovery of operation metadata.
+          }
+        }
+        if (state._cachedCards == null) await _persist(state);
+      }
       final accepted = state._goOn;
       if (accepted?.roundId != null) {
         // The hidden Go On trigger is absent from history. Its receipt is
@@ -466,6 +520,11 @@ class ChatroomReplyActionsController extends ChangeNotifier {
           }
           _onGoOnAccepted?.call(locationId, pending.roundId!);
         }
+      }
+    }
+    for (final state in statesFor(locationId)) {
+      if (!state.isLatest && state._cachedCards != null) {
+        _invalidateCardsCache(state);
       }
     }
     _notify();
@@ -522,7 +581,10 @@ class ChatroomReplyActionsController extends ChangeNotifier {
                     !state._entryRound) ||
                 state.frozen ||
                 state._regenerationRequestId != null)) {
-          await _loadCards(state);
+          await _loadCards(
+            state,
+            force: state.frozen || state._regenerationRequestId != null,
+          );
         }
         if (!_isReady(locationId)) return;
         if (state.frozen) await finalizeBeforeSend(locationId);
@@ -538,6 +600,10 @@ class ChatroomReplyActionsController extends ChangeNotifier {
     _checkCurrent();
     final value = <String, dynamic>{
       'round_id': state.roundId,
+      if (state._cachedCards != null) ...{
+        'cards_cached_at': state._cardsCachedAt,
+        'cards_cache': _cardsCacheJson(state._cachedCards!),
+      },
       'owner': state._owner,
       'entry_round': state._entryRound,
       'invalidated': state._invalidated,
@@ -574,22 +640,104 @@ class ChatroomReplyActionsController extends ChangeNotifier {
     return write;
   }
 
+  bool _validCardsCacheTime(int timestamp) {
+    final age = _now().millisecondsSinceEpoch - timestamp;
+    return age >= 0 && age < cardsCacheMaxAge.inMilliseconds;
+  }
+
+  Map<String, dynamic> _cardsCacheJson(ChatroomLlmCardsResponse result) => {
+    'conversation_round_id': result.conversationRoundId,
+    'original_card_id': result.originalCardId,
+    'selected_card_id': result.selectedCardId,
+    'active_card_id': result.activeCardId,
+    'confirmed': result.confirmed,
+    'can_regenerate': result.canRegenerate,
+    'can_confirm': result.canConfirm,
+    'list': result.list.map((card) => card.rawJson).toList(),
+    'total': result.total,
+  };
+
+  void _invalidateCardsCache(ChatroomReplyRoundState state) {
+    state._cardsCacheVersion++;
+    state._query++;
+    state._cardsFetch = null;
+    final hadCache = state._cachedCards != null;
+    state._cachedCards = null;
+    state._cardsCachedAt = null;
+    if (hadCache) _background(state, () => _persist(state));
+  }
+
+  void invalidateCardsOnDisconnect() {
+    for (final location in locationIds.toList()) {
+      for (final state in statesFor(location)) {
+        _invalidateCardsCache(state);
+      }
+    }
+  }
+
+  /// Clears only cached server snapshots, preserving drafts and recovery receipts.
+  Future<void> clearCardsCache(
+    String locationId, {
+    int? start,
+    int? end,
+  }) async {
+    // Mark current states immediately so pending disk/network reads cannot revive them.
+    for (final state in statesFor(locationId)) {
+      if ((start == null || state.roundId >= start) &&
+          (end == null || state.roundId <= end)) {
+        _invalidateCardsCache(state);
+      }
+    }
+    await restore(locationId);
+    _checkCurrent();
+    for (final state in statesFor(locationId)) {
+      if ((start == null || state.roundId >= start) &&
+          (end == null || state.roundId <= end)) {
+        _invalidateCardsCache(state);
+        await _persist(state);
+      }
+    }
+  }
+
   Future<void> _loadCards(
     ChatroomReplyRoundState state, {
     bool Function()? isCurrent,
+    bool force = false,
   }) async {
+    if (force ||
+        (state._cardsCachedAt != null &&
+            !_validCardsCacheTime(state._cardsCachedAt!))) {
+      // An authoritative recovery read must never fall back to stale data on error.
+      if (state._cachedCards != null) _invalidateCardsCache(state);
+    }
     final generation = state._generation;
+    final cacheVersion = state._cardsCacheVersion;
     final query = ++state._query;
-    final result = await _http.getLlmCards(
-      worldId: worldId,
-      locationId: state.locationId,
-      conversationRoundId: state.roundId,
-    );
+    var fetched = force ? null : state._cachedCards;
+    if (fetched == null) {
+      final fetch = state._cardsFetch ??= _http.getLlmCards(
+        worldId: worldId,
+        locationId: state.locationId,
+        conversationRoundId: state.roundId,
+      );
+      try {
+        fetched = await fetch;
+      } finally {
+        if (identical(state._cardsFetch, fetch)) state._cardsFetch = null;
+      }
+    }
+    final result = fetched;
     _checkCurrent();
     if (generation != state._generation ||
+        cacheVersion != state._cardsCacheVersion ||
         query != state._query ||
         (isCurrent != null && !isCurrent())) {
       return;
+    }
+    if (state.isLatest &&
+        result.list.every((card) => _terminal(card.generationState))) {
+      state._cardsCachedAt ??= _now().millisecondsSinceEpoch;
+      state._cachedCards = result;
     }
     state._cardsResponse = result;
     state._canRegenerate = result.canRegenerate;
@@ -648,130 +796,6 @@ class ChatroomReplyActionsController extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> regenerate(String locationId) async {
-    await restore(locationId);
-    final state = await _target(locationId);
-    if (!state.canRegenerate) {
-      throw StateError('This round cannot be regenerated');
-    }
-    state._regenerateDispatching = true;
-    ++state._generation;
-    state._error = null;
-    final oldView = state._viewedCardId;
-    final originalMessages = state.formalReplyMessages;
-    _notify();
-    var dispatched = false;
-    var candidatePrepared = false;
-    try {
-      if (!state._canRegenerate ||
-          state._cards.where((card) => card.cardId > 0).length >= 10 ||
-          state._cards.any(
-            (card) => card.cardId > 0 && !_terminal(card.generationState),
-          )) {
-        throw StateError('This round cannot be regenerated');
-      }
-      if (!state._eligible || state.frozen) {
-        throw StateError('The source round changed');
-      }
-      final pendingIndex = state._cards.isEmpty
-          ? 2
-          : state._cards.fold<int>(
-                  0,
-                  (v, c) => c.cardIndex > v ? c.cardIndex : v,
-                ) +
-                1;
-      if (state._cards.isEmpty) {
-        // ID zero is a local preview only; it is never submitted as a card ID.
-        state._cards.add(
-          _placeholder(
-            0,
-            1,
-            generationState: ChatroomCardGenerationState.succeeded,
-          ),
-        );
-      }
-      state._cards.add(_placeholder(-1, pendingIndex));
-      state._viewedCardId = -1;
-      state._presentationRevision++;
-      candidatePrepared = true;
-      state._generating = true;
-      state._regenerationRequestId = _request('regenerate');
-      await _persist(state);
-      _notify();
-      dispatched = true;
-      final receipt = await _requireSession().regenerateLlmCard(
-        locationId: locationId,
-        conversationRoundId: state.roundId,
-        clientMsgId: state._regenerationRequestId!,
-      );
-      _checkCurrent();
-      final stillPendingView = state._viewedCardId == -1;
-      state._cards.removeWhere((card) => card.cardId == -1);
-      if (state._card(receipt.cardId) == null) {
-        state._cards.add(
-          _placeholder(
-            receipt.cardId,
-            pendingIndex,
-            generationState: receipt.generationState,
-          ),
-        );
-      }
-      if (stillPendingView) state._viewedCardId = receipt.cardId;
-      if (state._card(receipt.originalCardId) == null) {
-        state._cards.removeWhere((card) => card.cardId == 0);
-        state._cards.add(
-          _assembledCard(
-            state,
-            receipt.originalCardId,
-            1,
-            originalMessages,
-            billing: const ChatroomCardBilling(
-              status: ChatroomCardBillingStatus.notRequired,
-            ),
-            isOriginal: true,
-          ),
-        );
-        if (state._viewedCardId == 0) {
-          state._viewedCardId = receipt.originalCardId;
-        }
-      }
-      state._cards.sort((a, b) => a.cardIndex.compareTo(b.cardIndex));
-      if (oldView == 0 && state._lastCompleteCardId == 0) {
-        state._lastCompleteCardId = receipt.originalCardId;
-      }
-      state._canConfirm = true;
-      state._generating = state._cards.any(
-        (card) => !_terminal(card.generationState),
-      );
-      await _persist(state);
-    } catch (error) {
-      if (!_disposed) {
-        state._error = error;
-        // Unknown acceptance retains the request metadata and is resolved by
-        // GET cards on reconnect; never send a fresh request automatically.
-        if (candidatePrepared && (!dispatched || _definiteRejection(error))) {
-          state._cards.removeWhere((card) => card.cardId <= 0);
-          state._regenerationRequestId = null;
-          state._viewedCardId = state._lastCompleteCardId;
-        }
-        state._generating = state._cards.any(
-          (card) => !_terminal(card.generationState),
-        );
-        await _persist(state);
-      }
-      rethrow;
-    } finally {
-      state._regenerateDispatching = false;
-      _notify();
-      if (state.frozen && !_disposed) {
-        if ((state._fixedCardId ?? 0) <= 0) {
-          state._fixedCardId = state.lastCompleteCardId;
-        }
-        _background(state, () => finalizeBeforeSend(locationId));
-      }
-    }
-  }
-
   Future<void> browse(String locationId, int delta) async {
     final state = stateFor(locationId);
     if (state == null ||
@@ -810,266 +834,6 @@ class ChatroomReplyActionsController extends ChangeNotifier {
       throw StateError('This round is not owned by the current user');
     }
     return state;
-  }
-
-  Future<ChatroomReplyEditorTarget> prepareEditor(String locationId) async {
-    await restore(locationId);
-    final state = await _target(locationId);
-    if (!state.canEdit) throw StateError('This reply is not editable');
-    _checkCurrent();
-    if (state.frozen) throw StateError('This reply has been fixed');
-    ++state._generation;
-    final target = _editor(state);
-    state._openEditors.add(target.cardId ?? 0);
-    return target;
-  }
-
-  ChatroomReplyEditorTarget _editor(
-    ChatroomReplyRoundState state, {
-    int? cardId,
-  }) {
-    final targetCardId =
-        cardId ?? (state.showCandidates ? state.viewedCardId : null);
-    final card = targetCardId == null ? null : state._card(targetCardId);
-    final messages = card == null
-        ? state._formal.where(_isReply).toList()
-        : card.messages.map(_candidateToWorld).toList();
-    return ChatroomReplyEditorTarget(
-      worldId: worldId,
-      locationId: state.locationId,
-      roundId: state.roundId,
-      cardId: targetCardId,
-      messages: List.unmodifiable(messages),
-      canEdit: card?.canEdit ?? true,
-      canDelete: card?.canDelete ?? true,
-      state: state,
-    );
-  }
-
-  Future<void> setDraft(
-    ChatroomReplyEditorTarget target,
-    List<ChatroomLlmMessageOperation> operations,
-  ) async {
-    final state = _validateTarget(target);
-    if (state.frozen || state.busy) throw StateError('Reply editor is frozen');
-    if (state._uncertainBatches.contains(target.cardId ?? 0)) {
-      throw StateError('Resolve the previous save before changing its draft');
-    }
-    _validateOperations(target, operations, allowBlankDraft: true);
-    _storeDraft(state, target, operations);
-    await _persist(state);
-    _notify();
-  }
-
-  void _storeDraft(
-    ChatroomReplyRoundState state,
-    ChatroomReplyEditorTarget target,
-    List<ChatroomLlmMessageOperation> operations,
-  ) {
-    final key = target.cardId ?? 0;
-    if (operations.isEmpty) {
-      state._drafts.remove(key);
-      state._draftBaselines.remove(key);
-      return;
-    }
-    state._drafts[key] = List.of(operations);
-    final baseline = state._draftBaselines.putIfAbsent(key, () => {});
-    final changed = operations
-        .map((operation) => operation.globalMessageId)
-        .toSet();
-    baseline.removeWhere((id, _) => !changed.contains(id));
-    for (final message in target.messages) {
-      if (changed.contains(message.globalMessageId)) {
-        baseline.putIfAbsent(message.globalMessageId, () => message.content);
-      }
-    }
-  }
-
-  Future<void> cancelDraft(ChatroomReplyEditorTarget target) async {
-    final state = _validateTarget(target);
-    if (state.frozen || state.busy) return;
-    state._openEditors.remove(target.cardId ?? 0);
-    if (state._uncertainBatches.contains(target.cardId ?? 0)) return;
-    state._drafts.remove(target.cardId ?? 0);
-    state._draftBaselines.remove(target.cardId ?? 0);
-    await _persist(state);
-    _notify();
-  }
-
-  Future<void> save(
-    ChatroomReplyEditorTarget target,
-    List<ChatroomLlmMessageOperation> operations,
-  ) async {
-    final state = _validateTarget(target);
-    if (state.frozen || state.busy) throw StateError('Reply editor is frozen');
-    if (state._uncertainBatches.contains(target.cardId ?? 0) &&
-        !_sameOperations(state._drafts[target.cardId ?? 0] ?? [], operations)) {
-      throw StateError('Resolve the previous save before changing its draft');
-    }
-    _validateOperations(target, operations);
-    _storeDraft(state, target, operations);
-    state._busy = true;
-    state._error = null;
-    _notify();
-    try {
-      await _persist(state);
-      await _saveDraft(state, target);
-      state._openEditors.remove(target.cardId ?? 0);
-      state._completionRevision++;
-    } catch (error) {
-      if (!_disposed) state._error = error;
-      rethrow;
-    } finally {
-      state._busy = false;
-      _notify();
-      if (state.frozen && !_disposed && state.error == null) {
-        _background(state, () => finalizeBeforeSend(state.locationId));
-      }
-    }
-  }
-
-  Future<void> _saveDraft(
-    ChatroomReplyRoundState state,
-    ChatroomReplyEditorTarget target,
-  ) async {
-    final key = target.cardId ?? 0;
-    final operations = state._drafts[key] ?? const [];
-    if (operations.isEmpty) return;
-    if (state._uncertainBatches.contains(key)) {
-      final current = target.cardId == null
-          ? await _loadRound(state.locationId, state.roundId)
-          : await _reloadCardMessages(state, target.cardId!);
-      if (_operationsApplied(operations, current)) {
-        state._drafts.remove(key);
-        state._draftBaselines.remove(key);
-        state._uncertainBatches.remove(key);
-        if (target.cardId == null) {
-          await _refreshFormalRange(
-            state.locationId,
-            state.roundId,
-            state.roundId,
-          );
-        }
-        await _persist(state);
-        return;
-      }
-      // With deleted IDs absent or a changed baseline, replaying an atomic
-      // batch is unsafe. Explicitly keep the draft for recovery instead.
-      if (!_unchangedTargets(
-        operations,
-        state._draftBaselines[key] ?? {},
-        current,
-      )) {
-        throw StateError(
-          'The previous save result is uncertain; reload before editing again',
-        );
-      }
-      state._uncertainBatches.remove(key);
-    }
-    _validateOperations(target, operations);
-    ++state._generation;
-    // Persist ambiguity before dispatch so process death during POST also
-    // requires a read before retrying (particularly for delete operations).
-    state._uncertainBatches.add(key);
-    await _persist(state);
-    try {
-      if (target.cardId != null) {
-        final result = await _http.batchMutateLlmCardMessages(
-          worldId: worldId,
-          locationId: state.locationId,
-          conversationRoundId: state.roundId,
-          cardId: target.cardId!,
-          operations: operations,
-        );
-        _checkCurrent();
-        state._cards.removeWhere((card) => card.cardId == target.cardId);
-        state._cards.add(result.card);
-        state._cards.sort((a, b) => a.cardIndex.compareTo(b.cardIndex));
-        state._authoritativeCards.add(target.cardId!);
-        state._streamMessages.remove(target.cardId);
-      } else {
-        final result = await _http.batchMutateLlmMessages(
-          worldId: worldId,
-          locationId: state.locationId,
-          conversationRoundId: state.roundId,
-          operations: operations,
-        );
-        _checkCurrent();
-        await _refreshFormalRange(
-          state.locationId,
-          result.startConversationRoundId,
-          result.endConversationRoundId,
-        );
-        state._formal = await _loadRound(state.locationId, state.roundId);
-      }
-      _checkCurrent();
-      ++state._generation;
-      state._drafts.remove(key);
-      state._draftBaselines.remove(key);
-      state._uncertainBatches.remove(key);
-      await _persist(state);
-    } catch (error) {
-      if (_definiteRejection(error)) state._uncertainBatches.remove(key);
-      if (!_disposed) await _persist(state);
-      rethrow;
-    }
-  }
-
-  Future<List<WorldChatroomMessage>> _reloadCardMessages(
-    ChatroomReplyRoundState state,
-    int cardId,
-  ) async {
-    await _loadCards(state);
-    final card = state._card(cardId);
-    if (card == null) throw StateError('The candidate no longer exists');
-    return card.messages.map(_candidateToWorld).toList();
-  }
-
-  ChatroomReplyRoundState _validateTarget(ChatroomReplyEditorTarget target) {
-    _checkCurrent();
-    if (target.worldId != worldId || target._state._controller != this) {
-      throw StateError('Stale reply editor');
-    }
-    return target._state;
-  }
-
-  void _validateOperations(
-    ChatroomReplyEditorTarget target,
-    List<ChatroomLlmMessageOperation> operations, {
-    bool allowBlankDraft = false,
-  }) {
-    if (operations.length > 100) {
-      throw ArgumentError('A batch supports at most 100 changes');
-    }
-    final ids = <int>{};
-    final messages = {
-      for (final message in target.messages) message.globalMessageId: message,
-    };
-    var deletes = 0;
-    for (final operation in operations) {
-      if (!allowBlankDraft) operation.toJson();
-      if (operation.globalMessageId <= 0) {
-        throw ArgumentError('Missing stable message identity');
-      }
-      if (!ids.add(operation.globalMessageId) ||
-          !messages.containsKey(operation.globalMessageId)) {
-        throw ArgumentError('The edit target has changed');
-      }
-      if (operation.action == ChatroomLlmMessageAction.delete) {
-        if (!target.canDelete) {
-          throw StateError('Deleting this candidate is disabled');
-        }
-        deletes++;
-      } else if (!target.canEdit ||
-          messages[operation.globalMessageId]!.messageType == 'image') {
-        throw StateError('This message cannot be edited');
-      }
-    }
-    if (target.cardId != null &&
-        deletes >= target.messages.length &&
-        deletes > 0) {
-      throw StateError('A candidate must retain at least one message');
-    }
   }
 
   Future<void> finalizeBeforeSend(
@@ -1132,7 +896,7 @@ class ChatroomReplyActionsController extends ChangeNotifier {
       _notify();
       try {
         await _persist(state);
-        await _loadCards(state);
+        await _loadCards(state, force: true);
         if (state.confirmed &&
             state._selectionRequestId != null &&
             state.selectedCardId == state._fixedCardId) {
@@ -1155,6 +919,7 @@ class ChatroomReplyActionsController extends ChangeNotifier {
           if (!state._canConfirm) {
             throw StateError('This card group cannot be confirmed');
           }
+          _invalidateCardsCache(state);
           state._selectionRequestId ??= _request('select');
           await _persist(state);
           final result = await _http.selectLlmCard(
@@ -1221,69 +986,6 @@ class ChatroomReplyActionsController extends ChangeNotifier {
     state._uncertainBatches.removeWhere(isAlternative);
   }
 
-  Future<ChatroomGoOnReceipt> goOn(String locationId) async {
-    await restore(locationId);
-    final state = await _target(locationId);
-    if (!state.canGoOn) throw StateError('This round cannot continue');
-    // Block a second tap synchronously, before any save/select awaits.
-    state._goOn = _PendingGoOn(_request('go-on'));
-    state._error = null;
-    _notify();
-    var dispatched = false;
-    try {
-      await finalizeBeforeSend(locationId);
-      if (!state._eligible || _isTickLocked()) {
-        throw StateError('The source round changed');
-      }
-      state._busy = true;
-      await _persist(state);
-      dispatched = true;
-      final receipt = await _requireSession().goOn(
-        locationId: locationId,
-        sourceConversationRoundId: state.roundId,
-        clientMsgId: state._goOn!.clientMsgId,
-      );
-      _checkCurrent();
-      state._goOn!.roundId = receipt.conversationRoundId;
-      final next = _state(locationId, receipt.conversationRoundId);
-      next._owner = ownerUid;
-      if (!next._ended) {
-        next._active = true;
-        _onGoOnAccepted?.call(locationId, receipt.conversationRoundId);
-      }
-      state._goOn!.ended = next._ended;
-      if (receipt.conversationRoundId > (_latest[locationId] ?? 0)) {
-        _latest[locationId] = receipt.conversationRoundId;
-      }
-      await _persist(state);
-      if (next._ended) await _recoverGoOn(state);
-      return receipt;
-    } catch (error) {
-      if (!_disposed) {
-        state._error = error;
-        if (!dispatched || _goOnDefiniteRejection(error)) {
-          state._goOn = null;
-        } else {
-          state._goOn!.uncertain = true;
-        }
-        await _persist(state);
-        if (_errorCode(error) == 2015) {
-          state._invalidated = true;
-          await _persist(state);
-          try {
-            await _refreshLatestHistory?.call(locationId);
-          } catch (_) {
-            /* Preserve the original server rejection. */
-          }
-        }
-      }
-      rethrow;
-    } finally {
-      state._busy = false;
-      _notify();
-    }
-  }
-
   bool _hasPendingGoOn(String location) =>
       statesFor(location).any((state) => state.goOnPending);
   ChatroomSession _requireSession() =>
@@ -1335,6 +1037,12 @@ class ChatroomReplyActionsController extends ChangeNotifier {
 
   void receiveEvent(ChatroomEvent event) {
     if (_disposed) return;
+    if (event is ChatroomLlmMessageUpdated) {
+      if (event.worldId == worldId && event.errNo == 0) {
+        unawaited(clearCardsCache(event.locationId).catchError((Object _) {}));
+      }
+      return;
+    }
     if (event is ChatroomLlmCardStream) {
       if (event.worldId != worldId || event.userId != ownerUid) return;
       final state = _state(event.locationId, event.conversationRoundId);
@@ -1359,6 +1067,7 @@ class ChatroomReplyActionsController extends ChangeNotifier {
         () => _CandidateMessage(event),
       );
       message.apply(event);
+      _invalidateCardsCache(state);
       ++state._generation;
       final terminal = state._cardTerminals[event.cardId];
       if (terminal != null) {
@@ -1374,6 +1083,7 @@ class ChatroomReplyActionsController extends ChangeNotifier {
           state._cardTerminals.containsKey(event.cardId)) {
         return;
       }
+      _invalidateCardsCache(state);
       ++state._generation;
       state._cardTerminals[event.cardId] = event;
       _completeLocalCard(state, event);
@@ -1567,6 +1277,7 @@ class ChatroomReplyActionsController extends ChangeNotifier {
         ChatroomLlmCardMessage(
           cardId: id,
           cardMessageIndex: isOriginal ? position + 1 : message.roundOrder,
+          isLlmStreamMessage: message.isLlmStreamMessage,
           message: ChatroomV2Message(
             type: message.businessType,
             worldId: worldId,
@@ -1707,7 +1418,7 @@ class ChatroomReplyActionsController extends ChangeNotifier {
           if (state.hasCardGroup ||
               state._regenerationRequestId != null ||
               state.frozen) {
-            await _loadCards(state);
+            await _loadCards(state, force: true);
           }
           if (state.frozen) {
             await finalizeBeforeSend(location);
@@ -1829,7 +1540,7 @@ bool _completeCard(ChatroomLlmCard? card) =>
 WorldChatroomMessage _candidateToWorld(ChatroomLlmCardMessage message) =>
     WorldChatroomMessage.fromHttpMessage(
       ChatroomHttpMessage.fromV2Message(message.message),
-    );
+    ).copyWith(isLlmStreamMessage: message.isLlmStreamMessage);
 ChatroomLlmCard _placeholder(
   int id,
   int index, {

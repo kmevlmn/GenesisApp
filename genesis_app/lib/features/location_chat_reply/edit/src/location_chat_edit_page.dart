@@ -1,4 +1,4 @@
-part of 'location_chat_page.dart';
+part of '../../../../pages/chat/location_chat_page.dart';
 
 bool _isEditableRoundMessage(ChatMessageVm message) =>
     !message.isMe &&
@@ -552,6 +552,18 @@ class _LocationChatEditPageState extends State<LocationChatEditPage>
 }
 
 extension _LocationChatEditActions on _LocationChatPanelState {
+  LocationChatEditFeature _editFeature(
+    bool replyBlocked,
+    ChatroomReplyRoundState? replyState,
+    ChatUiStyleConfig style,
+    double? selfCap,
+    double? otherCap,
+  ) => LocationChatEditFeature(
+    enabled: !replyBlocked && (replyState?.canEdit ?? false),
+    busy: _preparingReplyAction,
+    onInvoke: () => unawaited(_editCurrentReply(style, selfCap, otherCap)),
+  );
+
   Future<void> _openReplyEditor(LocationChatEditPageArgs args) async {
     if (_replyEditorOpen || !widget.active) return;
     _replyEditorOpen = true;

@@ -1,4 +1,4 @@
-part of 'chatroom_models.dart';
+part of '../../../../network/chatroom/chatroom_models.dart';
 
 /// Ordinary round pricing is optional and has no candidate billing status.
 class ChatroomRoundBilling {

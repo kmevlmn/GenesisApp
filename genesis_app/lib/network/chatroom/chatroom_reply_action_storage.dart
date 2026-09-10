@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
 
-/// Private operation metadata. Candidate bodies stay in the server's card store.
+/// Private operation metadata and expiring card snapshots, separate from formal history.
 abstract class ChatroomReplyActionStorage {
   Future<List<Map<String, dynamic>>> load({
     required String ownerUid,

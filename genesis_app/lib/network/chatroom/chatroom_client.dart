@@ -14,6 +14,9 @@ import 'chatroom_models.dart';
 import 'chatroom_socket_transport.dart';
 import 'chatroom_timeline_payload.dart';
 
+part '../../features/location_chat_reply/regenerate/src/chatroom_regenerate_protocol.dart';
+part '../../features/location_chat_reply/go_on/src/chatroom_go_on_protocol.dart';
+
 class ChatroomClient {
   ChatroomClient({
     required String wsBaseUrl,
@@ -394,96 +397,30 @@ class ChatroomSession {
 
   /// Start a new round without a user message. The ID correlates the receipt;
   /// it is NOT a business idempotency key. An uncertain result is never retried.
+  /// Request a private candidate over V2. The caller supplies an idempotency ID;
+  /// no request, polling, stream replay or formal-history mutation is automatic.
+  /// Final selection may target a previously joined location. Only return its
+  /// receipt; business code decides when to confirm and when to refresh.
   Future<ChatroomGoOnReceipt> goOn({
     required String locationId,
     required int sourceConversationRoundId,
     required String clientMsgId,
-  }) async {
-    _throwIfClosed();
-    if (protocolVersion != ChatroomProtocolVersion.v2) {
-      throw const ChatroomProtocolException('Go on requires a V2 connection');
-    }
-    final location = locationId.trim();
-    if (location.isEmpty ||
-        sourceConversationRoundId <= 0 ||
-        clientMsgId.trim().isEmpty) {
-      throw ArgumentError(
-        'Go on requires location, positive source round and request ID',
-      );
-    }
-    if (_joined?.locationId != location) {
-      throw const ChatroomProtocolException(
-        'Go on requires the joined location',
-      );
-    }
-    if (_pendingAcks.containsKey(clientMsgId)) {
-      throw StateError('clientMsgId is already in flight');
-    }
-    final ack = await _sendAckedClientMessage(
-      'go_on',
-      {
-        'payload': {
-          'location_id': location,
-          'source_conversation_round_id': sourceConversationRoundId,
-        },
-      },
-      clientMsgId: clientMsgId,
-      maxAttempts: 1,
-    );
-    final round = ack.receiptConversationRoundId;
-    if (ack.worldId != worldId ||
-        ack.locationId != location ||
-        round == null ||
-        round <= 0 ||
-        round == sourceConversationRoundId) {
-      throw const ChatroomProtocolException(
-        'Missing or mismatched Go on receipt',
-      );
-    }
-    return ChatroomGoOnReceipt(
-      worldId: worldId,
-      locationId: location,
-      sourceConversationRoundId: sourceConversationRoundId,
-      conversationRoundId: round,
-      clientMsgId: ack.clientMsgId,
-      billing: ack.billing,
-    );
-  }
+  }) => _executeGoOn(
+    locationId: locationId,
+    sourceConversationRoundId: sourceConversationRoundId,
+    clientMsgId: clientMsgId,
+  );
 
-  /// Request a private candidate over V2. The caller supplies an idempotency ID;
-  /// no request, polling, stream replay or formal-history mutation is automatic.
   Future<ChatroomCardRegeneration> regenerateLlmCard({
     required String locationId,
     required int conversationRoundId,
     required String clientMsgId,
-  }) async {
-    _validateCardCommand(locationId, conversationRoundId, clientMsgId);
-    if (_joined?.locationId != locationId.trim()) {
-      throw const ChatroomProtocolException(
-        'Regeneration requires the joined location',
-      );
-    }
-    final ack = await _sendAckedClientMessage(
-      'regenerate_llm_card',
-      {
-        'conversation_round_id': conversationRoundId,
-        'payload': {'location_id': locationId.trim()},
-      },
-      clientMsgId: clientMsgId,
-      maxAttempts: 1,
-    );
-    _validateCardAck(ack, locationId, conversationRoundId);
-    final result = ack.regeneration;
-    if (result == null || result.conversationRoundId != conversationRoundId) {
-      throw const ChatroomProtocolException(
-        'Missing or mismatched regeneration receipt',
-      );
-    }
-    return result;
-  }
+  }) => _executeRegenerateLlmCard(
+    locationId: locationId,
+    conversationRoundId: conversationRoundId,
+    clientMsgId: clientMsgId,
+  );
 
-  /// Final selection may target a previously joined location. Only return its
-  /// receipt; business code decides when to confirm and when to refresh.
   Future<ChatroomCardSelection> selectLlmCard({
     required String locationId,
     required int conversationRoundId,

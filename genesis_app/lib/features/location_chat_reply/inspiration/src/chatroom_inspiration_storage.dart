@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
 
-import 'chatroom_inspiration.dart';
+import 'chatroom_inspiration_models.dart';
 
 abstract class ChatroomInspirationStorage {
   Future<ChatroomInspirationResponse?> load(ChatroomInspirationSource source);

@@ -162,11 +162,15 @@ class ChatroomLlmCardMessage {
     required this.cardId,
     required this.cardMessageIndex,
     required this.rawJson,
+    this.isLlmStreamMessage = false,
   });
 
   final ChatroomV2Message message;
   final int cardId, cardMessageIndex;
   final Map<String, dynamic> rawJson;
+
+  /// Local display provenance for assembled streams; never read from server JSON.
+  final bool isLlmStreamMessage;
   int get globalMessageId => message.globalMessageId!;
   int get conversationRoundId => message.conversationRoundId!;
   String get content => message.payload['content'] as String;

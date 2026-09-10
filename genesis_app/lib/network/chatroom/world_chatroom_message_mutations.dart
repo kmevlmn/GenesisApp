@@ -219,6 +219,14 @@ extension _WorldChatroomMessageMutations on WorldChatroomService {
     }
 
     try {
+      if (request.start != null) {
+        await _replyActionsController?.clearCardsCache(
+          location,
+          start: request.start,
+          end: request.end,
+        );
+        if (!current()) return;
+      }
       var since = 0;
       var newest = 0;
       var snapshotTruncated = false;

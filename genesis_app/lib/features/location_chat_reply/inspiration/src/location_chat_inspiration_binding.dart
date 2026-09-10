@@ -1,6 +1,30 @@
-part of 'location_chat_page.dart';
+part of '../../../../pages/chat/location_chat_page.dart';
 
 extension _LocationChatInspirationBinding on _LocationChatPanelState {
+  void _editInspiration(String text) {
+    if (_replyCardTransitionBusy) return;
+    _textController.setSerializedText(text);
+    if (_composerFocusNode.hasFocus) {
+      // The system back button can hide the keyboard without dropping focus.
+      unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.show'));
+    } else {
+      _composerFocusNode.requestFocus();
+    }
+  }
+
+  LocationChatInspirationFeature _inspirationFeature() =>
+      LocationChatInspirationFeature(
+        messages: _inspirationMessages,
+        loading: _inspirationLoading,
+        enabled:
+            _currentInspirationSource != null &&
+            !_sending &&
+            !_preparingReplyAction,
+        onExpandedChanged: _onInspirationExpanded,
+        onSend: _sendInspiration,
+        onEdit: _editInspiration,
+      );
+
   ChatroomInspirationSource? get _currentInspirationSource {
     if (!widget.active ||
         _chatroomState.inputBlocked ||

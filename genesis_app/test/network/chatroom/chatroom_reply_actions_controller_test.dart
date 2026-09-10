@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:io';
+
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/network/api_client.dart';
@@ -10,6 +13,7 @@ import 'package:genesis_flutter_android/network/chatroom/chatroom_models.dart';
 import 'package:genesis_flutter_android/network/chatroom/chatroom_reply_action_storage.dart';
 import 'package:genesis_flutter_android/network/chatroom/world_chatroom_service.dart';
 import 'package:genesis_flutter_android/network/http_transport.dart';
+import 'package:genesis_flutter_android/pages/chat/message_parsers/location_chat_message_parse_support.dart';
 
 const _round = 9007199254740993;
 const _messageId = _round + 10;
@@ -244,7 +248,11 @@ class _Session implements ChatroomSession {
 }
 
 class _Harness {
-  _Harness({MemoryChatroomReplyActionStorage? storage, String owner = 'u'}) {
+  _Harness({
+    ChatroomReplyActionStorage? storage,
+    String owner = 'u',
+    DateTime Function()? now,
+  }) {
     controller = ChatroomReplyActionsController(
       worldId: 'w',
       ownerUid: owner,
@@ -259,6 +267,7 @@ class _Harness {
         walletRefreshes++;
       },
       storage: storage ?? MemoryChatroomReplyActionStorage(),
+      now: now,
     );
     controller.observeMessages('l', [_formal(user: owner)]);
   }
@@ -329,6 +338,238 @@ ChatroomLlmCardGenerationEnd _terminal(
 );
 
 void main() {
+  Future<void> historyCards(_Harness h, {bool Function()? current}) =>
+      h.controller.loadHistoryCards(
+        'l',
+        roundIds: {_round},
+        isCurrent: current ?? () => true,
+      );
+
+  test(
+    'SQLite card cache survives closing and reopening the database',
+    () async {
+      sqfliteFfiInit();
+      final directory = await Directory.systemTemp.createTemp(
+        'reply-card-cache-',
+      );
+      final path = '${directory.path}/actions.db';
+      final storage = SqfliteChatroomReplyActionStorage(
+        databasePath: path,
+        databaseFactoryOverride: databaseFactoryFfi,
+      );
+      final first = _Harness(storage: storage);
+      first.api.cards = _cards([_card(101)]);
+      await historyCards(first);
+      first.controller.dispose();
+      await _settle();
+      final reopened = SqfliteChatroomReplyActionStorage(
+        databasePath: path,
+        databaseFactoryOverride: databaseFactoryFfi,
+      );
+      final second = _Harness(storage: reopened);
+      try {
+        await historyCards(second);
+        expect(second.api.calls, isEmpty);
+        expect(
+          second.state.cards.single.messages.first.conversationRoundId,
+          _round,
+        );
+        expect(second.state.cards.single.messages.first.content, 'Original');
+        await second.controller.clearCardsCache('l');
+        final saved = await reopened.load(
+          ownerUid: 'u',
+          worldId: 'w',
+          locationId: 'l',
+        );
+        expect(saved.single, isNot(contains('cards_cache')));
+        expect(saved.single, contains('go_on'));
+      } finally {
+        second.controller.dispose();
+        await _settle();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'card history coalesces requests and caches empty and populated groups',
+    () async {
+      for (final cards in [
+        <ChatroomLlmCard>[],
+        [_card(101)],
+      ]) {
+        final h = _Harness();
+        addTearDown(h.controller.dispose);
+        final barrier = Completer<ChatroomLlmCardsResponse>();
+        h.api.cardsBarrier = barrier;
+        var oldCurrent = true;
+        final first = historyCards(h, current: () => oldCurrent);
+        await _settle();
+        oldCurrent = false;
+        final second = historyCards(h);
+        await _settle();
+        expect(h.api.calls.where((c) => c.startsWith('cards:')), hasLength(1));
+        barrier.complete(_cards(cards));
+        await Future.wait([first, second]);
+        await historyCards(h);
+        expect(h.api.calls.where((c) => c.startsWith('cards:')), hasLength(1));
+        expect(h.state.cards.length, cards.length);
+      }
+    },
+  );
+
+  test(
+    'cards persist across controllers and clearing preserves operation metadata',
+    () async {
+      final storage = MemoryChatroomReplyActionStorage();
+      final first = _Harness(storage: storage);
+      first.api.cards = _cards([_card(101)]);
+      await historyCards(first);
+      first.controller.dispose();
+      final restored = _Harness(storage: storage);
+      addTearDown(restored.controller.dispose);
+      await historyCards(restored);
+      expect(restored.api.calls, isEmpty);
+      expect(restored.state.cards.single.cardId, 101);
+      await restored.controller.clearCardsCache('l');
+      final saved = (await storage.load(
+        ownerUid: 'u',
+        worldId: 'w',
+        locationId: 'l',
+      )).single;
+      expect(saved, isNot(contains('cards_cache')));
+      expect(saved['viewed_card_id'], 101);
+      expect(saved, contains('drafts'));
+      await historyCards(restored);
+      expect(restored.api.calls, ['cards:$_round']);
+      final other = _Harness(storage: storage, owner: 'other');
+      addTearDown(other.controller.dispose);
+      await historyCards(other);
+      expect(other.api.calls, ['cards:$_round']);
+    },
+  );
+
+  test(
+    'expired cards are removed on restore and do not extend on cache hits',
+    () async {
+      var now = DateTime.utc(2026, 9, 9);
+      final storage = MemoryChatroomReplyActionStorage();
+      final first = _Harness(storage: storage, now: () => now);
+      first.api.cards = _cards([_card(101)]);
+      await historyCards(first);
+      now = now.add(const Duration(hours: 23));
+      await historyCards(first);
+      expect(first.api.calls, ['cards:$_round']);
+      first.controller.dispose();
+      now = now.add(const Duration(hours: 1));
+      final next = _Harness(storage: storage, now: () => now);
+      addTearDown(next.controller.dispose);
+      await next.controller.restore('l');
+      final saved = (await storage.load(
+        ownerUid: 'u',
+        worldId: 'w',
+        locationId: 'l',
+      )).single;
+      expect(saved, isNot(contains('cards_cache')));
+      await historyCards(next);
+      expect(next.api.calls, ['cards:$_round']);
+    },
+  );
+
+  test(
+    'invalidated in-flight card responses cannot revive persisted cache',
+    () async {
+      final storage = MemoryChatroomReplyActionStorage();
+      final h = _Harness(storage: storage);
+      addTearDown(h.controller.dispose);
+      final barrier = Completer<ChatroomLlmCardsResponse>();
+      h.api.cardsBarrier = barrier;
+      final old = historyCards(h);
+      await _settle();
+      await h.controller.clearCardsCache('l', start: _round, end: _round);
+      h.api.cards = _cards([_card(102)]);
+      await historyCards(h);
+      barrier.complete(_cards([_card(101)]));
+      await old;
+      await historyCards(h);
+      expect(h.api.calls, ['cards:$_round', 'cards:$_round']);
+      expect(h.state.cards.single.cardId, 102);
+      final saved = (await storage.load(
+        ownerUid: 'u',
+        worldId: 'w',
+        locationId: 'l',
+      )).single;
+      expect((saved['cards_cache'] as Map)['original_card_id'], 102);
+    },
+  );
+
+  test('nonterminal cards and failed reads are not cached', () async {
+    final h = _Harness();
+    addTearDown(h.controller.dispose);
+    h.api.cards = _cards([_card(101, generation: 'generating')]);
+    await historyCards(h);
+    await historyCards(h);
+    expect(h.api.calls, ['cards:$_round', 'cards:$_round']);
+    final barrier = Completer<ChatroomLlmCardsResponse>();
+    h.api.cardsBarrier = barrier;
+    final failed = historyCards(h);
+    final check = expectLater(failed, throwsStateError);
+    await _settle();
+    barrier.completeError(StateError('offline'));
+    await check;
+    h.api.cards = _cards([_card(101)]);
+    await historyCards(h);
+    await historyCards(h);
+    expect(h.api.calls, hasLength(4));
+  });
+
+  test(
+    'new rounds and disconnect discard old snapshots without removing drafts',
+    () async {
+      final storage = MemoryChatroomReplyActionStorage();
+      final h = _Harness(storage: storage);
+      addTearDown(h.controller.dispose);
+      h.api.cards = _cards([_card(101)]);
+      await historyCards(h);
+      h.controller.invalidateCardsOnDisconnect();
+      await historyCards(h);
+      expect(h.api.calls, hasLength(2));
+      h.controller.observeMessages('l', [_formal(round: _round + 1)]);
+      await _settle();
+      final saved = await storage.load(
+        ownerUid: 'u',
+        worldId: 'w',
+        locationId: 'l',
+      );
+      expect(saved.single, isNot(contains('cards_cache')));
+      expect(saved.single, contains('drafts'));
+    },
+  );
+
+  test(
+    'candidate previews read local streams without browsing or persistence',
+    () async {
+      final h = _Harness();
+      addTearDown(h.controller.dispose);
+      h.api.cards = _cards([
+        _card(101),
+        _card(102, index: 2, generation: 'generating'),
+      ]);
+      await h.controller.restoreLocationCards('l');
+      final revision = h.state.presentationRevision;
+      final current = h.state.viewedCardId;
+      h.api.calls.clear();
+      h.controller.receiveEvent(_stream('chunk', content: 'Live preview'));
+      expect(h.state.messagesForCard(102).single.content, 'Live preview');
+      expect(h.state.messagesForCard(101), isNotEmpty);
+      expect(h.state.messagesForCard(-99), isEmpty);
+      expect(h.state.viewedCardId, current);
+      expect(h.state.presentationRevision, revision);
+      expect(h.api.calls, isEmpty);
+      expect(h.session.requests, isEmpty);
+    },
+  );
+
   test('formal inspiration permits another owner and respects readiness', () {
     final h = _Harness();
     addTearDown(h.controller.dispose);
@@ -428,6 +669,86 @@ void main() {
       expect(h.state.canGoOn, isFalse);
     },
   );
+
+  for (final entry in <(String, String, String)>[
+    ('literal newline', r'A\nB', 'A\nB'),
+    ('escaped backslash', r'A\\nB', r'A\nB'),
+    ('real newline', 'A\nB', 'A\nB'),
+    ('backslash before newline', 'A\\\nB', 'A\nB'),
+    ('unicode and tab', r'\u4F60\tB', '你\tB'),
+  ]) {
+    for (final terminalFirst in [false, true]) {
+      test(
+        'candidate escape display survives completion: ${entry.$1}, terminalFirst=$terminalFirst',
+        () async {
+          final h = _Harness();
+          addTearDown(h.controller.dispose);
+          h.session.regenerateHandler = () async =>
+              const ChatroomCardRegeneration(
+                conversationRoundId: _round,
+                originalCardId: 101,
+                cardId: 102,
+                generationState: ChatroomCardGenerationState.generating,
+                billing: ChatroomCardBilling(
+                  status: ChatroomCardBillingStatus.reserved,
+                ),
+              );
+          // The original card can itself originate from a completed LLM stream.
+          h.controller.observeMessages('l', [
+            _formal().copyWith(content: entry.$2, isLlmStreamMessage: true),
+          ]);
+          await h.controller.regenerate('l');
+          h.controller.receiveEvent(_stream('chunk', content: entry.$2));
+          expect(
+            locationChatMessageDisplayText(h.state.displayedMessages.single),
+            entry.$3,
+          );
+          if (terminalFirst) h.controller.receiveEvent(_terminal('succeeded'));
+          h.controller.receiveEvent(_stream('end', content: entry.$2));
+          if (!terminalFirst) h.controller.receiveEvent(_terminal('succeeded'));
+          await _settle();
+          expect(h.state.displayedMessages.single.streaming, isFalse);
+          expect(
+            h.state.displayedMessages.single.content,
+            entry.$2,
+            reason:
+                'Display decoding must not rewrite the submitted source text',
+          );
+          expect(
+            locationChatMessageDisplayText(h.state.displayedMessages.single),
+            entry.$3,
+          );
+          await h.controller.browse('l', -1);
+          expect(
+            locationChatMessageDisplayText(h.state.displayedMessages.single),
+            entry.$3,
+          );
+          await h.controller.browse('l', 1);
+          expect(
+            locationChatMessageDisplayText(h.state.displayedMessages.single),
+            entry.$3,
+          );
+          final editor = await h.controller.prepareEditor('l');
+          expect(editor.messages.single.content, entry.$2);
+          expect(
+            locationChatMessageDisplayText(editor.messages.single),
+            entry.$3,
+          );
+          expect(h.api.calls, isEmpty);
+        },
+      );
+    }
+  }
+
+  test('HTTP card content retains ordinary server text semantics', () async {
+    final h = _Harness();
+    addTearDown(h.controller.dispose);
+    h.api.cards = _cards([_card(101, content: r'A\nB')]);
+    await h.controller.restoreLocationCards('l');
+    final message = h.state.messagesForCard(101).first;
+    expect(message.isLlmStreamMessage, isFalse);
+    expect(locationChatMessageDisplayText(message), r'A\nB');
+  });
 
   test(
     'regeneration and editing use local cards without GET before ACK or after terminal',

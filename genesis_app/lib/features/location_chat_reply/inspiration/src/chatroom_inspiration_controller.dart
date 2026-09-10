@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import '../http_transport.dart';
+import '../../../../network/http_transport.dart';
 
-import 'chatroom_http_api.dart';
-import 'chatroom_inspiration.dart';
+import '../../../../network/chatroom/chatroom_http_api.dart';
+import 'chatroom_inspiration_models.dart';
 import 'chatroom_inspiration_storage.dart';
 
 class ChatroomInspirationController extends ChangeNotifier {
