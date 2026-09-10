@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 import '../../network/models/membership_product.dart';
+import '../../platform/billing/membership_catalog_cache.dart';
 
 class MembershipPlatformUnavailable implements Exception {}
 
@@ -39,11 +42,50 @@ class MembershipCatalogData {
 typedef MembershipCatalogLoader = Future<MembershipCatalogData> Function();
 
 class MembershipCatalog {
-  MembershipCatalog({required this.loadProducts, required this.provider});
+  MembershipCatalog({
+    required this.loadProducts,
+    required this.provider,
+    this.cacheStore,
+    this.readOwnerUid,
+  });
 
   final Future<MembershipProductList> Function(MembershipProvider provider)
   loadProducts;
   final MembershipProvider? provider;
+  final MembershipCatalogCache? cacheStore;
+  final Future<String?> Function()? readOwnerUid;
+  MembershipCatalogData? _cached;
+  int _session = 0;
+  int _loadGeneration = 0;
+
+  MembershipCatalogData? get cached => _cached;
+
+  void resetForSession() {
+    _session++;
+    _loadGeneration++;
+    _cached = null;
+  }
+
+  Future<MembershipCatalogData?> loadCached() async {
+    if (_cached != null) return _cached;
+    final platform = provider;
+    if (platform == null || cacheStore == null) return null;
+    final session = _session;
+    try {
+      final owner = await readOwnerUid?.call();
+      final response = await cacheStore!.load(platform, owner);
+      if (session != _session) return null;
+      // A slow disk read must not replace an already returned API response.
+      if (_cached != null) return _cached;
+      if (response == null) return null;
+      return _cached = _catalog(response, platform);
+    } catch (error) {
+      debugPrint(
+        '[Membership] catalog cache read failed: ${error.runtimeType}',
+      );
+      return null;
+    }
+  }
 
   static MembershipProvider? get currentProvider => kIsWeb
       ? null
@@ -56,7 +98,47 @@ class MembershipCatalog {
   Future<MembershipCatalogData> load() async {
     final platform = provider;
     if (platform == null) throw MembershipPlatformUnavailable();
+    final session = _session;
+    final generation = ++_loadGeneration;
+    final owner = await readOwnerUid?.call();
     final response = await loadProducts(platform);
+    final result = _catalog(response, platform);
+    if (session == _session && generation == _loadGeneration) {
+      // Cache display fields without account UUIDs or upgrade purchase tokens.
+      _cached = _catalog(
+        MembershipProductList(
+          products: [
+            for (final product in response.products)
+              MembershipProduct.fromJson(
+                Map<String, dynamic>.from(product.toJson()),
+              ),
+          ],
+        ),
+        platform,
+      );
+      unawaited(_saveCache(platform, owner, response.products));
+    }
+    return result;
+  }
+
+  Future<void> _saveCache(
+    MembershipProvider platform,
+    String? owner,
+    List<MembershipProduct> products,
+  ) async {
+    try {
+      await cacheStore?.save(platform, owner, products);
+    } catch (error) {
+      debugPrint(
+        '[Membership] catalog cache write failed: ${error.runtimeType}',
+      );
+    }
+  }
+
+  MembershipCatalogData _catalog(
+    MembershipProductList response,
+    MembershipProvider platform,
+  ) {
     final products = response.products.toList();
     if (products.any((product) => product.provider != platform) ||
         products.map((product) => product.planCode).toSet().length !=

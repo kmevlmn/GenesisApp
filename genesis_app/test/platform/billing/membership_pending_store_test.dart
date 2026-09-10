@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_pending_store.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_restore_record.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_guest_claim_record.dart';
+import 'package:genesis_flutter_android/platform/billing/membership_guest_claim_proof.dart';
 import 'package:genesis_flutter_android/platform/billing/billing_models.dart';
 import 'package:genesis_flutter_android/network/models/membership_product.dart';
 import 'package:genesis_flutter_android/network/models/membership_purchase.dart';
@@ -14,6 +15,91 @@ import '../../support/membership_fixtures.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final provider in MembershipProvider.values) {
+    test(
+      '$provider legacy claim proof drops stored plan without losing credentials',
+      () async {
+        final proof = MembershipGuestClaimProof.fromJson({
+          'provider': provider.name,
+          'store_product_id': 'original-store-product',
+          'request_id': 'original-request',
+          'purchase_token': 'original-token',
+          'transaction_id': 'original-transaction',
+          'plan_code': 'pro_yearly',
+        });
+        FlutterSecureStorage.setMockInitialValues({});
+        final store = SecureMembershipPendingStore();
+        await store.saveGuestClaim(
+          MembershipGuestClaimRecord(
+            guest: support.guest,
+            ownerUid: 'first-login',
+            status: 'accepted',
+            recoveredProof: proof,
+          ),
+        );
+        final saved =
+            (await SecureMembershipPendingStore().loadGuestClaims()).single;
+        expect(saved.recoveredProof!.toJson(), {
+          'provider': provider.name,
+          'store_product_id': 'original-store-product',
+          'request_id': 'original-request',
+          if (provider == MembershipProvider.google)
+            'purchase_token': 'original-token',
+          if (provider == MembershipProvider.apple)
+            'transaction_id': 'original-transaction',
+        });
+        expect(saved.ownerUid, 'first-login');
+        expect(saved.status, 'accepted');
+      },
+    );
+    test(
+      '$provider reinstall claim proof survives restart and is removed after binding',
+      () async {
+        FlutterSecureStorage.setMockInitialValues({});
+        final store = SecureMembershipPendingStore();
+        final claim = MembershipGuestClaimRecord(
+          guest: support.guest,
+          loginRequired: true,
+          recoveredProof: MembershipGuestClaimProof(
+            provider: provider,
+            storeProductId: 'store-subscription',
+            requestId: 'stable-claim-attempt',
+            purchaseToken: 'google-proof',
+            transactionId: 'apple-transaction',
+          ),
+        );
+        await store.saveGuestClaim(claim);
+        final restarted = SecureMembershipPendingStore();
+        final restored = (await restarted.loadGuestClaims()).single;
+        expect(restored.recoveredProof!.requestId, 'stable-claim-attempt');
+        expect(restored.recoveredProof!.provider, provider);
+        expect(restored.recoveredProof!.toJson(), isNot(contains('plan_code')));
+        expect(restored.guest.accountUuid, support.guest.accountUuid);
+        expect(await restarted.loadAll(), isEmpty);
+        expect(await restarted.loadRestores(), isEmpty);
+        expect(await restarted.loadConfirmedReceipts(), isEmpty);
+        final saved = restored.copyWith(
+          ownerUid: 'first-login',
+          status: 'accepted',
+        );
+        await restarted.saveGuestClaim(saved);
+        final retry =
+            (await SecureMembershipPendingStore().loadGuestClaims()).single;
+        expect(retry.ownerUid, 'first-login');
+        expect(retry.recoveredProof!.toJson(), saved.recoveredProof!.toJson());
+        final completed = retry.copyWith(status: 'completed');
+        await restarted.saveGuestClaim(completed);
+        await restarted.completeGuestClaim(completed);
+        final bound =
+            (await SecureMembershipPendingStore().loadGuestClaims()).single;
+        expect(bound.guest.accountUuid, support.guest.accountUuid);
+        expect(bound.ownerUid, 'first-login');
+        expect(bound.recoveredProof, isNull);
+        expect(bound.needsRetry, isFalse);
+      },
+    );
+  }
 
   test(
     'legacy guest credentials migrate without losing receipt or binding progress',
@@ -97,80 +183,71 @@ void main() {
       expect(saved.product.basePlanId, isEmpty);
       expect(saved.request.toJson(), {
         'provider': 'google',
-        'plan_code': 'pro_monthly',
         'store_product_id': 'test_pro',
-        'request_id': 'no-base-plan',
         'purchase_token': 'stored-token',
       });
     },
   );
 
-  for (final interruptedAfter in [0, 1, 2]) {
-    test(
-      'completed claim resumes cleanup after $interruptedAfter receipt writes',
-      () async {
-        FlutterSecureStorage.setMockInitialValues({});
-        final store = SecureMembershipPendingStore();
-        const claim = MembershipGuestClaimRecord(
-          guest: support.guest,
-          purchaseRequestId: 'confirmed-order',
-          purchaseConfirmed: true,
-          ownerUid: 'first-login',
-          status: 'completed',
-        );
-        final confirmed = MembershipPurchaseRecord(
-          requestId: 'confirmed-order',
+  test(
+    'binding keeps UUID and removes purchase proof, including repeated cleanup',
+    () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final store = SecureMembershipPendingStore();
+      const claim = MembershipGuestClaimRecord(
+        guest: support.guest,
+        ownerUid: 'first-login',
+        status: 'completed',
+        purchaseRequestId: 'guest-order',
+        purchaseConfirmed: true,
+      );
+      await store.complete(
+        MembershipPurchaseRecord(
+          requestId: 'guest-order',
           product: membershipProduct(),
           accountUuid: support.guest.accountUuid,
           ownerUid: null,
           guest: support.guest,
-          purchaseToken: 'confirmed-token',
-          transactionId: '100',
+          purchaseToken: 'guest-receipt',
           state: 'purchased',
           reportStatus: 'completed',
-          reportId: 'report-test',
-        );
-        final pendingFinish = confirmed.copyWith(requestId: 'pending-finish');
-        await store.complete(confirmed);
-        await store.save(pendingFinish);
-        await store.saveGuestClaim(claim);
-        // Recreate the on-disk state after each write boundary of cleanup.
-        if (interruptedAfter >= 1) {
-          await store.complete(confirmed.bindGuestToAccount('first-login'));
-        }
-        if (interruptedAfter >= 2) {
-          await store.save(pendingFinish.bindGuestToAccount('first-login'));
-        }
-        final restarted = SecureMembershipPendingStore();
-        await restarted.completeGuestClaim(
-          (await restarted.loadGuestClaims()).single,
-        );
-        expect(await restarted.loadGuestClaims(), isEmpty);
-        expect(
-          await const FlutterSecureStorage().read(
-            key: 'membership_guest_claims_v1',
-          ),
-          isNull,
-        );
-        final receipts = [
-          ...(await restarted.loadAll()),
-          ...(await restarted.loadConfirmedReceipts()),
-        ];
-        expect(receipts, hasLength(2));
-        for (final receipt in receipts) {
-          expect(receipt.ownerUid, 'first-login');
-          expect(receipt.guest, isNull);
-          expect(receipt.accountUuid, support.guest.accountUuid);
-          expect(receipt.purchaseToken, 'confirmed-token');
-          expect(receipt.product.basePlanId, confirmed.product.basePlanId);
-          expect(jsonEncode(receipt.toJson()), isNot(contains('claim_token')));
-        }
-        // Cleanup is safe to replay even after the final delete succeeded.
-        await restarted.completeGuestClaim(claim);
-        expect(await restarted.loadGuestClaims(), isEmpty);
-      },
+        ),
+      );
+      await store.saveGuestClaim(claim);
+      await store.completeGuestClaim(claim);
+      final restarted = SecureMembershipPendingStore();
+      final cached = (await restarted.loadGuestClaims()).single;
+      expect(cached.guest.accountUuid, support.guest.accountUuid);
+      expect(cached.status, 'completed');
+      expect(cached.needsRetry, isFalse);
+      expect(cached.purchaseRequestId, isNull);
+      expect(cached.autoClaimAllowed, isFalse);
+      expect(await restarted.loadConfirmedReceipts(), isEmpty);
+      expect(await restarted.loadAll(), isEmpty);
+      await restarted.completeGuestClaim(claim);
+      expect(await restarted.loadGuestClaims(), hasLength(1));
+    },
+  );
+
+  test('successful logged-in order is deleted rather than archived', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final store = SecureMembershipPendingStore();
+    final record = MembershipPurchaseRecord(
+      requestId: 'report-retry',
+      product: membershipProduct(),
+      accountUuid: support.accountUuid,
+      ownerUid: 'user-test',
+      purchaseToken: 'receipt',
+      state: 'purchased',
     );
-  }
+    await store.save(record);
+    await store.complete(record.copyWith(reportStatus: 'completed'));
+    expect(await SecureMembershipPendingStore().loadAll(), isEmpty);
+    expect(
+      await SecureMembershipPendingStore().loadConfirmedReceipts(),
+      isEmpty,
+    );
+  });
 
   test(
     'cleanup preserves other guests and rejects unconfirmed binding',
@@ -199,7 +276,11 @@ void main() {
       await store.saveGuestClaim(completedClaim);
       await store.completeGuestClaim(completedClaim);
       expect(
-        (await store.loadGuestClaims()).single.guest.accountUuid,
+        (await store.loadGuestClaims())
+            .where((record) => record.status != 'completed')
+            .single
+            .guest
+            .accountUuid,
         other.guest.accountUuid,
       );
     },
@@ -267,8 +348,7 @@ void main() {
       expect(platform.launches, 1);
       expect(platform.product?.basePlanId, 'test-annual');
       final pending = await store.loadAll();
-      expect(pending, hasLength(1));
-      expect(pending.first.accountUuid, support.accountUuid);
+      expect(pending, isEmpty);
       for (final row in pending) {
         expect(
           (row.toJson()['product'] as Map).keys,
@@ -288,10 +368,7 @@ void main() {
         (await store.loadAll()).map((r) => r.requestId),
         isNot(contains('old-order')),
       );
-      expect(
-        (await store.loadConfirmedReceipts()).single.purchaseToken,
-        'old-token',
-      );
+      expect(await store.loadConfirmedReceipts(), isEmpty);
     },
   );
 

@@ -16,7 +16,17 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
     if (request.guest == null || provider != MembershipProvider.apple) {
       return request;
     }
-    final key = '${purchase.accountUuid}:${purchase.transactionId}';
+    final signed = await _signedGuestRequest(
+      MembershipClaimRequest.fromPurchase(request),
+    );
+    return request.withSignedTransaction(signed.signedTransaction);
+  }
+
+  Future<MembershipClaimRequest> _signedGuestRequest(
+    MembershipClaimRequest request,
+  ) async {
+    if (request.provider != MembershipProvider.apple) return request;
+    final key = '${request.guest.accountUuid}:${request.transactionId}';
     var signed = _signedTransactions[key];
     if (signed == null || signed.isEmpty) {
       signed = await loadSignedTransaction?.call(request);
@@ -28,6 +38,26 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
       if (!_disposed) _signedTransactions[key] = signed;
     }
     return request.withSignedTransaction(signed);
+  }
+
+  Future<MembershipClaimRequest> _recoveredGuestClaimRequest(
+    MembershipGuestClaimRecord claim,
+  ) async {
+    final proof = claim.recoveredProof!;
+    if (proof.provider != provider) {
+      throw const BillingPlatformException(
+        'membership_claim_provider_mismatch',
+      );
+    }
+    return _signedGuestRequest(
+      MembershipClaimRequest(
+        provider: provider,
+        storeProductId: proof.storeProductId,
+        guest: claim.guest,
+        purchaseToken: proof.purchaseToken,
+        transactionId: proof.transactionId,
+      ),
+    );
   }
 
   MembershipPurchaseRecord? _claimPurchase(MembershipGuestClaimRecord claim) {
@@ -90,7 +120,22 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
     if (_disposed || guest == null || !purchase.paid || !purchase.hasReceipt) {
       return;
     }
-    final previous = _guestClaims[guest.accountUuid];
+    var previous = _guestClaims[guest.accountUuid];
+    if (previous?.recoveredProof != null &&
+        _checkoutWaits.containsKey(purchase.requestId)) {
+      previous = null;
+    }
+    if (previous?.status == 'completed') {
+      // A later explicit guest checkout may reuse the UUID retained for check.
+      // Its new receipt needs a new claim; an old background callback does not.
+      if (!_checkoutWaits.containsKey(purchase.requestId)) return;
+      previous = null;
+    }
+    if (previous == null ||
+        previous.purchaseRequestId != purchase.requestId ||
+        purchase.reportStatus == 'completed' && !previous.purchaseConfirmed) {
+      await store.saveGuestPurchase(purchase);
+    }
     var claim =
         previous ??
         MembershipGuestClaimRecord(
@@ -102,6 +147,11 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
         purchaseRequestId: purchase.requestId,
         purchaseConfirmed: true,
       );
+      if (!_currentGuestLoginUuids.contains(guest.accountUuid)) {
+        _guestStartupResolved = false;
+        _guestStartupRefreshNeeded = true;
+        _guestOrderChecks.remove(guest.accountUuid);
+      }
     }
     if (!identical(previous, claim) ||
         _pendingGuestClaimWrites.contains(guest.accountUuid)) {
@@ -117,9 +167,33 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
     if (uid == null) {
       for (final claim in _guestClaims.values) {
         final id = claim.purchaseRequestId ?? claim.guest.accountUuid;
-        if (claim.requiresLogin && !_presentedAttempts.contains(id)) {
+        if (checkGuestPurchase != null &&
+            !_currentGuestLoginUuids.contains(claim.guest.accountUuid) &&
+            _guestOrderChecks[claim.guest.accountUuid]?.hasUnboundOrder !=
+                true) {
+          continue;
+        }
+        final needsLogin =
+            _currentGuestLoginUuids.contains(claim.guest.accountUuid)
+            ? claim.requiresLogin
+            : checkGuestPurchase == null
+            ? claim.requiresLogin
+            : _guestOrderChecks[claim.guest.accountUuid]?.hasUnboundOrder ==
+                  true;
+        if (needsLogin && !_presentedAttempts.contains(id)) {
           requestId = id;
           break;
+        }
+      }
+      if (requestId == null && !_busy && _presentedAttempts.isEmpty) {
+        // A reinstall has no local claim record. A store-discovered UUID can
+        // still require login according to check, without creating an order.
+        for (final entry in _guestOrderChecks.entries) {
+          if (!_guestClaims.containsKey(entry.key) &&
+              entry.value.hasUnboundOrder) {
+            requestId = entry.key;
+            break;
+          }
         }
       }
     }
@@ -128,6 +202,13 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
 
   Future<void> _completeGuestClaim(MembershipGuestClaimRecord record) async {
     if (record.status != 'completed' || record.ownerUid == null) return;
+    if (record.purchaseRequestId == null &&
+        record.recoveredProof == null &&
+        !record.purchaseConfirmed &&
+        !record.loginRequired &&
+        !record.autoClaimAllowed) {
+      return;
+    }
     final accountUuid = record.guest.accountUuid;
     final session = _session;
     if (_claimWalletRefreshSessions[accountUuid] != session &&
@@ -161,7 +242,8 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
         );
       }
     }
-    _guestClaims.remove(record.guest.accountUuid);
+    _guestClaims[record.guest.accountUuid] = record.boundIdentity;
+    _guestOrderChecks.remove(record.guest.accountUuid);
     _pendingGuestClaimWrites.remove(record.guest.accountUuid);
     _claimRetries.remove(accountUuid)?.timer?.cancel();
     _claimWalletRefreshSessions.remove(accountUuid);
@@ -195,7 +277,14 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
     if (uid == null || claimGuest == null) return;
     for (var record in _guestClaims.values.toList()) {
       if (_disposed || await readLoginUid() != uid) return;
+      if (record.ownerUid == null &&
+          _guestHomeCheck != null &&
+          !_guestStartupResolved &&
+          !_currentGuestLoginUuids.contains(record.guest.accountUuid)) {
+        continue;
+      }
       if (!record.needsRetry ||
+          (!record.autoClaimAllowed && record.ownerUid == null) ||
           record.ownerUid != null && record.ownerUid != uid) {
         continue;
       }
@@ -210,11 +299,15 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
       var requested = false;
       try {
         final purchase = _claimPurchase(record);
-        if (purchase == null) {
+        if (purchase == null && record.recoveredProof == null) {
           _scheduleRetry();
           continue;
         }
-        final request = await _guestPurchaseRequest(purchase);
+        final request = purchase != null
+            ? MembershipClaimRequest.fromPurchase(
+                await _guestPurchaseRequest(purchase),
+              )
+            : await _recoveredGuestClaimRequest(record);
         if (_disposed || session != _session || await readLoginUid() != uid) {
           return;
         }
@@ -244,7 +337,9 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
                 purchase.hasReceipt &&
                 purchase.reportStatus == 'completed') {
               // Preserve the receipt, request key and any completed Apple finish.
-              await _save(purchase.copyWith(retryReport: true));
+              final retry = purchase.copyWith(retryReport: true);
+              await _save(retry);
+              await store.save(retry);
             }
           }
           _claimReportsRequeued.add(accountUuid);

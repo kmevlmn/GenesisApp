@@ -23,7 +23,6 @@ bool isMembershipAccountUuid(String value) => RegExp(
 class MembershipPurchaseRequest {
   const MembershipPurchaseRequest({
     required this.product,
-    required this.requestId,
     this.transactionId = '',
     this.purchaseToken = '',
     this.signedTransaction = '',
@@ -31,7 +30,6 @@ class MembershipPurchaseRequest {
   });
 
   final MembershipOrderProduct product;
-  final String requestId;
   final String transactionId;
   final String purchaseToken;
 
@@ -42,7 +40,6 @@ class MembershipPurchaseRequest {
   MembershipPurchaseRequest withSignedTransaction(String value) =>
       MembershipPurchaseRequest(
         product: product,
-        requestId: requestId,
         transactionId: transactionId,
         purchaseToken: purchaseToken,
         signedTransaction: value,
@@ -51,9 +48,7 @@ class MembershipPurchaseRequest {
 
   Map<String, Object?> toJson() {
     final google = product.provider == MembershipProvider.google;
-    if (requestId.isEmpty ||
-        requestId.length > 64 ||
-        (google ? purchaseToken.isEmpty : transactionId.isEmpty)) {
+    if (google ? purchaseToken.isEmpty : transactionId.isEmpty) {
       throw const FormatException('Incomplete membership purchase');
     }
     if (guest != null &&
@@ -63,9 +58,9 @@ class MembershipPurchaseRequest {
     }
     return {
       'provider': product.provider.name,
-      'plan_code': product.planCode,
+      // Report and claim send the original store proof. Local attempt IDs and
+      // selected plans are not part of either HTTP request.
       'store_product_id': product.storeProductId,
-      'request_id': requestId,
       if (google) 'purchase_token': purchaseToken,
       if (!google) 'transaction_id': transactionId,
       if (guest != null) 'account_uuid': guest!.accountUuid,

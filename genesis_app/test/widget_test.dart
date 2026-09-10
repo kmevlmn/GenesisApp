@@ -1,8 +1,11 @@
+import 'package:genesis_flutter_android/platform/billing/membership_guest_claim_record.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'support/font_expectations.dart';
+import 'app/membership/membership_purchase_service_test.dart'
+    as membership_support;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -38,6 +41,7 @@ import 'package:genesis_flutter_android/app/debug_floating_button_visibility.dar
 import 'package:genesis_flutter_android/app/debug_page_tracker.dart';
 import 'package:genesis_flutter_android/app/genesis_navigator.dart';
 import 'package:genesis_flutter_android/app/gems/gem_wallet_store.dart';
+import 'package:genesis_flutter_android/app/membership/membership_purchase_service.dart';
 import 'package:genesis_flutter_android/app/recent_chat/recent_world_chat_store.dart';
 import 'package:genesis_flutter_android/app/startup/app_startup_coordinator.dart';
 import 'package:genesis_flutter_android/app/telemetry/firebase_analytics_monitoring.dart';
@@ -139,6 +143,7 @@ import 'package:genesis_flutter_android/platform/app/app_metadata_service.dart';
 import 'package:genesis_flutter_android/platform/app/app_version_override_store.dart';
 import 'package:genesis_flutter_android/platform/app/external_url_opener.dart';
 import 'package:genesis_flutter_android/platform/billing/billing_models.dart';
+import 'package:genesis_flutter_android/platform/billing/membership_store_purchase.dart';
 import 'package:genesis_flutter_android/platform/billing/billing_service.dart';
 import 'package:genesis_flutter_android/platform/channels/genesis_method_channels.dart';
 import 'package:genesis_flutter_android/platform/device/device_id_service.dart';
@@ -272,6 +277,7 @@ Future<AppServices> _testServices({
   ChatroomMessageStorage? chatroomMessages,
   BillingService? billingService,
   GemWalletStore? gemWallet,
+  MembershipPurchaseService? membershipPurchases,
   AppVersionCheckService? appVersionCheck,
   ExternalUrlOpener? externalUrlOpener,
   DeviceIdService? deviceIdService,
@@ -338,6 +344,7 @@ Future<AppServices> _testServices({
     appVersionCheck: appVersionCheck ?? const _NoUpgradeVersionCheckService(),
     externalUrlOpener: externalUrlOpener ?? _FakeExternalUrlOpener(),
     gemWallet: gemWallet,
+    membershipPurchases: membershipPurchases,
     billing: billingService,
     appGlobalConfig: appGlobalConfig,
   );
@@ -2589,6 +2596,131 @@ class _RecordingCreateOriginTransport implements HttpTransport {
 }
 
 void main() {
+  for (final initialIndex in [0, 1]) {
+    testWidgets(
+      'app entry discovers store UUID without requiring Home: tab=$initialIndex',
+      (tester) async {
+        AppStartupCoordinator.resetForTesting();
+        addTearDown(AppStartupCoordinator.resetForTesting);
+        AppStartupCoordinator.configure(
+          appVersion: const AppVersionInfo(
+            versionName: 'test',
+            versionCode: '1',
+          ),
+        );
+        GenesisTelemetry.setSinkForTesting(_CapturingTelemetrySink());
+        addTearDown(GenesisTelemetry.resetForTesting);
+        final h = membership_support.Harness(guestRecoveryEnabled: true)
+          ..uid = null;
+        h.guestPurchases = [MembershipStorePurchase(purchase: h.purchase())];
+        final services = await _testServices(
+          initialUid: null,
+          membershipPurchases: h.service,
+        );
+        await tester.pumpWidget(
+          AppServicesScope(
+            services: services,
+            child: MaterialApp(home: AppShellPage(initialIndex: initialIndex)),
+          ),
+        );
+        for (var i = 0; i < 5; i++) {
+          await tester.pump();
+        }
+        expect(h.guestDiscoveries, 1);
+        expect(h.guestChecks, [membership_support.guest.accountUuid]);
+        expect(
+          h.service.guestLoginRequestId.value,
+          membership_support.guest.accountUuid,
+        );
+        expect(h.store.records, isEmpty);
+        expect(h.store.restores, isEmpty);
+        expect(h.guestPrepares, 0);
+        expect(h.platform.launches, 0);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+  testWidgets(
+    'active Home discovers store UUID after reinstall without opening VIP',
+    (tester) async {
+      final h = membership_support.Harness(guestRecoveryEnabled: true)
+        ..uid = null;
+      h.guestPurchases = [MembershipStorePurchase(purchase: h.purchase())];
+      final services = await _testServices(
+        initialUid: null,
+        membershipPurchases: h.service,
+      );
+      await tester.pumpWidget(
+        AppServicesScope(
+          services: services,
+          child: const MaterialApp(home: HomePage()),
+        ),
+      );
+      for (var i = 0; i < 5; i++) {
+        await tester.pump();
+      }
+      expect(h.guestDiscoveries, 1);
+      expect(h.guestChecks, [membership_support.guest.accountUuid]);
+      expect(
+        h.service.guestLoginRequestId.value,
+        membership_support.guest.accountUuid,
+      );
+      expect(h.guestPrepares, 0);
+      expect(h.platform.launches, 0);
+      expect(h.store.records, isEmpty);
+      expect(h.store.restores, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+  for (final initiallyActive in [false, true]) {
+    testWidgets(
+      'active Home checks cached guest VIP UUID once: initiallyActive=$initiallyActive',
+      (tester) async {
+        final h = membership_support.Harness(guestRecoveryEnabled: true)
+          ..uid = null;
+        await h.store.saveGuestClaim(
+          const MembershipGuestClaimRecord(
+            guest: membership_support.guest,
+            purchaseConfirmed: true,
+          ),
+        );
+        final active = ValueNotifier<bool>(initiallyActive);
+        addTearDown(active.dispose);
+        final services = await _testServices(
+          initialUid: null,
+          membershipPurchases: h.service,
+        );
+        await tester.pumpWidget(
+          AppServicesScope(
+            services: services,
+            child: MaterialApp(home: HomePage(isActiveListenable: active)),
+          ),
+        );
+        for (var i = 0; i < 5; i++) {
+          await tester.pump();
+        }
+        expect(h.guestDiscoveries, 0);
+        expect(h.guestChecks, hasLength(initiallyActive ? 1 : 0));
+        active.value = true;
+        for (var i = 0; i < 5; i++) {
+          await tester.pump();
+        }
+        expect(h.guestDiscoveries, 0);
+        expect(h.guestChecks, [membership_support.guest.accountUuid]);
+        active.value = false;
+        await tester.pump();
+        active.value = true;
+        for (var i = 0; i < 5; i++) {
+          await tester.pump();
+        }
+        expect(h.guestDiscoveries, 0);
+        expect(h.guestChecks, hasLength(1));
+        expect(h.guestPrepares, 0);
+        expect(h.platform.launches, 0);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
   test('create form accents use the shared brand palette', () {
     expect(createFormGreen, GenesisColors.brand);
     expect(createFormDash, GenesisColors.brandSoft);

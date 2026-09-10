@@ -17,7 +17,6 @@ void main() {
     'store',
     'guest',
     'uuid',
-    'persistence',
   ]) {
     for (final failsLate in [false, true]) {
       testWidgets(
@@ -57,8 +56,6 @@ void main() {
                 await block();
                 return accountUuid;
               };
-            case 'persistence':
-              h.store.onSave = (_) => block();
           }
           final events = <MembershipCheckoutEvent>[];
           h.service.checkoutEvents.listen(events.add);
@@ -85,7 +82,10 @@ void main() {
           await purchase;
           expect(h.platform.launches, 0);
           expect(h.reports, isEmpty);
-          expect(h.store.claims, isEmpty);
+          expect(
+            h.store.claims.values.where((r) => r.status != 'completed'),
+            isEmpty,
+          );
           expect(events, hasLength(count));
           expect(
             h.store.records.values.where((r) => r.state == 'prepared'),
@@ -206,7 +206,7 @@ void main() {
         expect(h.reports, hasLength(1));
         await tester.pump(const Duration(seconds: 20));
         expect(h.service.state.value, MembershipCheckoutState.reporting);
-        expect(h.store.records.values.single.hasReceipt, isTrue);
+        expect(h.store.records, isEmpty);
         response.complete(completed);
         await callback;
         expect(h.service.state.value, MembershipCheckoutState.completed);
@@ -230,9 +230,10 @@ void main() {
       expect(h.platform.launches, 1);
       await tester.pump(const Duration(seconds: 90));
       expect(returned, isTrue);
-      expect(h.store.records.values.single.state, 'prepared');
+      expect(h.store.records, isEmpty);
       await h.service.interceptPurchase(h.purchase());
-      expect(h.reports.single.requestId, 'guest-order');
+      expect(h.store.confirmed.keys.single, 'guest-order');
+      expect(h.reports.single.toJson(), isNot(contains('request_id')));
       expect(h.store.confirmed.values.single.guest, guest);
       expect(h.store.claims, hasLength(1));
       // A late launch error cannot overwrite the verified receipt or success.

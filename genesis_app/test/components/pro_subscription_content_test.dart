@@ -6,6 +6,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:genesis_flutter_android/network/models/membership_benefit.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:genesis_flutter_android/platform/billing/membership_catalog_cache.dart';
 import 'package:genesis_flutter_android/app/membership/membership_catalog.dart';
 import 'package:genesis_flutter_android/app/membership/membership_purchase_service.dart';
 import 'package:genesis_flutter_android/components/gems/pro_subscription_content.dart';
@@ -22,7 +24,8 @@ const surfaceKey = ValueKey('subscription-test-surface');
 const buttonKey = ValueKey('pro-subscribe-button');
 
 Widget page(
-  MembershipCatalogLoader loader, {
+  MembershipCatalogLoader? loader, {
+  MembershipCatalog? catalog,
   Future<void> Function(MembershipProduct)? purchase,
   MembershipPurchaseService? service,
 }) => MaterialApp(
@@ -32,6 +35,7 @@ Widget page(
       key: surfaceKey,
       child: ProSubscriptionContent(
         productsLoader: loader,
+        catalog: catalog,
         purchaseHandler: purchase,
         purchaseService: service,
       ),
@@ -65,6 +69,90 @@ Future<List<int>> pixels(WidgetTester tester) async {
 }
 
 void main() {
+  for (final outcome in ['success', 'failure', 'empty']) {
+    testWidgets('reenter shows cached subscriptions until refresh $outcome', (
+      tester,
+    ) async {
+      final response = Completer<MembershipProductList>();
+      var calls = 0;
+      final catalog = MembershipCatalog(
+        provider: MembershipProvider.google,
+        loadProducts: (_) async {
+          if (++calls == 1) {
+            return MembershipProductList(
+              products: [membershipProduct(yearly: true, title: 'Cached VIP')],
+            );
+          }
+          return response.future;
+        },
+      );
+      await tester.pumpWidget(page(null, catalog: catalog));
+      await tester.pumpAndSettle();
+      expect(find.text('Cached VIP'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(page(null, catalog: catalog));
+      expect(find.text('Cached VIP'), findsOneWidget);
+      expect(find.text(r'Yearly: $99.99'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      await tester.pump();
+      expect(calls, 2);
+      if (outcome == 'failure') {
+        response.completeError(StateError('offline'));
+      } else {
+        response.complete(
+          MembershipProductList(
+            products: outcome == 'empty'
+                ? []
+                : [
+                    membershipProduct(
+                      yearly: true,
+                      title: 'Fresh VIP',
+                      priceAmount: 11999,
+                    ),
+                  ],
+          ),
+        );
+      }
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Cached VIP'),
+        outcome == 'failure' ? findsOneWidget : findsNothing,
+      );
+      if (outcome == 'success') {
+        expect(find.text('Fresh VIP'), findsOneWidget);
+        expect(find.text(r'Yearly: $119.99'), findsOneWidget);
+      }
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+  }
+
+  testWidgets('new app catalog displays disk cache before the API completes', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = MembershipCatalogCache(namespace: 'widget-test');
+    await store.save(MembershipProvider.google, null, [
+      membershipProduct(yearly: true, title: 'Disk VIP'),
+    ]);
+    final response = Completer<MembershipProductList>();
+    final catalog = MembershipCatalog(
+      provider: MembershipProvider.google,
+      cacheStore: store,
+      loadProducts: (_) => response.future,
+    );
+    await tester.pumpWidget(page(null, catalog: catalog));
+    await tester.pumpAndSettle();
+    expect(find.text('Disk VIP'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    response.complete(
+      MembershipProductList(
+        products: [membershipProduct(yearly: true, title: 'Fresh VIP')],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Fresh VIP'), findsOneWidget);
+    expect(find.text('Disk VIP'), findsNothing);
+  });
   for (final provider in MembershipProvider.values) {
     testWidgets('$provider upgrade action does not block the purchase button', (
       tester,
@@ -123,7 +211,7 @@ void main() {
   }
 
   testWidgets(
-    'entry loads products once while an accepted restore remains unchanged',
+    'entry loads products once while a report retry remains pending',
     (tester) async {
       final h = support.Harness(
         provider: MembershipProvider.apple,
@@ -136,7 +224,8 @@ void main() {
         status: MembershipReportStatus.accepted,
         reportId: 'accepted',
       );
-      await h.service.restorePurchases(products: [h.product(yearly: true)]);
+      await h.service.purchase(h.product(yearly: true));
+      await h.service.interceptPurchase(h.purchase(yearly: true));
       var loads = 0;
       Future<MembershipCatalogData> load() async {
         loads++;
@@ -148,9 +237,8 @@ void main() {
       await tester.pumpWidget(page(load, service: h.service));
       await tester.pumpAndSettle();
       expect(loads, 1);
-      // One initial restore plus one retry during entry, not another immediate
-      // report of the same receipt returned by the store query.
-      expect(h.reports, hasLength(2));
+      // Opening the page never queries or imports store history.
+      expect(h.reports, hasLength(1));
       expect(h.store.records.values.single.reportStatus, 'accepted');
 
       // A later real transition must still update purchase eligibility.
@@ -158,7 +246,7 @@ void main() {
       await h.service.recover();
       await tester.pumpAndSettle();
       expect(loads, 2);
-      expect(h.restoreQueries, 2);
+      expect(h.restoreQueries, 0);
       expect(h.store.restores, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
       h.service.dispose();
@@ -333,7 +421,7 @@ void main() {
           }, service: h.service),
         );
         await tester.pumpAndSettle();
-        expect(h.restoreQueries, 1);
+        expect(h.restoreQueries, 0);
         await h.service.purchase(h.product(yearly: true));
         await h.service.interceptPurchase(h.purchase(yearly: true));
         await tester.pump();
@@ -355,7 +443,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.text(r'Yearly: $120.00'), findsOneWidget);
-        expect(h.restoreQueries, 1);
+        expect(h.restoreQueries, 0);
         await tester.pumpWidget(const SizedBox.shrink());
         h.service.dispose();
       },

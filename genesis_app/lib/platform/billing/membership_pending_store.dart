@@ -64,7 +64,6 @@ class MembershipPurchaseRecord {
       (paid || state == 'receipt_missing');
   MembershipPurchaseRequest get request => MembershipPurchaseRequest(
     product: product,
-    requestId: requestId,
     transactionId: transactionId,
     purchaseToken: purchaseToken,
     guest: guest,
@@ -172,6 +171,7 @@ abstract interface class MembershipPendingStore {
   Future<void> save(MembershipPurchaseRecord record);
   Future<List<MembershipPurchaseRecord>> loadConfirmedReceipts();
   Future<void> complete(MembershipPurchaseRecord record);
+  Future<void> saveGuestPurchase(MembershipPurchaseRecord record);
   Future<List<MembershipRestoreRecord>> loadRestores();
   Future<void> saveRestore(MembershipRestoreRecord record);
   Future<void> removeRestore(String requestId);
@@ -262,17 +262,39 @@ class SecureMembershipPendingStore implements MembershipPendingStore {
   }
 
   @override
-  Future<void> complete(MembershipPurchaseRecord record) {
-    final operation = _writes.then((_) async {
-      // Keep exact plan/account/receipt identity for restore and deduplication.
-      // Guest claim identity must survive removal from the pending queue.
-      final receipts = await _read(_confirmedKey);
-      receipts.removeWhere((r) => r.requestId == record.requestId);
+  Future<void> saveGuestPurchase(MembershipPurchaseRecord record) {
+    final operation = _writes.then((_) => _saveGuestPurchase(record));
+    _writes = operation.catchError((Object _) {});
+    return operation;
+  }
+
+  Future<void> _saveGuestPurchase(MembershipPurchaseRecord record) async {
+    final receipts = await _read(_confirmedKey);
+    receipts.removeWhere(
+      (r) => r.requestId == record.requestId || r.guest == null,
+    );
+    if (record.guest != null &&
+        record.paid &&
+        record.hasReceipt &&
+        record.reportStatus != 'rejected') {
       receipts.add(record);
+    }
+    if (receipts.isEmpty) {
+      await _storage.delete(key: _confirmedKey);
+    } else {
       await _storage.write(
         key: _confirmedKey,
         value: jsonEncode(receipts.map((r) => r.toJson()).toList()),
       );
+    }
+  }
+
+  @override
+  Future<void> complete(MembershipPurchaseRecord record) {
+    final operation = _writes.then((_) async {
+      // Only an unbound guest needs proof after report succeeds. Ordinary
+      // successful purchases have no durable local order history.
+      await _saveGuestPurchase(record);
       await _removePurchase(record.requestId);
     });
     _writes = operation.catchError((Object _) {});
@@ -411,37 +433,27 @@ class SecureMembershipPendingStore implements MembershipPendingStore {
       if (saved.single.status != 'completed' || saved.single.ownerUid != uid) {
         throw StateError('Guest claim completion must be durable');
       }
-      // Remove the claim last: an interrupted cleanup can resume from its
-      // durable completed status, without sending another binding request.
-      for (final key in [_confirmedKey, _key]) {
-        final purchases = await _read(key);
-        if (!purchases.any(
-          (r) => r.guest?.accountUuid == record.guest.accountUuid,
-        )) {
-          continue;
-        }
+      final receipts = await _read(_confirmedKey);
+      receipts.removeWhere(
+        (r) => r.guest?.accountUuid == record.guest.accountUuid,
+      );
+      if (receipts.isEmpty) {
+        await _storage.delete(key: _confirmedKey);
+      } else {
         await _storage.write(
-          key: key,
-          value: jsonEncode([
-            for (final purchase in purchases)
-              (purchase.guest?.accountUuid == record.guest.accountUuid
-                      ? purchase.bindGuestToAccount(uid)
-                      : purchase)
-                  .toJson(),
-          ]),
+          key: _confirmedKey,
+          value: jsonEncode(receipts.map((r) => r.toJson()).toList()),
         );
       }
+      // Keep only the bound UUID for a later logged-out check, never re-claim it.
       claims.removeWhere(
         (r) => r.guest.accountUuid == record.guest.accountUuid,
       );
-      if (claims.isEmpty) {
-        await _storage.delete(key: _guestClaimsKey);
-      } else {
-        await _storage.write(
-          key: _guestClaimsKey,
-          value: jsonEncode(claims.map((r) => r.toJson()).toList()),
-        );
-      }
+      claims.add(record.boundIdentity);
+      await _storage.write(
+        key: _guestClaimsKey,
+        value: jsonEncode(claims.map((r) => r.toJson()).toList()),
+      );
     });
     _writes = operation.catchError((Object _) {});
     return operation;

@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/network/models/membership_product.dart';
 import 'package:genesis_flutter_android/network/models/membership_purchase.dart';
-import 'package:genesis_flutter_android/platform/billing/membership_pending_store.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_restore_record.dart';
 
 import 'membership_purchase_service_test.dart' as support;
@@ -11,7 +10,7 @@ MembershipRestoreRecord legacy(
   String id = 'legacy-restore',
   String? owner,
   String transaction = '100',
-  String status = 'accepted',
+  String? status = 'accepted',
   String? reason,
   bool finished = false,
 }) => MembershipRestoreRecord(
@@ -28,6 +27,32 @@ MembershipRestoreRecord legacy(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'legacy report failure without a response preserves its request and receipt',
+    () async {
+      final h = support.Harness();
+      final old = legacy(h, status: null);
+      await h.store.saveRestore(old);
+      h.reportHandler = (_) async => throw StateError('offline');
+      await h.service.recover();
+      expect(h.reports.single.toJson(), old.request.toJson());
+      expect(h.store.records.keys.single, old.requestId);
+      expect(h.reports.single.toJson(), isNot(contains('request_id')));
+      expect(h.reports.single.toJson(), isNot(contains('plan_code')));
+      expect(
+        h.store.records.values.single.purchaseToken,
+        old.purchase.purchaseToken,
+      );
+      expect(h.store.restores, isEmpty);
+      h.service.dispose();
+      final restarted = support.Harness(storage: h.store);
+      await restarted.service.recover();
+      expect(restarted.reports.single.toJson(), h.reports.single.toJson());
+      expect(h.store.records, isEmpty);
+      expect(h.store.confirmed, isEmpty);
+    },
+  );
+
   for (final provider in MembershipProvider.values) {
     test(
       '$provider old accepted receipt retries through report and survives restart',
@@ -40,7 +65,10 @@ void main() {
           reportId: 'pending-report',
         );
         await h.service.start();
-        expect(h.reports.single.requestId, old.requestId);
+        expect(h.reports.single.toJson(), old.request.toJson());
+        expect(h.store.records.keys.single, old.requestId);
+        expect(h.reports.single.toJson(), isNot(contains('request_id')));
+        expect(h.reports.single.toJson(), isNot(contains('plan_code')));
         expect(h.reports.single.purchaseToken, old.purchase.purchaseToken);
         expect(h.reports.single.transactionId, old.purchase.transactionId);
         expect(h.store.restores, isEmpty);
@@ -50,26 +78,8 @@ void main() {
         await restarted.service.start();
         expect(restarted.reports.single.toJson(), h.reports.single.toJson());
         expect(h.store.records, isEmpty);
-        expect(h.store.confirmed.values.single.reportStatus, 'completed');
+        expect(h.store.confirmed, isEmpty);
         expect(restarted.refreshes, 1);
-      },
-    );
-
-    test(
-      '$provider successful purchase removes duplicate accepted restore without a new report',
-      () async {
-        final h = support.Harness(provider: provider);
-        await h.service.purchase(h.product());
-        await h.service.interceptPurchase(h.purchase());
-        await h.store.saveRestore(legacy(h));
-        h.service.dispose();
-        final restarted = support.Harness(provider: provider, storage: h.store);
-        await restarted.service.start();
-        expect(restarted.reports, isEmpty);
-        expect(h.store.restores, isEmpty);
-        expect(h.store.confirmed, hasLength(1));
-        await restarted.service.purchase(h.product());
-        expect(restarted.platform.launches, 1);
       },
     );
   }
@@ -91,7 +101,7 @@ void main() {
       expect(h.store.records, hasLength(1));
       await h.service.restorePurchases();
       expect(h.reports, hasLength(2));
-      expect(h.reports.first.requestId, h.reports.last.requestId);
+      expect(h.reports.first.toJson(), h.reports.last.toJson());
     },
   );
 
@@ -112,8 +122,8 @@ void main() {
         expect(h.reports, isEmpty);
         expect(h.store.restores, isEmpty);
         expect(h.store.records, isEmpty);
-        expect(h.platform.finishes, status == 'completed' ? 1 : 0);
-        expect(h.store.confirmed.values.single.reportStatus, status);
+        expect(h.platform.finishes, 0);
+        expect(h.store.confirmed, isEmpty);
       },
     );
   }
@@ -132,7 +142,7 @@ void main() {
       h.service.dispose();
       final restarted = support.Harness(storage: h.store);
       await restarted.service.recover();
-      expect(restarted.reports.single.requestId, 'legacy-restore');
+      expect(restarted.reports.single.toJson(), legacy(h).request.toJson());
       expect(h.store.restores, isEmpty);
       expect(h.store.records, isEmpty);
     },
@@ -152,7 +162,7 @@ void main() {
       h.store.failRestoreCleanup = false;
       final restarted = support.Harness(storage: h.store);
       await restarted.service.recover();
-      expect(restarted.reports.single.requestId, 'legacy-restore');
+      expect(restarted.reports.single.toJson(), legacy(h).request.toJson());
       expect(h.store.restores, isEmpty);
       expect(h.store.records, isEmpty);
       await restarted.service.recover();
@@ -170,34 +180,6 @@ void main() {
       expect(h.store.restores, hasLength(1));
       await h.service.purchase(h.product());
       expect(h.platform.launches, 1);
-    },
-  );
-
-  test(
-    'Google renewal migration keeps transaction boundaries and deduplicates late callbacks',
-    () async {
-      final h = support.Harness(restoreEnabled: true);
-      await h.store.complete(
-        MembershipPurchaseRecord(
-          requestId: 'old-purchase',
-          product: h.product(),
-          accountUuid: support.accountUuid,
-          ownerUid: h.uid,
-          purchaseToken: 'test-token',
-          transactionId: '100',
-          state: 'purchased',
-          reportStatus: 'completed',
-          finished: true,
-        ),
-      );
-      await h.store.saveRestore(legacy(h, transaction: 'renewal'));
-      await h.service.recover();
-      expect(h.reports.single.transactionId, 'renewal');
-      expect(h.store.confirmed, hasLength(2));
-      h.recoverable = [h.purchase(), h.purchase(transaction: 'renewal')];
-      await h.service.restorePurchases(products: [h.product()]);
-      expect(h.reports, hasLength(1));
-      expect(h.store.records, isEmpty);
     },
   );
 }

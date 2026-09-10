@@ -3,21 +3,139 @@ import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_storekit/store_kit_2_wrappers.dart';
 import 'package:genesis_flutter_android/network/models/membership_product.dart';
 import 'package:genesis_flutter_android/network/models/membership_purchase.dart';
+import 'package:genesis_flutter_android/network/models/membership_claim.dart';
 import 'package:genesis_flutter_android/platform/billing/billing_models.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_store_restorer.dart';
 
 void main() {
   test(
+    'guest discovery queries Google SUBS without a catalog and ignores pending or missing identities',
+    () async {
+      const uuid = '4b74ec68-7abc-4cce-a223-e997e31dc811';
+      PurchaseWrapper purchase(String? account, PurchaseStateWrapper state) =>
+          PurchaseWrapper(
+            orderId: 'order',
+            packageName: 'test',
+            purchaseTime: 100,
+            purchaseToken: 'token',
+            signature: '',
+            products: ['subscription'],
+            isAutoRenewing: false,
+            originalJson: '',
+            isAcknowledged: true,
+            purchaseState: state,
+            obfuscatedAccountId: account,
+          );
+      final restorer = MembershipStoreRestorer(
+        provider: MembershipProvider.google,
+        googleQuery: () async => PurchasesResultWrapper(
+          responseCode: BillingResponse.ok,
+          billingResult: const BillingResultWrapper(
+            responseCode: BillingResponse.ok,
+          ),
+          purchasesList: [
+            purchase(uuid, PurchaseStateWrapper.purchased),
+            purchase(uuid.toUpperCase(), PurchaseStateWrapper.purchased),
+            purchase(
+              '8b74ec68-7abc-4cce-a223-e997e31dc811',
+              PurchaseStateWrapper.pending,
+            ),
+            purchase(null, PurchaseStateWrapper.purchased),
+            purchase('not-a-uuid', PurchaseStateWrapper.purchased),
+          ],
+        ),
+      );
+      expect(
+        (await restorer.discoverGuestPurchases())
+            .map((entry) => entry.purchase.obfuscatedAccountId)
+            .toSet(),
+        {uuid},
+      );
+    },
+  );
+
+  test(
+    'guest Apple discovery excludes Gems, expired, revoked and replaced subscription chains',
+    () async {
+      const uuid = '4b74ec68-7abc-4cce-a223-e997e31dc811';
+      const other = '8b74ec68-7abc-4cce-a223-e997e31dc811';
+      SK2Transaction transaction(
+        String id,
+        String chain,
+        String account,
+        int? expires, {
+        String json = '{}',
+      }) => SK2Transaction(
+        id: id,
+        originalId: chain,
+        productId: 'product-$id',
+        purchaseDate: id,
+        expirationDate: expires?.toString(),
+        appAccountToken: account,
+        jsonRepresentation: json,
+      );
+      final restorer = MembershipStoreRestorer(
+        provider: MembershipProvider.apple,
+        now: () => DateTime.fromMillisecondsSinceEpoch(1000),
+        appleQuery: () async => [
+          transaction('1', 'paid', uuid, 2000),
+          transaction('2', 'paid', uuid.toUpperCase(), 3000),
+          transaction('3', 'gems', other, null),
+          transaction('4', 'expired', other, 1000),
+          transaction(
+            '5',
+            'revoked',
+            other,
+            3000,
+            json: '{"revocationDate":900}',
+          ),
+          transaction(
+            '6',
+            'upgraded',
+            other,
+            3000,
+            json: '{"isUpgraded":true}',
+          ),
+          transaction('7', 'old-chain', other, 4000),
+          transaction('8', 'old-chain', other, 900),
+        ],
+      );
+      expect(
+        (await restorer.discoverGuestPurchases())
+            .map((entry) => entry.purchase.obfuscatedAccountId)
+            .toSet(),
+        {uuid},
+      );
+    },
+  );
+
+  test(
+    'guest discovery store failure is not an empty successful result',
+    () async {
+      final restorer = MembershipStoreRestorer(
+        provider: MembershipProvider.google,
+        googleQuery: () async => const PurchasesResultWrapper(
+          responseCode: BillingResponse.error,
+          billingResult: BillingResultWrapper(
+            responseCode: BillingResponse.error,
+          ),
+          purchasesList: [],
+        ),
+      );
+      await expectLater(
+        restorer.discoverGuestPurchases(),
+        throwsA(isA<BillingPlatformException>()),
+      );
+    },
+  );
+
+  test(
     'Apple claim proof lookup matches transaction, product and UUID exactly',
     () async {
       const uuid = '4b74ec68-7abc-4cce-a223-e997e31dc811';
-      final request = MembershipPurchaseRequest(
-        product: MembershipOrderProduct(
-          provider: MembershipProvider.apple,
-          planCode: 'pro_monthly',
-          storeProductId: 'test_pro',
-        ),
-        requestId: 'original-key',
+      final request = MembershipClaimRequest(
+        provider: MembershipProvider.apple,
+        storeProductId: 'test_pro',
         transactionId: '100',
         guest: const MembershipGuestIdentity(accountUuid: uuid),
       );

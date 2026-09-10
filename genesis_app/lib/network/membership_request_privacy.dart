@@ -13,6 +13,28 @@ bool isPrivateMembershipRequest(Uri uri) => const [
 bool isMembershipProductRequest(Uri uri) =>
     uri.path.endsWith('/membership/products');
 
+bool isMembershipGuestCheckRequest(Uri uri) =>
+    uri.path.endsWith('/membership/guest/purchase/check');
+
+List<int> membershipGuestCheckProfileBody(List<int> bytes) {
+  if (bytes.isEmpty) return bytes;
+  try {
+    final value = jsonDecode(utf8.decode(bytes));
+    if (value is! Map) throw const FormatException('Invalid check envelope');
+    final data = value['data'];
+    return utf8.encode(
+      jsonEncode({
+        if (value.containsKey('account_uuid')) 'account_uuid': '[REDACTED]',
+        if (value['err_no'] is int) 'err_no': value['err_no'],
+        if (data is Map && data['has_unbound_order'] is bool)
+          'data': {'has_unbound_order': data['has_unbound_order']},
+      }),
+    );
+  } catch (_) {
+    return utf8.encode(jsonEncode('[REDACTED]'));
+  }
+}
+
 /// Purchase reports can be inspected in DevTools using a sanitized copy.
 /// Keep their real payloads out of native profiling and persistent capture.
 bool isMembershipPurchaseReportRequest(Uri uri) => const [
@@ -56,10 +78,8 @@ Object? _membershipReportProfileJson(Object? value) {
       entry.key:
           const {
             'provider',
-            'plan_code',
             'store_product_id',
             'base_plan_id',
-            'request_id',
             'err_no',
             'err_msg',
             'data',

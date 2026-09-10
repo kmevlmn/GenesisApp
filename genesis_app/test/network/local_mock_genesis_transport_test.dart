@@ -9,6 +9,7 @@ import 'package:genesis_flutter_android/network/mock_data/mock_v1_data.dart';
 import 'package:genesis_flutter_android/network/models/gem_purchase_report.dart';
 import 'package:genesis_flutter_android/network/models/membership_product.dart';
 import 'package:genesis_flutter_android/network/models/membership_purchase.dart';
+import 'package:genesis_flutter_android/network/models/membership_claim.dart';
 import 'package:genesis_flutter_android/network/models/origin.dart';
 import 'package:genesis_flutter_android/network/models/search_v2.dart';
 import 'package:genesis_flutter_android/network/models/world.dart';
@@ -20,22 +21,9 @@ void main() {
       final api = GenesisApi(useMock: true);
       await expectLater(
         api.v1.membership.claimGuest(
-          const MembershipPurchaseRequest(
-            product: MembershipProduct(
-              title: 'Test',
-              benefits: [],
-              planCode: 'pro_monthly',
-              provider: MembershipProvider.google,
-              storeProductId: 'test-pro',
-              basePlanId: 'test-month',
-              billingMonths: 1,
-              monthlyGemsCent: 100,
-              priceCurrencyCode: 'USD',
-              priceAmount: 999,
-              canPurchase: true,
-              purchaseBlockReason: '',
-            ),
-            requestId: 'test-claim',
+          const MembershipClaimRequest(
+            provider: MembershipProvider.google,
+            storeProductId: 'test-pro',
             purchaseToken: 'test-proof',
             guest: MembershipGuestIdentity(
               accountUuid: '4b74ec68-7abc-4cce-a223-e997e31dc811',
@@ -69,7 +57,6 @@ void main() {
         api.v1.membership.reportPurchase(
           MembershipPurchaseRequest(
             product: product,
-            requestId: 'test-request',
             purchaseToken: 'test-token',
           ),
         ),

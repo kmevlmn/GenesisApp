@@ -117,10 +117,40 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _homeNetworkRequestsAllowed = ValueNotifier<bool>(true);
+    widget.isActiveListenable?.addListener(_scheduleGuestPurchaseCheck);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    AppServicesScope.maybeOf(context);
+    _scheduleGuestPurchaseCheck();
+  }
+
+  @override
+  void didUpdateWidget(HomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActiveListenable != widget.isActiveListenable) {
+      oldWidget.isActiveListenable?.removeListener(_scheduleGuestPurchaseCheck);
+      widget.isActiveListenable?.addListener(_scheduleGuestPurchaseCheck);
+      _scheduleGuestPurchaseCheck();
+    }
+  }
+
+  void _scheduleGuestPurchaseCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.isActiveListenable?.value == false) return;
+      final membership = AppServicesScope.maybeRead(
+        context,
+      )?.membershipPurchases;
+      if (membership != null) unawaited(membership.checkGuestPurchasesOnHome());
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   @override
   void dispose() {
+    widget.isActiveListenable?.removeListener(_scheduleGuestPurchaseCheck);
     _homeNetworkRequestsAllowed.dispose();
     super.dispose();
   }

@@ -35,20 +35,7 @@ void main() {
         expect(h.platform.product, same(current));
         expect(h.platform.uuid, support.guest.accountUuid);
         expect(h.guestPrepares, 0);
-        final pending = h.store.records.values.single;
-        expect(pending.hasReceipt, isFalse);
-        expect(pending.guest, isNull);
-        expect(pending.ownerUid, h.uid);
-        expect(
-          jsonEncode(pending.toJson()),
-          isNot(contains('old-month-token')),
-        );
-        expect(pending.product.toOrderJson(), isNot(contains('account_uuid')));
-        expect(
-          pending.product.toOrderJson(),
-          isNot(contains('purchase_token')),
-        );
-
+        expect(h.store.records, isEmpty);
         await h.service.interceptPurchase(
           h.purchase(
             yearly: true,
@@ -64,7 +51,7 @@ void main() {
         if (provider == MembershipProvider.google) {
           expect(report.toJson()['purchase_token'], 'new-year-token');
         }
-        expect(report.requestId, pending.requestId);
+        expect(report.toJson(), isNot(contains('request_id')));
         expect(jsonEncode(report.toJson()), isNot(contains('old-month-token')));
         expect(h.store.records, isEmpty);
         expect(h.refreshes, 1);
@@ -136,7 +123,7 @@ void main() {
           ),
         );
         expect(h.reports, isEmpty);
-        expect(h.store.records.values.single.hasReceipt, isFalse);
+        expect(h.store.records, isEmpty);
         await h.service.interceptPurchase(
           h.purchase(
             yearly: true,
@@ -145,33 +132,13 @@ void main() {
             uuid: support.guest.accountUuid,
           ),
         );
-        expect(h.reports.single.purchaseToken, 'new-year-token');
-        expect(h.reports.single.product.planCode, 'pro_yearly');
+        if (restart) {
+          expect(h.reports, isEmpty);
+        } else {
+          expect(h.reports.single.purchaseToken, 'new-year-token');
+          expect(h.reports.single.product.planCode, 'pro_yearly');
+        }
       },
     );
   }
-
-  test(
-    'receipt reconciliation excludes the old monthly token after restart',
-    () async {
-      final first = support.Harness();
-      first.productsHandler = () async => [upgrade(MembershipProvider.google)];
-      await first.service.purchase(first.product(yearly: true));
-      final record = first.store.records.values.single.copyWith(
-        state: 'purchased',
-      );
-      final storage = support.PendingStore()
-        ..records[record.requestId] = MembershipPurchaseRecord.fromJson(
-          record.toJson(),
-        );
-      final h = support.Harness(storage: storage, restoreEnabled: true);
-      h.recoverable = [
-        h.purchase(token: 'old-month-token', uuid: support.guest.accountUuid),
-      ];
-      await h.service.recover();
-      expect(h.reports, isEmpty);
-      expect(h.store.records[record.requestId]!.state, 'receipt_missing');
-      expect(h.store.records[record.requestId]!.hasReceipt, isFalse);
-    },
-  );
 }

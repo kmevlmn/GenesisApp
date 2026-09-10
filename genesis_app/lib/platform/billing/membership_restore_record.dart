@@ -39,7 +39,6 @@ class MembershipRestoreRecord {
   MembershipPurchaseRequest get request => MembershipPurchaseRequest(
     product:
         product ?? (throw StateError('membership_restore_plan_unresolved')),
-    requestId: requestId,
     purchaseToken: purchase.purchaseToken,
     transactionId: purchase.transactionId,
   );

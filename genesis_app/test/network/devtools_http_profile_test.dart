@@ -17,8 +17,138 @@ void main() {
     HttpClientRequestProfile.profilingEnabled = previousProfilingState;
   });
 
+  for (final path in [
+    'membership/products',
+    'membership/guest/prepare',
+    'membership/purchase/report',
+    'membership/guest/purchase/report',
+    'membership/guest/purchase/check',
+    'membership/claim',
+  ]) {
+    test(
+      'Debug $path preserves original request, response and errors',
+      () async {
+        late HttpClientRequestProfile profile;
+        final body = jsonEncode({
+          'account_uuid': 'debug-original-uuid',
+          'purchase_token': 'debug-original-token',
+          'signed_transaction': 'debug-original-jws',
+        });
+        final request = TransportRequest(
+          method: 'POST',
+          uri: Uri.parse(
+            'https://test.invalid/api/v1/$path?account_uuid=debug-query',
+          ),
+          headers: const {'Authorization': 'Bearer debug-auth'},
+          bodyBytes: utf8.encode(body),
+          timeoutMs: 1000,
+        );
+        DevToolsHttpProfile recorder() => DevToolsHttpProfile.start(
+          request,
+          profileFactory:
+              ({
+                required requestStartTime,
+                required requestMethod,
+                required requestUri,
+              }) => profile = HttpClientRequestProfile.profile(
+                requestStartTime: requestStartTime,
+                requestMethod: requestMethod,
+                requestUri: requestUri,
+              )!,
+        )!;
+        final recording = recorder();
+        await recording.completeRequest(request);
+        final responseBody = jsonEncode({
+          'err_no': 0,
+          'data': jsonDecode(body),
+        });
+        await recording.completeResponse(
+          TransportResponse(
+            statusCode: 200,
+            headers: const {'set-cookie': 'debug-cookie'},
+            body: responseBody,
+            bodyBytes: utf8.encode(responseBody),
+          ),
+        );
+        expect(profile.requestUri, request.uri.toString());
+        expect(utf8.decode(profile.requestData.bodyBytes), body);
+        expect(profile.requestData.headers?['Authorization'], [
+          'Bearer debug-auth',
+        ]);
+        expect(utf8.decode(profile.responseData.bodyBytes), responseBody);
+        expect(profile.responseData.headers?['set-cookie'], ['debug-cookie']);
+        expect(utf8.decode(request.bodyBytes!), body);
+        final failed = recorder();
+        await failed.completeRequest(request);
+        await failed.completeWithError(StateError('debug-original-error'));
+        expect(profile.responseData.error, contains('debug-original-error'));
+      },
+    );
+  }
+
   test(
-    'catalog profiles retain display data but redact nested upgrade credentials',
+    'non-Debug guest check profiles redact UUID, headers and response secrets',
+    () async {
+      late HttpClientRequestProfile profile;
+      final request = TransportRequest(
+        method: 'POST',
+        uri: Uri.parse(
+          'https://test.invalid/api/v1/membership/guest/purchase/check',
+        ),
+        headers: const {
+          'Authorization': 'private-auth',
+          'X-Device-ID': 'private-device',
+        },
+        bodyBytes: utf8.encode('{"account_uuid":"private-uuid"}'),
+        timeoutMs: 1000,
+      );
+      final recorder = DevToolsHttpProfile.start(
+        request,
+        isDebugBuild: false,
+        profileFactory:
+            ({
+              required requestStartTime,
+              required requestMethod,
+              required requestUri,
+            }) => profile = HttpClientRequestProfile.profile(
+              requestStartTime: requestStartTime,
+              requestMethod: requestMethod,
+              requestUri: requestUri,
+            )!,
+      )!;
+      await recorder.completeRequest(request);
+      await recorder.completeResponse(
+        TransportResponse(
+          statusCode: 200,
+          headers: const {'set-cookie': 'private-cookie'},
+          body:
+              '{"err_no":0,"err_msg":"private-error","data":{"has_unbound_order":true,"account_uuid":"private-uuid"}}',
+          bodyBytes: utf8.encode(
+            '{"err_no":0,"err_msg":"private-error","data":{"has_unbound_order":true,"account_uuid":"private-uuid"}}',
+          ),
+        ),
+      );
+      expect(jsonDecode(utf8.decode(profile.requestData.bodyBytes)), {
+        'account_uuid': '[REDACTED]',
+      });
+      expect(jsonDecode(utf8.decode(profile.responseData.bodyBytes)), {
+        'err_no': 0,
+        'data': {'has_unbound_order': true},
+      });
+      expect(
+        profile.requestData.headers.toString(),
+        isNot(contains('private-')),
+      );
+      expect(
+        profile.responseData.headers.toString(),
+        isNot(contains('private-')),
+      );
+      expect(utf8.decode(request.bodyBytes!), contains('private-uuid'));
+    },
+  );
+
+  test(
+    'non-Debug catalog profiles retain display data but redact nested upgrade credentials',
     () async {
       late HttpClientRequestProfile profile;
       final request = TransportRequest(
@@ -35,6 +165,7 @@ void main() {
       );
       final recorder = DevToolsHttpProfile.start(
         request,
+        isDebugBuild: false,
         profileFactory:
             ({
               required requestStartTime,
@@ -211,7 +342,7 @@ void main() {
   });
 
   test(
-    'report failures stay visible without leaking non-JSON bodies or error text',
+    'non-Debug report failures stay visible without leaking non-JSON bodies or error text',
     () async {
       late HttpClientRequestProfile profile;
       final request = TransportRequest(
@@ -225,6 +356,7 @@ void main() {
       );
       DevToolsHttpProfile recorder() => DevToolsHttpProfile.start(
         request,
+        isDebugBuild: false,
         profileFactory:
             ({
               required requestStartTime,
@@ -274,14 +406,12 @@ void main() {
     '/api/v1/membership/guest/purchase/report',
   ]) {
     test(
-      '$path is visible with redacted credentials and its business result',
+      'non-Debug $path is visible with redacted credentials and its business result',
       () async {
         late HttpClientRequestProfile profile;
         final body = {
           'provider': 'google',
-          'plan_code': 'pro_yearly',
           'store_product_id': 'premium',
-          'request_id': 'attempt-1',
           'purchase_token': 'private-purchase-token',
           'claim_token': 'private-claim-token',
           'transaction_id': 'private-transaction',
@@ -299,6 +429,7 @@ void main() {
         );
         final recorder = DevToolsHttpProfile.start(
           request,
+          isDebugBuild: false,
           profileFactory:
               ({
                 required requestStartTime,

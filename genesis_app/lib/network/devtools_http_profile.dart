@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:http_profile/http_profile.dart';
 
 import 'http_transport.dart';
@@ -27,13 +28,20 @@ class DevToolsHttpProfile {
   static DevToolsHttpProfile? start(
     TransportRequest request, {
     GenesisHttpProfileFactory profileFactory = _createHttpProfile,
+    bool isDebugBuild = kDebugMode,
   }) {
-    final sanitizeBody = isMembershipPurchaseReportRequest(request.uri)
+    final sanitizeBody = isDebugBuild
+        ? null
+        : isMembershipPurchaseReportRequest(request.uri)
         ? membershipReportProfileBody
         : isMembershipProductRequest(request.uri)
         ? membershipProductProfileBody
+        : isMembershipGuestCheckRequest(request.uri)
+        ? membershipGuestCheckProfileBody
         : null;
-    if (isPrivateMembershipRequest(request.uri) && sanitizeBody == null) {
+    if (!isDebugBuild &&
+        isPrivateMembershipRequest(request.uri) &&
+        sanitizeBody == null) {
       return null;
     }
     try {

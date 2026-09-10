@@ -33,9 +33,9 @@ void main() {
         storage: h.store,
       )..uid = 'first-login';
       restarted.signedTransactionHandler = (request) async {
-        expect(request.requestId, report.requestId);
+        expect(request.storeProductId, report.product.storeProductId);
         expect(request.transactionId, report.transactionId);
-        expect(request.guest!.accountUuid, guest.accountUuid);
+        expect(request.guest.accountUuid, guest.accountUuid);
         return 'new.header.signature';
       };
       await restarted.service.recover();
@@ -45,7 +45,10 @@ void main() {
         'signed_transaction': 'new.header.signature',
       });
       expect(restarted.refreshes, 1);
-      expect(restarted.store.claims, isEmpty);
+      expect(
+        restarted.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
     },
   );
 
@@ -70,7 +73,10 @@ void main() {
           'fresh.header.signature';
       await restarted.service.recover();
       expect(restarted.claimRequests, hasLength(1));
-      expect(restarted.store.claims, isEmpty);
+      expect(
+        restarted.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
     },
   );
 
@@ -86,20 +92,26 @@ void main() {
         await h.service.purchase(h.product());
         final purchase = h.purchase(uuid: guest.accountUuid);
         await h.service.interceptPurchase(purchase);
-        final originalRequestId = h.reports.single.requestId;
+        final originalReport = h.reports.single.toJson();
         h.uid = 'first-login';
         await h.service.recover();
-        expect(h.store.claims, isEmpty);
+        expect(
+          h.store.claims.values.where((r) => r.status != 'completed'),
+          isEmpty,
+        );
         await h.service.interceptPurchase(purchase);
         expect(h.reports, hasLength(1));
         expect(h.claimRequests, hasLength(1));
         h.recoverable = [purchase];
         await h.service.restorePurchases(products: [h.product()]);
         expect(h.reports, hasLength(1));
-        expect(h.reports.single.requestId, originalRequestId);
+        expect(h.reports.single.toJson(), originalReport);
         expect(h.store.records, isEmpty);
         expect(h.store.restores, isEmpty);
-        expect(h.store.claims, isEmpty);
+        expect(
+          h.store.claims.values.where((r) => r.status != 'completed'),
+          isEmpty,
+        );
         expect(h.service.guestLoginRequestId.value, isNull);
       },
     );
@@ -189,7 +201,10 @@ void main() {
       restarted.uid = 'first-login';
       await restarted.service.recover();
       expect(restarted.claimRequests, hasLength(1));
-      expect(restarted.store.claims, isEmpty);
+      expect(
+        restarted.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
     },
   );
 
@@ -209,9 +224,12 @@ void main() {
         ..uid = null;
       await restarted.service.start();
       expect(restarted.claimRequests, isEmpty);
-      expect(restarted.store.claims, isEmpty);
-      expect(restarted.store.confirmed.values.single.guest, isNull);
-      expect(restarted.store.confirmed.values.single.ownerUid, 'first-login');
+      expect(
+        restarted.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
+      expect(restarted.store.confirmed, isEmpty);
+      expect(restarted.store.claims.values.single.ownerUid, 'first-login');
       expect(restarted.service.guestLoginRequestId.value, isNull);
     },
   );
@@ -238,9 +256,12 @@ void main() {
       await h.service.recover();
       expect(h.reports.last.toJson(), originalRequest);
       expect(h.claimRequests, hasLength(1));
-      expect(h.store.claims, isEmpty);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
       expect(h.store.records, isEmpty);
-      expect(h.store.confirmed.values.single.guest, isNull);
+      expect(h.store.confirmed, isEmpty);
     },
   );
 
@@ -288,7 +309,10 @@ void main() {
       h.uid = 'first-login';
       await h.service.recover();
       expect(h.claimRequests, hasLength(1));
-      expect(h.store.claims, isEmpty);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
     },
   );
 
@@ -296,7 +320,7 @@ void main() {
     final h = Harness(claimEnabled: true)..uid = null;
     await h.service.purchase(h.product());
     expect(h.platform.uuid, guest.accountUuid);
-    expect(h.store.records.values.single.guest?.accountUuid, guest.accountUuid);
+    expect(h.store.records, isEmpty);
     await h.service.interceptPurchase(h.purchase());
     expect(h.claimRequests, isEmpty);
     expect(h.refreshes, 0);
@@ -308,10 +332,13 @@ void main() {
     expect(h.store.claims.values.single.loginRequired, isTrue);
     h.uid = 'first-login';
     await h.service.recover();
-    expect(h.claimRequests.single.guest!.accountUuid, guest.accountUuid);
-    expect(h.store.claims, isEmpty);
-    expect(h.store.confirmed.values.single.ownerUid, 'first-login');
-    expect(h.store.confirmed.values.single.guest, isNull);
+    expect(h.claimRequests.single.guest.accountUuid, guest.accountUuid);
+    expect(
+      h.store.claims.values.where((r) => r.status != 'completed'),
+      isEmpty,
+    );
+    expect(h.store.claims.values.single.ownerUid, 'first-login');
+    expect(h.store.confirmed, isEmpty);
     expect(h.service.guestLoginRequestId.value, isNull);
     expect(h.refreshes, 1);
     expect(h.service.catalogRevision.value, 2);
@@ -337,10 +364,13 @@ void main() {
       restarted.uid = 'first-login';
       await restarted.service.recover();
       expect(
-        restarted.claimRequests.single.guest!.accountUuid,
+        restarted.claimRequests.single.guest.accountUuid,
         guest.accountUuid,
       );
-      expect(restarted.store.claims, isEmpty);
+      expect(
+        restarted.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
     },
   );
 
@@ -372,11 +402,12 @@ void main() {
       await h.service.purchase(h.product());
       await h.service.interceptPurchase(h.purchase());
       final request = h.reports.single;
+      final localId = h.store.confirmed.keys.single;
       h.uid = 'first-login';
       h.claimHandler = (identity) async =>
           MembershipClaimResult(status: MembershipReportStatus.accepted);
       await h.service.recover();
-      expect(h.store.records.values.single.requestId, request.requestId);
+      expect(h.store.records.values.single.requestId, localId);
       expect(h.store.records.values.single.finished, isTrue);
       h.claimHandler = null;
       await tester.pump(const Duration(seconds: 15));
@@ -385,7 +416,10 @@ void main() {
       expect(h.reports.last.toJson(), request.toJson());
       expect(h.platform.finishes, 1);
       expect(h.store.records, isEmpty);
-      expect(h.store.claims, isEmpty);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
     },
   );
 
@@ -395,7 +429,10 @@ void main() {
     await h.service.purchase(h.product());
     await h.service.recover();
     expect(h.service.guestLoginRequestId.value, isNull);
-    expect(h.store.claims, isEmpty);
+    expect(
+      h.store.claims.values.where((r) => r.status != 'completed'),
+      isEmpty,
+    );
     expect(h.claimRequests, isEmpty);
   });
 
@@ -414,7 +451,10 @@ void main() {
       expect(h.store.claims.values.single.status, isNull);
       h.store.failClaim = false;
       await h.service.recover();
-      expect(h.store.claims, isEmpty);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
       expect(h.claimRequests, hasLength(1));
       expect(h.refreshes, 1);
     },

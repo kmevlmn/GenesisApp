@@ -5,11 +5,13 @@ import 'package:genesis_flutter_android/app/membership/membership_purchase_servi
 import 'package:genesis_flutter_android/network/models/membership_product.dart';
 import 'package:genesis_flutter_android/network/models/membership_purchase.dart';
 import 'package:genesis_flutter_android/network/models/membership_claim.dart';
+import 'package:genesis_flutter_android/network/models/membership_guest_purchase_check.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_guest_claim_record.dart';
 import 'package:genesis_flutter_android/platform/billing/billing_models.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_checkout_platform.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_pending_store.dart';
 import 'package:genesis_flutter_android/platform/billing/membership_restore_record.dart';
+import 'package:genesis_flutter_android/platform/billing/membership_store_purchase.dart';
 
 import '../../support/membership_fixtures.dart';
 
@@ -53,16 +55,10 @@ class PendingStore implements MembershipPendingStore {
     if (record.status != 'completed' || record.ownerUid == null) {
       throw StateError('claim is not completed');
     }
-    for (final purchases in [confirmed, records]) {
-      for (final purchase in purchases.values.toList()) {
-        if (purchase.guest?.accountUuid == record.guest.accountUuid) {
-          purchases[purchase.requestId] = purchase.bindGuestToAccount(
-            record.ownerUid!,
-          );
-        }
-      }
-    }
-    claims.remove(record.guest.accountUuid);
+    confirmed.removeWhere(
+      (_, p) => p.guest?.accountUuid == record.guest.accountUuid,
+    );
+    claims[record.guest.accountUuid] = record.boundIdentity;
   }
 
   @override
@@ -71,8 +67,21 @@ class PendingStore implements MembershipPendingStore {
   @override
   Future<void> complete(MembershipPurchaseRecord record) async {
     if (fail || failComplete) throw StateError('storage unavailable');
-    confirmed[record.requestId] = record;
+    if (record.guest != null &&
+        record.paid &&
+        record.hasReceipt &&
+        record.reportStatus != 'rejected') {
+      confirmed[record.requestId] = record;
+    } else {
+      confirmed.remove(record.requestId);
+    }
     records.remove(record.requestId);
+  }
+
+  @override
+  Future<void> saveGuestPurchase(MembershipPurchaseRecord record) async {
+    if (fail || failClaim) throw StateError('guest storage unavailable');
+    confirmed[record.requestId] = record;
   }
 
   @override
@@ -153,6 +162,7 @@ class Harness {
     PendingStore? storage,
     bool restoreEnabled = false,
     bool claimEnabled = false,
+    bool guestRecoveryEnabled = false,
     Duration retryDelay = const Duration(days: 1),
     Duration attemptTimeout = const Duration(seconds: 90),
   }) : store = storage ?? PendingStore() {
@@ -177,7 +187,10 @@ class Harness {
       },
       reportPurchase: (request) async {
         reports.add(request);
-        expectSync(store.records[request.requestId]?.hasReceipt, isTrue);
+        expectSync(
+          request.purchaseToken.isNotEmpty || request.transactionId.isNotEmpty,
+          isTrue,
+        );
         return reportHandler == null
             ? completed
             : await reportHandler!(request);
@@ -186,7 +199,7 @@ class Harness {
           ? (request) async {
               claimRequests.add(request);
               expectSync(
-                store.claims[request.guest!.accountUuid]?.ownerUid,
+                store.claims[request.guest.accountUuid]?.ownerUid,
                 uid,
               );
               return claimHandler == null
@@ -202,6 +215,22 @@ class Harness {
             ? 'test.header.signature'
             : await signedTransactionHandler!(request);
       },
+      checkGuestPurchase: guestRecoveryEnabled
+          ? (uuid) async {
+              guestChecks.add(uuid);
+              return guestCheckHandler == null
+                  ? const MembershipGuestPurchaseCheck(hasUnboundOrder: true)
+                  : await guestCheckHandler!(uuid);
+            }
+          : null,
+      discoverGuestPurchases: guestRecoveryEnabled
+          ? () async {
+              guestDiscoveries++;
+              return guestPurchasesHandler == null
+                  ? guestPurchases
+                  : await guestPurchasesHandler!();
+            }
+          : null,
       queryRestorePurchases: restoreEnabled
           ? (ids) async {
               restoreQueries++;
@@ -227,22 +256,26 @@ class Harness {
   final Checkout platform = Checkout();
   late final MembershipPurchaseService service;
   String? uid = 'user-test';
+  List<MembershipStorePurchase> guestPurchases = [];
+  Future<List<MembershipStorePurchase>> Function()? guestPurchasesHandler;
   Future<String?> Function()? loginUidHandler;
   Future<String> Function()? accountUuidHandler;
   Future<MembershipGuestIdentity> Function()? guestHandler;
   bool gemsBusy = false;
   int guestPrepares = 0;
+  int guestDiscoveries = 0;
+  final guestChecks = <String>[];
+  Future<MembershipGuestPurchaseCheck> Function(String)? guestCheckHandler;
   int eligibilityQueries = 0;
   Future<List<MembershipProduct>> Function()? productsHandler;
   int refreshes = 0;
   Future<void> Function()? walletRefreshHandler;
   int recoverQueries = 0;
   int restoreQueries = 0;
-  final claimRequests = <MembershipPurchaseRequest>[];
-  Future<MembershipClaimResult> Function(MembershipPurchaseRequest)?
-  claimHandler;
+  final claimRequests = <MembershipClaimRequest>[];
+  Future<MembershipClaimResult> Function(MembershipClaimRequest)? claimHandler;
   int signedTransactionQueries = 0;
-  Future<String> Function(MembershipPurchaseRequest)? signedTransactionHandler;
+  Future<String> Function(MembershipClaimRequest)? signedTransactionHandler;
   Future<List<BillingPurchase>> Function()? storeQuery;
   List<BillingPurchase> recoverable = [];
   final reports = <MembershipPurchaseRequest>[];
@@ -277,26 +310,20 @@ class Harness {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test(
-    'completed order is removed and restart keeps exact Google restore plan',
-    () async {
-      final h = Harness();
-      await h.service.purchase(h.product(yearly: true));
-      await h.service.interceptPurchase(h.purchase(yearly: true));
-      expect(h.store.records, isEmpty);
-      final restarted = Harness(storage: h.store, restoreEnabled: true);
-      restarted.recoverable = [h.purchase(yearly: true)];
-      await restarted.service.restorePurchases(
-        products: [h.product(), h.product(yearly: true)],
-      );
-      expect(restarted.reports, isEmpty);
-      expect(
-        restarted.store.confirmed.values.single.product.basePlanId,
-        'test-annual',
-      );
-      expect(restarted.store.restores, isEmpty);
-    },
-  );
+  test('successful logged-in report leaves no durable order history', () async {
+    final h = Harness();
+    await h.service.purchase(h.product(yearly: true));
+    await h.service.interceptPurchase(h.purchase(yearly: true));
+    expect(h.store.records, isEmpty);
+    final restarted = Harness(storage: h.store, restoreEnabled: true);
+    restarted.recoverable = [h.purchase(yearly: true)];
+    await restarted.service.restorePurchases(
+      products: [h.product(), h.product(yearly: true)],
+    );
+    expect(restarted.reports, isEmpty);
+    expect(restarted.store.confirmed, isEmpty);
+    expect(restarted.store.restores, isEmpty);
+  });
   test(
     'cleanup failure keeps acknowledged order and retries without another report',
     () async {
@@ -335,24 +362,25 @@ void main() {
     },
   );
   test(
-    'stream errors release the lock and saved attempt can recover its receipt',
+    'stream errors release the lock and a late callback can still report',
     () async {
       final h = Harness();
       await h.service.purchase(h.product());
       h.service.handleStreamError();
       expect(h.service.isBusy, isFalse);
-      h.recoverable = [h.purchase()];
       await h.service.recover();
+      expect(h.reports, isEmpty);
+      await h.service.interceptPurchase(h.purchase());
       expect(h.reports, hasLength(1));
     },
   );
   test(
-    'persists selected yearly plan, then reports and deduplicates',
+    'keeps selected yearly plan in memory, then reports and deduplicates',
     () async {
       final h = Harness();
       h.platform.onLaunch = () async {
-        expect(h.store.records.values.single.product.isYearly, isTrue);
-        expect(h.store.records.values.single.hasReceipt, isFalse);
+        expect(h.store.records, isEmpty);
+        expect(h.platform.product!.isYearly, isTrue);
       };
       await h.service.purchase(h.product(yearly: true));
       expect(h.platform.launches, 1);
@@ -388,14 +416,12 @@ void main() {
     },
   );
   test(
-    'guest identity is saved before launch and guest reports do not refresh account wallet',
+    'guest proof is cached after payment and guest report does not refresh account wallet',
     () async {
       final h = Harness()..uid = null;
       h.platform.onLaunch = () async {
-        expect(
-          h.store.records.values.single.guest?.accountUuid,
-          guest.accountUuid,
-        );
+        expect(h.store.records, isEmpty);
+        expect(h.store.claims, isEmpty);
       };
       await h.service.purchase(h.product());
       expect(h.guestPrepares, 1);
@@ -410,12 +436,12 @@ void main() {
       );
     },
   );
-  test('failed secure persistence prevents platform launch', () async {
+  test('purchase launch does not persist a speculative order', () async {
     final h = Harness()..uid = null;
     h.store.fail = true;
     await h.service.purchase(h.product());
-    expect(h.platform.launches, 0);
-    expect(h.service.isBusy, isFalse);
+    expect(h.platform.launches, 1);
+    expect(h.store.records, isEmpty);
   });
   test(
     'launch rejection and cancellation allow another attempt without reporting',
@@ -457,7 +483,7 @@ void main() {
     },
   );
   test(
-    'report failure survives restart and retries identical request id and receipt',
+    'report failure survives restart and retries identical proof without a request ID',
     () async {
       final h = Harness();
       h.reportHandler = (_) async => throw StateError('offline');
@@ -467,17 +493,17 @@ void main() {
       final restarted = Harness(storage: h.store);
       await restarted.service.recover();
       expect(restarted.reports.single.toJson(), h.reports.single.toJson());
-      expect(restarted.reports.single.requestId, h.reports.single.requestId);
+      expect(restarted.reports.single.toJson(), isNot(contains('request_id')));
     },
   );
   test(
-    'receipt persistence failure retains memory receipt and retries before report',
+    'cleanup storage failure does not prevent report or cause a duplicate report',
     () async {
       final h = Harness();
       await h.service.purchase(h.product());
       h.store.fail = true;
       await h.service.interceptPurchase(h.purchase());
-      expect(h.reports, isEmpty);
+      expect(h.reports, hasLength(1));
       h.store.fail = false;
       await h.service.recover();
       expect(h.reports, hasLength(1));
@@ -497,7 +523,7 @@ void main() {
       expect(h.platform.finishes, 2);
       expect(h.reports, hasLength(1));
       expect(h.store.records, isEmpty);
-      expect(h.store.confirmed.values.single.finished, isTrue);
+      expect(h.store.confirmed, isEmpty);
     },
   );
   test('accepted keeps its order while rejected completes its order', () async {
@@ -589,19 +615,23 @@ void main() {
       expect(await h.service.interceptPurchase(gem), isFalse);
     },
   );
-  test('new Google renewal using same token gets a new request id', () async {
-    final h = Harness();
-    await h.service.purchase(h.product());
-    await h.service.interceptPurchase(h.purchase(transaction: 'order-1'));
-    await h.service.interceptPurchase(h.purchase(transaction: 'order-2'));
-    expect(h.reports, hasLength(2));
-    expect(h.reports.last.requestId, isNot(h.reports.first.requestId));
-    await h.service.interceptPurchase(h.purchase(transaction: 'order-1'));
-    await h.service.interceptPurchase(h.purchase(transaction: 'order-2'));
-    expect(h.reports, hasLength(2));
-    expect(h.store.records, isEmpty);
-    expect(h.store.confirmed, hasLength(2));
-  });
+  test(
+    'new Google renewal using same token reports once per transaction',
+    () async {
+      final h = Harness();
+      await h.service.purchase(h.product());
+      await h.service.interceptPurchase(h.purchase(transaction: 'order-1'));
+      await h.service.interceptPurchase(h.purchase(transaction: 'order-2'));
+      expect(h.reports, hasLength(2));
+      expect(h.reports.map((r) => r.transactionId), ['order-1', 'order-2']);
+      expect(h.reports.last.toJson(), h.reports.first.toJson());
+      await h.service.interceptPurchase(h.purchase(transaction: 'order-1'));
+      await h.service.interceptPurchase(h.purchase(transaction: 'order-2'));
+      expect(h.reports, hasLength(2));
+      expect(h.store.records, isEmpty);
+      expect(h.store.confirmed, isEmpty);
+    },
+  );
   test(
     'callback and foreground retry cannot double-report a receipt',
     () async {

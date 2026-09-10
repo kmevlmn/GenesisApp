@@ -45,6 +45,8 @@ void main() {
         expect(h.claimRequests, hasLength(6));
         for (final request in h.claimRequests) {
           expect(request.toJson(), h.reports.first.toJson());
+          expect(request.toJson(), isNot(contains('plan_code')));
+          expect(request.toJson(), isNot(contains('request_id')));
         }
         expect(
           h.store.claims.values.single.guest.accountUuid,
@@ -58,7 +60,10 @@ void main() {
         h.service.resetForSession();
         await h.service.recover();
         expect(h.claimRequests, hasLength(7));
-        expect(h.store.claims, isEmpty);
+        expect(
+          h.store.claims.values.where((r) => r.status != 'completed'),
+          isEmpty,
+        );
         expect(h.refreshes, 1);
       },
     );
@@ -80,7 +85,10 @@ void main() {
     await tester.pump(const Duration(seconds: 15));
     await h.service.recover();
     expect(h.claimRequests, hasLength(2));
-    expect(h.store.claims, isEmpty);
+    expect(
+      h.store.claims.values.where((r) => r.status != 'completed'),
+      isEmpty,
+    );
     await tester.pump(const Duration(days: 1));
     await h.service.recover();
     expect(h.claimRequests, hasLength(2));
@@ -119,7 +127,10 @@ void main() {
       h.service.resetForSession();
       await h.service.recover();
       expect(h.claimRequests, hasLength(2));
-      expect(h.store.claims, isEmpty);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
     },
   );
 
@@ -139,7 +150,10 @@ void main() {
       await h.service.recover();
       expect(h.claimRequests, hasLength(1));
       expect(h.refreshes, 2);
-      expect(h.store.claims, isEmpty);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
     },
   );
 }

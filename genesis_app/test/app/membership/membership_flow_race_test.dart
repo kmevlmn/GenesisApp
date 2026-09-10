@@ -66,19 +66,16 @@ void main() {
   );
 
   test(
-    'report rechecks account ownership after its asynchronous receipt save',
+    'report rechecks account ownership before sending and retries only as original owner',
     () async {
       final h = Harness();
       await h.service.purchase(h.product());
-      var receiptWrites = 0;
-      h.store.onSave = (record) async {
-        if (record.hasReceipt && ++receiptWrites == 2) h.uid = 'other-login';
-      };
+      var reads = 0;
+      h.loginUidHandler = () async => ++reads == 1 ? h.uid : 'other-login';
       await h.service.interceptPurchase(h.purchase());
       expect(h.reports, isEmpty);
-      expect(h.store.records.values.single.hasReceipt, isTrue);
-      expect(h.store.records.values.single.ownerUid, 'user-test');
-      h.store.onSave = null;
+      expect(h.store.records, isEmpty);
+      h.loginUidHandler = null;
       h.uid = 'user-test';
       await h.service.recover();
       expect(h.reports, hasLength(1));
@@ -114,6 +111,9 @@ void main() {
     await tester.pump();
     await h.service.recover();
     expect(h.claimRequests, hasLength(2));
-    expect(h.store.claims, isEmpty);
+    expect(
+      h.store.claims.values.where((r) => r.status != 'completed'),
+      isEmpty,
+    );
   });
 }

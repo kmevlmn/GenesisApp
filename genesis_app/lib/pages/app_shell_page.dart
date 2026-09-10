@@ -124,6 +124,13 @@ class _AppShellPageState extends State<AppShellPage>
       _startPostLaunchWorkIfAllowed();
       _startInitialBillingRecoveryIfReady();
       _scheduleAttRequest();
+      if (mounted) {
+        // Startup can land on Worldo or Me with Home still unbuilt.
+        final membership = AppServicesScope.read(context).membershipPurchases;
+        if (membership != null) {
+          unawaited(membership.checkGuestPurchasesOnHome());
+        }
+      }
     });
   }
 

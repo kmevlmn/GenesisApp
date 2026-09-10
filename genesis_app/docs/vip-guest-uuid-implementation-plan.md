@@ -1,43 +1,36 @@
 # VIP 游客购买、恢复与账号绑定实施方案
 
-更新：2026-09-10 已完成游客身份模型、report/claim 请求、UUID 缓存关联和旧缓存迁移；Apple JWS 仅驻留内存，重启后按原交易向 StoreKit 读取。claim 复用 report 的凭据及 request_id，保留原强制登录、5 次退避重试及完成后刷新 wallet/清缓存逻辑。本文其余首页 check、无本地订单的商店恢复等仍为实施方案，不代表已落地或真机联调完成。
+更新：2026-09-10 已接入 Android/iOS 无缓存的商店查询 → check → 登录 → claim，以及凭据持久化、固定账号的重试和完成清理。Android / iOS 登录 report、游客 report 和 claim 均按用户最新要求去掉 plan_code、request_id；本地记录编号保留用于回调、弹窗和队列关联，不上送接口。Apple 携带原交易与 JWS，不再查询目录解析套餐。本文第 2～8 节保留早期设计背景，涉及购买尝试持久化、商店历史补报或旧订单阻塞的内容已由第 9 节当前实现取代；测试不代表真机验单和会员到账已验证。
 
 ## 1. 接口基线与需要先对齐的事项
 
-已刷新 Apifox 并核对现有 Flutter 实现。
+已刷新 Apifox 并核对现有 Flutter 实现。在线 schema 仍要求 request_id，本次客户端按用户明确要求先完成删除；下表描述最终客户端参数，后端参数及幂等规则需要同步后联调。
 
 | 接口 | 最新契约及客户端用途 |
 | --- | --- |
 | `POST /api/v1/membership/guest/prepare` | 请求仍为 `provider + device_id`；响应只有 `account_uuid`。购买前准备身份，不能据此认为已付款。 |
-| `POST /api/v1/membership/guest/purchase/report` | 游客身份只传 `account_uuid`，同时提交平台购买信息、凭据及 `request_id`。 |
+| `POST /api/v1/membership/guest/purchase/report` | 游客身份只传 `account_uuid`，同时提交平台商品标识及购买凭据，不传 plan_code、request_id。 |
 | `POST /api/v1/membership/guest/purchase/check` | 请求只有 `account_uuid`；成功响应只有 `has_unbound_order`。公开只读，只查服务端已有记录，不向商店验单。 |
-| `POST /api/v1/membership/claim` | 最新文档要求真实登录，并提交 `account_uuid + 平台购买信息及凭据 + request_id`。客户端响应模型继续只读取 `status`。 |
+| `POST /api/v1/membership/claim` | 要求真实登录，并提交 `account_uuid + 平台商品标识及凭据`，不传 plan_code、request_id。客户端响应模型继续只读取 `status`。 |
 | `GET /api/v1/gem/wallet` | claim 完成后重新获取，使用响应中的 membership 更新会员状态。 |
 
 接口依据：[prepare](https://app.apifox.com/link/project/8297783/apis/api-512243338)、[check](https://app.apifox.com/link/project/8297783/apis/api-512807632)、[claim](https://app.apifox.com/link/project/8297783/apis/api-512243340)。
 
-### 1.1 claim 参数存在一处待确认的表述差异
+### 1.1 claim 参数和购买凭据
 
 用户要求“去掉 guest_id，只保留 account_uuid”。最新文档明确禁止仅凭 UUID 或 device_id 认领，且 claim 请求引用游客 report 的同一请求模型。因此，本方案中“只保留 UUID”是指游客身份字段；整个请求仍需交易凭据。本次按最新接口契约实施，游客身份仅保留 UUID，但 claim 仍提交完整交易凭据。
 
-按文档及用户后续确认，共同字段为 `account_uuid / provider / plan_code / store_product_id / request_id`；Google 另传 `purchase_token`，Apple 另传 `transaction_id / signed_transaction`。`base_plan_id` 已按用户确认从请求中去掉；无缓存恢复的 `plan_code` 是否可省略尚待确认。不再发送 `guest_id`、`claim_token`，UID 从登录 session 获取。
+按用户最新要求，claim 共同字段为 `account_uuid / provider / store_product_id`；Google 另传 `purchase_token`，Apple 另传 `transaction_id / signed_transaction`。`base_plan_id`、`plan_code`、`request_id` 均已从请求中去掉，由服务端凭平台证明确定套餐。不再发送 `guest_id`、`claim_token`，UID 从登录 session 获取。
 
 如果用户要求整个请求体只有 UUID，需要先调整服务端认领授权设计及契约，再实施该分支；当前文档不能支持这种调用。
 
-### 1.2 Android 无缓存恢复仍需确认 plan_code 规则
+### 1.2 Android / iOS 无缓存认领规则
 
-Google 客户端订单提供商品 ID、purchaseToken 和购买时的账号标识，但没有已购买订单的 `base_plan_id`。项目里的月、年会员共用 Google 商品 ID，现有恢复代码也明确在缺少原订单时不能推断套餐。查询在售商品只能知道有哪些套餐，不能证明历史订单买了哪一个。
+Google 客户端查询返回商品 ID、purchaseToken 和原账号 UUID，不返回已购基础套餐。按最新要求，Google 与 iOS 的 claim 均不发送 plan_code，由服务端凭购买证明验单确认真实套餐，客户端不读取在售商品或当前页面选项补值。
 
-用户已确认服务端验单获取 base plan，客户端不再提交 `base_plan_id`。但目前尚未确认无缓存恢复是否允许省略 `plan_code`；它同样区分月/年套餐，因此仅移除 base plan 还不足以完成当前客户端的无缓存恢复路径。
+iOS 使用原 appAccountToken、交易 ID、商品 ID 和签名 JWS，不再查询正式目录解析套餐。JWS 不持久化，重启后按原交易、商品及 UUID 向 StoreKit 重新读取。
 
-剩余需要对齐的契约：
-
-1. 确认 report 和 claim 在缺失本地套餐时是否允许省略 `plan_code`。客户端已移除独立 restore HTTP 接口，恢复订单统一走 report。`base_plan_id` 的去除已经确认，不再作为待实施项。
-2. 服务端用有效购买凭据向平台验单，依据官方商品及基础方案映射内部套餐；不能按客户端当前选中的套餐补值。
-3. 正常新购买仍提交完整字段；只要客户端提交了套餐字段，服务端仍校验其与官方结果一致。
-4. 同步修改两个接口共用的请求模型和校验规则，明确幂等比较按官方确认的交易身份处理。首次恢复生成并保存 request_id，重试保持一致；不能补齐套餐后意外生成另一笔业务操作。
-
-base plan 由服务端验单取得的调整以用户确认为准；`plan_code` 省略规则尚未确认。Google 官方依据：[客户端 Purchase](https://developer.android.com/reference/com/android/billingclient/api/Purchase)、[服务端 SubscriptionPurchaseV2 的 lineItems.offerDetails.basePlanId](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptionsv2)。
+claim 使用独立请求模型。Android / iOS 登录 report、游客 report、claim 均省略 plan_code、request_id；已有游客 report 的 claim 复用原购买凭据，两次 HTTP 请求的字段保持一致。无缓存认领保存原购买证明；缓存内的记录编号仅用于本地关联，失败及重启不重新生成，也不传入 HTTP 请求模型。后端无 request_id 的参数校验和幂等处理仍需同步；具体验证边界见 [双端重装认领](vip-guest-recovery-backend-contract.md)。
 
 ## 2. 购买前为什么保存，以及失败后怎么处理
 
@@ -126,7 +119,7 @@ check 为 false 的原因包括：UUID 不存在、只 prepare、只有上报事
 ## 5. 登录绑定、重试和清理
 
 1. 登录成功，读取全部未完成的游客任务。
-2. 对当前待处理 UUID，取得其真实平台购买凭据，组装最新 claim 请求。原 report 和 claim 对同一笔购买复用 request_id；无原本地记录时，为恢复操作生成一次并持久化。
+2. 对当前待处理 UUID，取得其真实平台购买凭据，组装最新 claim 请求。report 和 claim 对同一笔购买复用原凭据，不发送 request_id；本地记录编号只负责关联重试及清理。
 3. 在发请求前持久化目标 `ownerUid`，防止响应超时后因切换账号而把同一笔订单认领到另一个账号。
 4. claim completed：先持久化完成状态，再重新拉 `/api/v1/gem/wallet`，将返回的会员信息交给现有会员展示逻辑。
 5. wallet 刷新失败只重试刷新和清理，不重复提交已经 completed 的 claim。清理失败同样保留 completed 标记续做。
@@ -155,7 +148,7 @@ claim 后刷 wallet 是刷新现有数据来源；普通 Gems 余额仍读 walle
 
 平台交易完成/确认继续按 VIP 既有服务端接管边界处理，不等用户登录后才处理商店确认；待付款交易不能提前当作已购买。游客 claim 失败不触发第二次支付。
 
-新 check 也加入现有 membership 私密请求排除范围；禁止输出 UUID、token、JWS 原始请求体。状态诊断只记录阶段、结果、耗时和脱敏关联标识。
+新 check 加入现有 membership 持久化捕获和原生 body 采集排除范围。按后续产品要求，Debug DevTools 显示会员接口原始请求和响应，允许核对 UUID、token、JWS；非 Debug 仍脱敏或排除 profile。普通状态日志只记录阶段、结果、耗时和脱敏关联标识。
 
 ## 7. 实施拆分及文件范围
 
@@ -195,8 +188,8 @@ claim 后刷 wallet 是刷新现有数据来源；普通 Gems 余额仍读 walle
 
 ## 9. 当前结论
 
-2026-09-10 接入进度：check 的网络封装、严格布尔响应模型、no-store 和隐私排除已完成；首页协调器尚未接入。最新要求仅对未登录用户进行启动检查，并筛选仍有效的会员，年会员优先、月会员其次、全部失效不拦截。当前 check 仍包含过期/退款的未绑定订单，且只返回 has_unbound_order；有效期与套餐对应关系的数据来源尚待服务端确认。此前第 4 节“check=true 即弹登录”须补充有效性筛选后才可实施，不能直接照旧执行。
+2026-09-10 按最新产品要求收敛缓存：只保留实际 report 失败/accepted 的补报请求，以及游客购买用于 check/claim 的身份和凭据；不建立商店旧订单恢复队列，不用本地历史拦截新购买。登录购买成功后删除补报记录，不另存成功订单归档。
 
-prepare 的 UUID 需要购买前保存，但临时记录不触发强制登录；report accepted 表示购买确认仍未完成，claim accepted 则表示已绑定但同步未完成；启动拦截改为先 check，false 不能直接用于删除交易。
+未登录进入首页时，优先对缓存的原 UUID 调用 check；无缓存（包括卸载重装）时，只读查询 Google SUBS 的 obfuscatedAccountId / Apple 有效订阅的 appAccountToken，按原 UUID 去重后调用 check。两条路径均以 has_unbound_order 决定是否强制登录。check=true 且原购买证明唯一时，将原 UUID、商品 ID、token/交易 ID 与稳定 request_id 放入独立游客认领缓存，登录成功后直接进入 claim 重试流程。商店发现不创建恢复订单、不调用 prepare/report，也不要求先打开 VIP 页。游客购买成功后的 OK → 登录顺序保留。绑定完成后清理购买凭据、停止自动 claim，保留已绑定 UUID 用于以后未登录时的 check。
 
-主流程可以按上述阶段实施。完整无缓存恢复的前置条件是 claim 参数含义确认，以及服务端支持从有效凭据推导缺失套餐；只改 guest_id/claim_token 字段和接入 check，还不能宣称卸载重装找回已全部跑通。
+前文有关自动补报商店历史和本地旧订单阻塞的设计不属于当前实现范围。无缓存 claim 已接入凭据缓存、登录触发、固定首次 owner 的重试、完成清理。按用户最新要求，Android / iOS 登录 report、游客 report 和全部 claim 请求均删除 plan_code、request_id，原购买证明不变；Apple 直接按原交易、商品及 UUID 读取对应 JWS。两端重装均直接 claim，不构造 report 记录。正常 checkout 仍使用商品目录选择套餐，本地编号关联回调及重试但不上送接口。已登录升级使用商品接口提供的原订阅身份和凭据；Gems 流程不变。

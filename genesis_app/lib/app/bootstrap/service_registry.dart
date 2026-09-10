@@ -19,6 +19,7 @@ import '../../network/network_capture.dart';
 import '../../routers/app_router.dart';
 import '../../platform/platform_services.dart';
 import '../../platform/session/user_info_cache.dart';
+import '../../platform/billing/membership_catalog_cache.dart';
 import '../config/app_config.dart';
 import '../config/app_global_config.dart';
 import '../config/platform_config.dart';
@@ -69,6 +70,11 @@ class AppServices {
                deviceId: await deviceId.getDeviceId(),
              ),
              provider: MembershipCatalog.currentProvider,
+             readOwnerUid: sessionStore.readLoginUid,
+             cacheStore: MembershipCatalogCache(
+               namespace:
+                   '${config.effectiveApiEnvironment}|${platformConfig.apiBaseUrl}',
+             ),
            ),
        deviceInfoTelemetry =
            deviceInfoTelemetry ??
@@ -118,6 +124,7 @@ class AppServices {
   final ValueNotifier<String?> pendingLoginCheckInUid = ValueNotifier(null);
 
   void _membershipSessionChanged() {
+    membershipCatalog.resetForSession();
     membership.resetForSession();
     unawaited(membership.start());
     membershipPurchases?.resetForSession();
@@ -326,7 +333,9 @@ class ServiceRegistry {
             ),
             reportPurchase: api.v1.membership.reportPurchase,
             claimGuest: api.v1.membership.claimGuest,
-            queryRestorePurchases: membershipRestorer!.query,
+            checkGuestPurchase: (uuid) =>
+                api.v1.membership.checkGuestPurchase(accountUuid: uuid),
+            discoverGuestPurchases: membershipRestorer!.discoverGuestPurchases,
             loadSignedTransaction: membershipRestorer.signedTransaction,
             queryPurchases: billingPlatform.queryRecoverablePurchases,
             otherPurchaseBusy: () =>

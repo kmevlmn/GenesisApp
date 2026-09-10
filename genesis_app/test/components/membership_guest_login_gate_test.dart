@@ -9,6 +9,7 @@ import 'package:genesis_flutter_android/components/gems/pro_subscription_content
 import 'package:genesis_flutter_android/components/login_sheet.dart';
 import 'package:genesis_flutter_android/platform/auth/auth_cancelled_exception.dart';
 import 'package:genesis_flutter_android/network/models/membership_claim.dart';
+import 'package:genesis_flutter_android/network/models/membership_product.dart';
 import 'package:genesis_flutter_android/routers/app_router.dart';
 
 import '../app/membership/membership_purchase_service_test.dart';
@@ -89,6 +90,60 @@ void main() {
   });
 
   testWidgets(
+    'cached Home purchase checks UUID then forces unclosable login and claims with its receipt',
+    (tester) async {
+      final h = Harness(
+        provider: MembershipProvider.apple,
+        guestRecoveryEnabled: true,
+        claimEnabled: true,
+      )..uid = null;
+      await h.service.purchase(h.product());
+      await h.service.interceptPurchase(h.purchase());
+      await openGuestApp(tester, h, homeOnly: true);
+      expect(find.byType(LoginSheet), findsNothing);
+      await h.service.checkGuestPurchasesOnHome();
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginSheet), findsOneWidget);
+      expect(find.text('VIP purchase successful!'), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginSheet), findsOneWidget);
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginSheet), findsOneWidget);
+      await tester.tap(find.text('Continue with Google'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginSheet), findsNothing);
+      expect(find.text('Me'), findsOneWidget);
+      expect(h.claimRequests, hasLength(1));
+      expect(h.claimRequests.single.guest.accountUuid, guest.accountUuid);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
+      expect(h.refreshes, greaterThan(0));
+    },
+  );
+
+  testWidgets(
+    'startup recovery support preserves checkout success OK then login',
+    (tester) async {
+      final h = Harness(guestRecoveryEnabled: true, claimEnabled: true)
+        ..uid = null;
+      await openGuestApp(tester, h);
+      await tester.tap(find.byKey(const ValueKey('pro-subscribe-button')));
+      await tester.pump(const Duration(milliseconds: 250));
+      await h.service.interceptPurchase(h.purchase(yearly: true));
+      await tester.pumpAndSettle();
+      expect(find.text('VIP purchase successful!'), findsOneWidget);
+      expect(find.byType(LoginSheet), findsNothing);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginSheet), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'successful forced login removes purchase routes before claim completes',
     (tester) async {
       final h = Harness(
@@ -132,7 +187,10 @@ void main() {
       await tester.pump(const Duration(seconds: 15));
       await tester.pumpAndSettle();
       expect(h.claimRequests, hasLength(2));
-      expect(h.store.claims, isEmpty);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
       expect(find.text('Me'), findsOneWidget);
       expect(h.refreshes, greaterThan(0));
     },
@@ -160,7 +218,10 @@ void main() {
       h.service.resetForSession();
       await h.service.recover();
       expect(h.claimRequests, hasLength(1));
-      expect(h.store.claims, isEmpty);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
     },
   );
 
@@ -348,7 +409,10 @@ void main() {
       await tester.tap(find.text('Continue with Google'));
       await tester.pumpAndSettle();
       expect(find.byType(LoginSheet), findsNothing);
-      expect(h.store.claims, isEmpty);
+      expect(
+        h.store.claims.values.where((r) => r.status != 'completed'),
+        isEmpty,
+      );
       expect(find.text('Me'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();

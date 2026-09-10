@@ -97,13 +97,8 @@ class MembershipV1Api extends V1ApiResource {
   }
 
   Future<MembershipClaimResult> claimGuest(
-    MembershipPurchaseRequest request,
+    MembershipClaimRequest request,
   ) async {
-    if (request.guest == null) {
-      throw const FormatException(
-        'Membership claim requires guest purchase proof',
-      );
-    }
     return MembershipClaimResult.fromJson(
       await _postPrivate('membership/claim', request.toJson()),
     );

@@ -149,35 +149,34 @@ void main() {
   );
 
   for (final status in ['accepted', 'offline', 'pending']) {
-    test('$status order blocks another plan and survives restart', () async {
-      final h = support.Harness();
-      h.reportHandler = (_) async {
-        if (status == 'offline') throw StateError('offline');
-        return const MembershipPurchaseReport(
-          status: MembershipReportStatus.accepted,
-          reportId: 'accepted',
+    test(
+      '$status report retry survives restart without blocking another plan',
+      () async {
+        final h = support.Harness();
+        h.reportHandler = (_) async {
+          if (status == 'offline') throw StateError('offline');
+          return const MembershipPurchaseReport(
+            status: MembershipReportStatus.accepted,
+            reportId: 'accepted',
+          );
+        };
+        await h.service.purchase(h.product(yearly: true));
+        await h.service.interceptPurchase(
+          h.purchase(
+            yearly: true,
+            status: status == 'pending'
+                ? BillingPurchaseStatus.pending
+                : BillingPurchaseStatus.purchased,
+          ),
         );
-      };
-      await h.service.purchase(h.product(yearly: true));
-      await h.service.interceptPurchase(
-        h.purchase(
-          yearly: true,
-          status: status == 'pending'
-              ? BillingPurchaseStatus.pending
-              : BillingPurchaseStatus.purchased,
-        ),
-      );
-      final restarted = support.Harness(storage: h.store);
-      final event = restarted.service.checkoutEvents.firstWhere(
-        (e) => e.state == MembershipCheckoutState.failed,
-      );
-      await restarted.service.purchase(restarted.product());
-      expect((await event).reason, 'purchase_processing');
-      expect(restarted.eligibilityQueries, 0);
-      expect(restarted.platform.launches, 0);
-      expect(h.store.records, hasLength(1));
-      expect(h.store.confirmed, isEmpty);
-    });
+        final restarted = support.Harness(storage: h.store);
+        await restarted.service.purchase(restarted.product());
+        expect(restarted.eligibilityQueries, 1);
+        expect(restarted.platform.launches, 1);
+        expect(h.store.records, hasLength(1));
+        expect(h.store.confirmed, isEmpty);
+      },
+    );
   }
 
   test(
@@ -186,7 +185,7 @@ void main() {
       final h = support.Harness();
       await h.service.purchase(h.product(yearly: true));
       await h.service.interceptPurchase(h.purchase(yearly: true));
-      expect(h.store.confirmed, hasLength(1));
+      expect(h.store.confirmed, isEmpty);
       // A later server response allows new purchase after the old plan expired.
       await h.service.purchase(h.product());
       expect(h.platform.launches, 2);
@@ -215,7 +214,7 @@ void main() {
       expect(h.service.state.value, MembershipCheckoutState.completed);
       expect(h.platform.finishes, 1);
       expect(h.store.records, isEmpty);
-      expect(h.store.confirmed.values.single.paid, isTrue);
+      expect(h.store.confirmed, isEmpty);
       expect(h.service.catalogRevision.value, 2);
     },
   );
@@ -240,7 +239,7 @@ void main() {
       await h.service.recover();
       expect(h.reports, hasLength(1));
       expect(h.store.records, isEmpty);
-      expect(h.store.confirmed.values.single.reportReason, 'purchase_canceled');
+      expect(h.store.confirmed, isEmpty);
       expect(h.platform.finishes, 0);
       expect(h.refreshes, 0);
       expect(h.service.catalogRevision.value, 1);

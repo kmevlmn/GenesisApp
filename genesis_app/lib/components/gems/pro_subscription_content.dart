@@ -37,12 +37,14 @@ class ProSubscriptionContent extends StatefulWidget {
   const ProSubscriptionContent({
     super.key,
     this.productsLoader,
+    this.catalog,
     this.purchaseHandler,
     this.purchaseService,
     this.closeOnPurchaseSuccess = false,
   });
 
   final MembershipCatalogLoader? productsLoader;
+  final MembershipCatalog? catalog;
   final Future<void> Function(MembershipProduct)? purchaseHandler;
   final MembershipPurchaseService? purchaseService;
   final bool closeOnPurchaseSuccess;
@@ -61,6 +63,10 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
   MembershipPurchasePresentation? _purchasePresentation;
   MembershipPurchaseService? _presentationService;
   MembershipPurchaseService? _catalogService;
+
+  MembershipCatalog? get _catalog =>
+      widget.catalog ??
+      (widget.productsLoader == null ? _services?.membershipCatalog : null);
 
   MembershipOffer? _offerFor(_ProPlan plan) {
     for (final offer in _offers) {
@@ -89,7 +95,10 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
   @override
   void didUpdateWidget(ProSubscriptionContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.productsLoader != widget.productsLoader) unawaited(_load());
+    if (oldWidget.productsLoader != widget.productsLoader ||
+        oldWidget.catalog != widget.catalog) {
+      unawaited(_load());
+    }
     _bindPurchaseUpdates();
   }
 
@@ -102,8 +111,7 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
   }
 
   void _purchaseChanged() {
-    // A catalog refresh caused by restore must not start another restore.
-    unawaited(_load(silent: true, restorePurchases: false));
+    unawaited(_load(silent: true));
   }
 
   void _sessionChanged() {
@@ -120,41 +128,53 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
     super.dispose();
   }
 
-  Future<void> _load({
-    bool silent = false,
-    bool restorePurchases = true,
-  }) async {
+  Future<void> _load({bool silent = false}) async {
     final request = ++_requestGeneration;
+    final source = _catalog;
+    final cached = source?.cached;
     setState(() {
       if (!silent) {
-        _loading = true;
-        _offers = [];
+        _loading = cached == null;
+        _applyCatalog(cached ?? const MembershipCatalogData());
       }
     });
+    var freshApplied = false;
+    if (source != null && cached == null) {
+      unawaited(() async {
+        final snapshot = await source.loadCached();
+        if (!mounted ||
+            request != _requestGeneration ||
+            freshApplied ||
+            snapshot == null) {
+          return;
+        }
+        setState(() {
+          _applyCatalog(snapshot);
+          _loading = false;
+        });
+      }());
+    }
     try {
-      final loader = widget.productsLoader ?? _services?.membershipCatalog.load;
+      final loader = widget.productsLoader ?? source?.load;
       if (loader == null) throw MembershipPlatformUnavailable();
       final catalog = await loader();
       if (!mounted || request != _requestGeneration) return;
+      freshApplied = true;
       setState(() {
-        _offers = catalog.offers;
-        if (_offerFor(_plan) == null && _offers.isNotEmpty) {
-          _plan = _ProPlan.values.firstWhere((plan) => _offerFor(plan) != null);
-        }
+        _applyCatalog(catalog);
         _loading = false;
       });
-      if (restorePurchases) {
-        unawaited(
-          (widget.purchaseService ?? _services?.membershipPurchases)
-              ?.restorePurchases(
-                products: catalog.offers.map((offer) => offer.product).toList(),
-              ),
-        );
-      }
     } catch (error) {
       if (!mounted || request != _requestGeneration) return;
       debugPrint('[Membership] catalog load failed: ${error.runtimeType}');
       setState(() => _loading = false);
+    }
+  }
+
+  void _applyCatalog(MembershipCatalogData catalog) {
+    _offers = catalog.offers;
+    if (_offerFor(_plan) == null && _offers.isNotEmpty) {
+      _plan = _ProPlan.values.firstWhere((plan) => _offerFor(plan) != null);
     }
   }
 
@@ -168,7 +188,7 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
     final blocked = membershipPurchaseBlockReason(offer.product);
     if (blocked != null) {
       showGenesisToast(context, membershipPurchaseFailureMessage(blocked));
-      unawaited(_load(silent: true, restorePurchases: false));
+      unawaited(_load(silent: true));
       return;
     }
     final handler = widget.purchaseHandler;

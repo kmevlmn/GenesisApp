@@ -44,6 +44,7 @@ void main() {
         var profileCreated = false;
         final profile = DevToolsHttpProfile.start(
           request,
+          isDebugBuild: false,
           profileFactory:
               ({
                 required requestStartTime,
@@ -58,7 +59,9 @@ void main() {
         expect(profile, isNull);
         expect(
           profileCreated,
-          path.endsWith('/purchase/report') || path.endsWith('/products'),
+          path.endsWith('/purchase/report') ||
+              path.endsWith('/products') ||
+              path.endsWith('/purchase/check'),
         );
         final private = _PrivateTransport();
         final transport = PlatformHttp3Transport(
