@@ -4,6 +4,7 @@ import '../../app/telemetry/genesis_telemetry.dart';
 import '../tokens/genesis_colors.dart';
 import '../tokens/genesis_radii.dart';
 import '../tokens/genesis_spacing.dart';
+import '../tokens/genesis_typography.dart';
 
 class GenesisPrimaryButton extends StatelessWidget {
   const GenesisPrimaryButton({
@@ -35,6 +36,8 @@ class GenesisPrimaryButton extends StatelessWidget {
   static const double defaultHeight = 42;
   static const BorderRadius defaultBorderRadius = GenesisRadii.button;
   static const TextStyle defaultTextStyle = TextStyle(
+    fontFamily: GenesisTypography.fontFamily,
+    fontFamilyFallback: GenesisTypography.fontFamilyFallback,
     fontSize: 16,
     fontWeight: FontWeight.w600,
   );

@@ -173,16 +173,13 @@ class _ModifiedSectionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 16,
-      height: 16,
-      child: SvgPicture.asset(
-        refreshModifiedIconAsset,
-        fit: BoxFit.contain,
-        colorFilter: const ColorFilter.mode(
-          GenesisColors.redPrimary,
-          BlendMode.srcIn,
-        ),
+    return const Text(
+      'Edited',
+      style: TextStyle(
+        color: GenesisColors.redSecondary,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        height: 1.2,
       ),
     );
   }

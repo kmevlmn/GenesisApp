@@ -486,6 +486,8 @@ class _WorldNewUserJoinNoticeText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const baseStyle = TextStyle(
+      fontFamily: GenesisTypography.fontFamily,
+      fontFamilyFallback: GenesisTypography.fontFamilyFallback,
       color: GenesisColors.darkTextSecondary,
       fontSize: 12,
       height: 1.2,

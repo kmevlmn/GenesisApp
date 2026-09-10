@@ -117,6 +117,9 @@ class _DiscussComposerPanel extends StatelessWidget {
                       foregroundColor: GenesisColors.brand,
                       disabledForegroundColor: _discussComposerMuted,
                       textStyle: const TextStyle(
+                        fontFamily: GenesisTypography.fontFamily,
+                        fontFamilyFallback:
+                            GenesisTypography.fontFamilyFallback,
                         fontSize: 16,
                         height: 1.1,
                         fontWeight: FontWeight.w600,

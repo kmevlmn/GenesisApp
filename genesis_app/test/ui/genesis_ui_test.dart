@@ -7,7 +7,6 @@ import 'package:genesis_flutter_android/components/common/genesis_action_box.dar
 import 'package:genesis_flutter_android/components/page_header.dart';
 import 'package:genesis_flutter_android/components/search_bar.dart';
 import 'package:genesis_flutter_android/icons/custom_icon_assets.dart';
-import 'package:genesis_flutter_android/ui/components/genesis_unread_badge.dart';
 import 'package:genesis_flutter_android/ui/genesis_ui.dart';
 
 void main() {
@@ -1086,28 +1085,65 @@ void main() {
     expect(badgePosition.left, 19);
   });
 
-  testWidgets('GenesisUnreadBadge applies platform optical offsets', (
+  testWidgets('GenesisUnreadBadge centers numbers on both platforms', (
     tester,
   ) async {
-    Future<double> textOffsetFor(TargetPlatform platform) async {
+    for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+      for (final count in [1, 4, 8, 10, 99, 100]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: GenesisTheme.light().copyWith(platform: platform),
+            home: Scaffold(
+              body: Center(
+                child: DefaultTextStyle(
+                  style: const TextStyle(
+                    fontSize: 30,
+                    height: 2,
+                    letterSpacing: 3,
+                  ),
+                  child: GenesisUnreadBadge(count: count),
+                ),
+              ),
+            ),
+          ),
+        );
+        final badge = find.byType(GenesisUnreadBadge);
+        final label = find.text(count > 99 ? '99+' : '$count');
+        final size = tester.getSize(badge);
+        expect(size.height, 16);
+        if (count < 10) {
+          expect(size.width, 16);
+        } else {
+          expect(size.width, tester.getSize(label).width + 8);
+        }
+        expect(tester.getCenter(label), tester.getCenter(badge));
+        final style = tester.widget<Text>(label).style!;
+        expect(style.inherit, isFalse);
+        expect(style.fontFamily, GenesisTypography.fontFamily);
+        expect(style.fontFamilyFallback, GenesisTypography.fontFamilyFallback);
+        expect(style.fontSize, 10);
+        expect(style.height, 1);
+        expect(style.fontWeight, FontWeight.w600);
+        expect(
+          find.descendant(of: badge, matching: find.byType(Transform)),
+          findsNothing,
+        );
+      }
+    }
+  });
+
+  testWidgets('GenesisUnreadBadge hides nonpositive counts', (tester) async {
+    for (final count in [0, -1]) {
       await tester.pumpWidget(
         MaterialApp(
-          key: ValueKey(platform),
-          theme: GenesisTheme.light().copyWith(platform: platform),
-          home: const Scaffold(body: GenesisUnreadBadge(count: 4)),
+          home: Scaffold(
+            body: Center(child: GenesisUnreadBadge(count: count)),
+          ),
         ),
       );
-      final transform = tester.widget<Transform>(
-        find.descendant(
-          of: find.byType(GenesisUnreadBadge),
-          matching: find.byType(Transform),
-        ),
-      );
-      return transform.transform.getTranslation().y;
+      expect(tester.getSize(find.byType(GenesisUnreadBadge)), Size.zero);
+      expect(find.byType(GenesisCountBadge), findsNothing);
     }
-
-    expect(await textOffsetFor(TargetPlatform.iOS), -0.5);
-    expect(await textOffsetFor(TargetPlatform.android), 0.5);
   });
 
   testWidgets('GenesisBottomNavigation can show an icon-only create action', (

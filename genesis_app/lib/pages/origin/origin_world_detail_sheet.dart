@@ -1161,12 +1161,6 @@ class _OriginDetailDraggableSheetState
       const SizedBox(height: originDetailSectionGapForTesting),
       _WorldViewSection(origin: widget.origin),
     ];
-    if (_originPreviewTick(widget.origin) case final tick?) {
-      children.addAll([
-        const SizedBox(height: originDetailSectionGapForTesting),
-        _LaunchPreviewSection(origin: widget.origin, previewTick: tick),
-      ]);
-    }
     children.addAll([
       const SizedBox(height: originDetailSectionGapForTesting),
       _DiscussSection(origin: widget.origin, controller: discussController),

@@ -89,6 +89,8 @@ const _searchMetadataStyle = TextStyle(
 );
 
 const _searchSummaryStyle = TextStyle(
+  fontFamily: GenesisTypography.fontFamily,
+  fontFamilyFallback: GenesisTypography.fontFamilyFallback,
   color: GenesisColors.darkTextSecondary,
   fontSize: 12,
   fontWeight: FontWeight.w400,

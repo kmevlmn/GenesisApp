@@ -335,7 +335,12 @@ class _InitialCharactersField extends StatelessWidget {
     final textPainter = TextPainter(
       text: TextSpan(
         text: name,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        style: const TextStyle(
+          fontFamily: GenesisTypography.fontFamily,
+          fontFamilyFallback: GenesisTypography.fontFamilyFallback,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       maxLines: 1,
       textDirection: Directionality.of(context),

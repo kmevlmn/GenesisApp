@@ -11,6 +11,7 @@ import '../../components/page_header.dart';
 import '../../network/models/gem_model.dart';
 import '../../utils/gem_amount.dart';
 import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/tokens/genesis_typography.dart';
 
 typedef GemModelCatalogLoader =
     Future<GemModelCatalog> Function(String worldId);
@@ -295,6 +296,8 @@ class _ModelSaveAction extends StatelessWidget {
           foregroundColor: const Color(0xFF111111),
           disabledForegroundColor: const Color(0xFF999999),
           textStyle: const TextStyle(
+            fontFamily: GenesisTypography.fontFamily,
+            fontFamilyFallback: GenesisTypography.fontFamilyFallback,
             fontSize: 14,
             height: 18 / 14,
             fontWeight: FontWeight.w600,

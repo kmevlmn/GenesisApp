@@ -14,6 +14,7 @@ import '../../network/genesis_api.dart';
 import '../../network/models/tilemap_definition.dart';
 import '../../ui/components/genesis_static_network_image.dart';
 import '../../ui/components/genesis_dark_close_button.dart';
+import '../../ui/tokens/genesis_typography.dart';
 import '../world_map_avatar_logic.dart';
 import '../world_map_contract.dart';
 import '../world_map_exit_location_button.dart';

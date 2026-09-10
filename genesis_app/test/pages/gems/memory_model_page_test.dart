@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../support/font_expectations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/app/telemetry/genesis_telemetry.dart';
 import 'package:genesis_flutter_android/network/models/gem_model.dart';
@@ -57,6 +59,7 @@ void main() {
     expect(requestedWorldIds, ['W_000001']);
     expect(find.text('Model'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
+    expectInterText(tester, find.text('Save'));
     expect(find.text('Recommended'), findsOneWidget);
     expect(find.text('Top Pick V3'), findsOneWidget);
     expect(find.text('Hot'), findsOneWidget);

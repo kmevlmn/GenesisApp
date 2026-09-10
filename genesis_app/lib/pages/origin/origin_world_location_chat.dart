@@ -793,21 +793,6 @@ _OriginInitialDialoguePreview? _originFirstInitialDialoguePreview(
   );
 }
 
-Map<String, Map<String, dynamic>> _originLocationsById(
-  List<OriginLocation> locations,
-) {
-  final out = <String, Map<String, dynamic>>{};
-  for (final location in locations) {
-    final locationId = location.locationId.trim();
-    if (locationId.isEmpty) continue;
-    out[locationId] = <String, dynamic>{
-      'location_name': location.name,
-      'name': location.name,
-    };
-  }
-  return out;
-}
-
 List<WorldChatroomMessage> _originLocationOpeningPreviewMessages(
   OriginDetail origin,
   Iterable<String> locationIds,

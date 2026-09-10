@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'support/font_expectations.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -3559,6 +3561,34 @@ void main() {
       expect(checker.checkCount, 3);
     },
   );
+
+  testWidgets('app text uses Inter across root overlay and main pages', (
+    WidgetTester tester,
+  ) async {
+    await _pumpGenesisApp(tester, initialAuthToken: 'backend-token');
+    await tester.pumpAndSettle();
+    expectInterText(tester, find.byType(GenesisApp));
+
+    final entry = OverlayEntry(
+      builder: (_) => const Positioned(
+        top: 100,
+        left: 20,
+        child: Text('Root overlay font probe'),
+      ),
+    );
+    genesisNavigatorKey.currentState!.overlay!.insert(entry);
+    await tester.pump();
+    expectInterText(tester, find.text('Root overlay font probe'));
+    entry.remove();
+    entry.dispose();
+
+    for (final tab in ['Inbox', 'Me', 'Worldo', 'Create']) {
+      await tester.tap(find.byKey(ValueKey('bottom-nav-$tab')));
+      await tester.pumpAndSettle();
+      expectInterText(tester, find.byType(GenesisApp));
+    }
+    AppStartupCoordinator.resetForTesting();
+  });
 
   testWidgets('Home is default tab', (WidgetTester tester) async {
     await _pumpGenesisApp(tester);
@@ -15146,7 +15176,53 @@ void main() {
     AppStartupCoordinator.resetForTesting();
   });
 
-  testWidgets('Origin detail launch preview uses detail tick and locations', (
+  testWidgets('Origin initial detail failure keeps a dark error surface', (
+    WidgetTester tester,
+  ) async {
+    final response = Completer<TransportResponse>();
+    final transport = _RecordingV1ListTransport(
+      originDetailCompleter: response,
+    );
+    await tester.pumpWidget(
+      AppServicesScope(
+        services: await _testServices(transport: transport, useMock: false),
+        child: const MaterialApp(
+          home: OriginWorldPage(oid: 'o_test_1', originId: 0),
+        ),
+      ),
+    );
+    await tester.pump();
+    response.complete(
+      transport._jsonResponse({
+        'err_no': 1,
+        'err_msg': 'Detail unavailable',
+        'data': null,
+      }),
+    );
+    await tester.pumpAndSettle();
+    final failure = find.text('Load failed');
+    expect(failure, findsOneWidget);
+    expect(
+      tester.widget<Text>(failure).style?.color,
+      GenesisColors.darkTextSecondary,
+    );
+    expect(
+      tester
+          .widget<Scaffold>(
+            find.ancestor(of: failure, matching: find.byType(Scaffold)).first,
+          )
+          .backgroundColor,
+      GenesisColors.darkBackground,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Retry'))
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('Origin detail omits launch preview even with tick data', (
     WidgetTester tester,
   ) async {
     final transport = _RecordingV1ListTransport();
@@ -15182,20 +15258,11 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    expect(find.text('Launch Preview'), findsOneWidget);
-    expect(find.text('Tick 1 · Day 1, 16:30'), findsOneWidget);
-    expect(find.text('Global'), findsOneWidget);
-    expect(find.text('Origin launch tick narrator.'), findsOneWidget);
-    expect(find.text('Detail Location'), findsWidgets);
-    expect(find.text('Detail location launch paragraph.'), findsOneWidget);
-    expect(tester.widget<Text>(find.text('Global')).style?.height, 1.4);
-    expect(
-      tester
-          .widget<Text>(find.text('Origin launch tick narrator.'))
-          .style
-          ?.height,
-      1.4,
-    );
+    expect(find.text('Launch Preview'), findsNothing);
+    expect(find.text('Tick 1 · Day 1, 16:30'), findsNothing);
+    expect(find.text('Global'), findsNothing);
+    expect(find.text('Origin launch tick narrator.'), findsNothing);
+    expect(find.text('Detail location launch paragraph.'), findsNothing);
   });
 
   testWidgets('Origin detail hides launch preview without tick1 data', (
@@ -15405,67 +15472,6 @@ void main() {
     expect(tester.widget<TextField>(fields.at(1)).controller?.text, 'I' * 100);
     expect(tester.widget<TextField>(fields.at(2)).controller?.text, 'B' * 500);
   });
-
-  testWidgets(
-    'Origin role sheet defaults to launched preset roles and launches selection',
-    (WidgetTester tester) async {
-      OriginRoleLaunchSelection? result;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Builder(
-              builder: (context) => FilledButton(
-                onPressed: () async {
-                  result = await showOriginRoleLaunchSheet(
-                    context: context,
-                    characters: const <OriginCharacter>[],
-                    launchedPresetRolesLoader: () async => const [
-                      OriginMyLaunchPresetCharacter(
-                        charId: 'char_launched_1',
-                        type: 'ai',
-                        name: 'Mira',
-                        identity: 'Navigator',
-                        brief: 'Knows every route.',
-                        goal: 'Reach the hidden harbor.',
-                        avatar: '',
-                        avatarResource: GenesisImageResource(),
-                        initialLocationId: 'loc_launched_1',
-                        lastLaunchedAt: 1785292800,
-                        worldId: 'w_launched_1',
-                        tickCount: 7,
-                        currentTime: 'Day 3',
-                      ),
-                    ],
-                  );
-                },
-                child: const Text('Open role sheet'),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      await tester.tap(find.text('Open role sheet'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Playing'), findsOneWidget);
-      expect(find.text('Mira'), findsOneWidget);
-      expect(find.text('w_launched_1'), findsOneWidget);
-      expect(find.text('Tick 7 · Day 3'), findsOneWidget);
-      expect(
-        find.widgetWithText(GenesisPrimaryButton, 'Enter'),
-        findsOneWidget,
-      );
-
-      await tester.tap(
-        find.byKey(const ValueKey('origin-role-launched-w_launched_1')),
-      );
-      await tester.tap(find.byKey(const ValueKey('origin-role-launch')));
-      await tester.pumpAndSettle();
-
-      expect(result?.existingWorldId, 'w_launched_1');
-    },
-  );
 
   testWidgets('World list item opens world detail with current wid', (
     WidgetTester tester,

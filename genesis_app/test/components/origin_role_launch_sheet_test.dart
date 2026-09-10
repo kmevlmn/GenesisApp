@@ -7,9 +7,74 @@ import 'package:genesis_flutter_android/components/origin/origin_role_launch_she
 import 'package:genesis_flutter_android/network/models/origin.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_character_avatar.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_primary_button.dart';
-import 'package:genesis_flutter_android/utils/genesis_image_resource.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
+import 'package:genesis_flutter_android/components/common/genesis_bottom_sheet_panel.dart';
 
 void main() {
+  testWidgets('role sheet has two dark tabs and a text-only custom launch', (
+    tester,
+  ) async {
+    OriginRoleLaunchSelection? selection;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OriginRoleLaunchSheet(
+            characters: const [],
+            onLaunch: (value) async {
+              selection = value;
+              return OriginRoleLaunchHandlerResult.failed;
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Preset'), findsOneWidget);
+    expect(find.text('Custom'), findsOneWidget);
+    expect(find.text('Playing'), findsNothing);
+    expect(find.text('Enter'), findsNothing);
+    final panel = find.byType(GenesisBottomSheetPanel);
+    final material = tester.widget<Material>(
+      find.descendant(of: panel, matching: find.byType(Material)).first,
+    );
+    expect(material.color, GenesisColors.darkRaisedBackground);
+    var launch = tester.widget<GenesisPrimaryButton>(
+      find.byKey(const ValueKey('origin-role-launch')),
+    );
+    expect(launch.leadingIcon, isNull);
+    expect(launch.onPressed, isNull);
+    expect(launch.onDisabledPressed, isNotNull);
+    await tester.tap(find.text('Custom'));
+    await tester.pumpAndSettle();
+    final fields = find.byType(TextField);
+    expect(fields, findsNWidgets(3));
+    final name = tester.widget<TextField>(fields.at(0));
+    expect(name.style?.color, GenesisColors.darkTextPrimary);
+    expect(name.cursorColor, GenesisColors.darkTextPrimary);
+    expect(
+      tester
+          .widgetList<Container>(
+            find.ancestor(of: fields.at(0), matching: find.byType(Container)),
+          )
+          .map((widget) => widget.decoration)
+          .whereType<BoxDecoration>()
+          .map((decoration) => decoration.color),
+      contains(GenesisColors.darkFaintFill),
+    );
+    await tester.enterText(fields.at(0), 'Mira');
+    await tester.enterText(fields.at(1), 'Navigator');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    launch = tester.widget<GenesisPrimaryButton>(
+      find.byKey(const ValueKey('origin-role-launch')),
+    );
+    expect(launch.onPressed, isNotNull);
+    await tester.tap(find.byKey(const ValueKey('origin-role-launch')));
+    await tester.pumpAndSettle();
+    expect(selection?.customRole?.name, 'Mira');
+    expect(selection?.customRole?.identity, 'Navigator');
+  });
+
   testWidgets('recommended preset roles are first and show an indicator', (
     WidgetTester tester,
   ) async {
@@ -119,47 +184,6 @@ void main() {
     );
   });
 
-  testWidgets('initial launched tab is visible before roles finish loading', (
-    WidgetTester tester,
-  ) async {
-    final rolesCompleter = Completer<List<OriginMyLaunchPresetCharacter>>();
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: OriginRoleLaunchSheet(
-            characters: const [
-              OriginCharacter(
-                id: 1,
-                characterId: 'preset_1',
-                originId: 1,
-                name: 'Preset role',
-                avatar: '',
-                tags: '',
-                currentLocationId: 0,
-                initialLocationId: 0,
-                createdAt: null,
-                updatedAt: null,
-              ),
-            ],
-            initialLaunchedTab: true,
-            launchedPresetRolesLoader: () => rolesCompleter.future,
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.byKey(const ValueKey('origin-role-preset-tab')), findsNothing);
-
-    rolesCompleter.complete(const <OriginMyLaunchPresetCharacter>[]);
-    await tester.pumpAndSettle();
-
-    expect(find.text('No playing World'), findsOneWidget);
-    expect(find.byKey(const ValueKey('origin-role-preset-tab')), findsNothing);
-  });
-
   testWidgets('route keeps the requested transparent status bar style', (
     WidgetTester tester,
   ) async {
@@ -256,10 +280,10 @@ void main() {
     );
     expect(
       tester
-          .widget<OutlinedButton>(
+          .widget<FilledButton>(
             find.descendant(
               of: find.byKey(const ValueKey('origin-role-cancel')),
-              matching: find.byType(OutlinedButton),
+              matching: find.byType(FilledButton),
             ),
           )
           .onPressed,
@@ -297,79 +321,5 @@ void main() {
 
     expect(find.byKey(const ValueKey('origin-role-sheet')), findsNothing);
     expect(result?.presetCharacterId, 'preset_1');
-  });
-
-  testWidgets('launched tab restores World details and Enter action', (
-    WidgetTester tester,
-  ) async {
-    OriginRoleLaunchSelection? result;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => TextButton(
-              onPressed: () async {
-                result = await showOriginRoleLaunchSheet(
-                  context: context,
-                  characters: const <OriginCharacter>[],
-                  initialLaunchedTab: true,
-                  initialLaunchedPresetRoles: const [
-                    OriginMyLaunchPresetCharacter(
-                      charId: 'char_launched_1',
-                      type: 'ai',
-                      name: 'Mira',
-                      identity: 'Navigator',
-                      brief: 'Knows every route.',
-                      goal: 'Reach the hidden harbor.',
-                      avatar: '',
-                      avatarResource: GenesisImageResource(),
-                      initialLocationId: 'loc_launched_1',
-                      lastLaunchedAt: 1785292800,
-                      worldId: 'w_launched_1',
-                      tickCount: 7,
-                      currentTime: 'Day 3',
-                    ),
-                    OriginMyLaunchPresetCharacter(
-                      charId: 'char_without_world',
-                      type: 'ai',
-                      name: 'Waiting for backend',
-                      identity: 'Scout',
-                      brief: '',
-                      goal: '',
-                      avatar: '',
-                      avatarResource: GenesisImageResource(),
-                      initialLocationId: '',
-                      lastLaunchedAt: 1785292700,
-                    ),
-                  ],
-                );
-              },
-              child: const Text('Show setup'),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    await tester.tap(find.text('Show setup'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Mira'), findsOneWidget);
-    expect(find.text('w_launched_1'), findsOneWidget);
-    expect(find.text('Tick 7 · Day 3'), findsOneWidget);
-    expect(find.byIcon(Icons.check), findsNothing);
-    expect(find.widgetWithText(GenesisPrimaryButton, 'Enter'), findsOneWidget);
-
-    await tester.tap(
-      find.byKey(const ValueKey('origin-role-launched-w_launched_1')),
-    );
-    await tester.pump();
-    expect(find.byIcon(Icons.check), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('origin-role-launch')));
-    await tester.pumpAndSettle();
-
-    expect(result?.existingWorldId, 'w_launched_1');
-    expect(result?.presetCharacterId, isNull);
   });
 }

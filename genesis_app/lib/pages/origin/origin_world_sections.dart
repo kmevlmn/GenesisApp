@@ -105,47 +105,6 @@ class _OriginPreviewImage extends StatelessWidget {
   }
 }
 
-class _LaunchPreviewSection extends StatelessWidget {
-  const _LaunchPreviewSection({
-    required this.origin,
-    required this.previewTick,
-  });
-
-  final OriginDetail origin;
-  final Map<String, dynamic> previewTick;
-
-  @override
-  Widget build(BuildContext context) {
-    final tickResult = previewTick['tick_result'] is Map
-        ? (previewTick['tick_result'] as Map).cast<String, dynamic>()
-        : const <String, dynamic>{};
-    final currentTime = _mapString(tickResult, const ['current_time']);
-    final globalBody = _mapString(tickResult, const ['narrator']);
-    final metricUnit = _mapString(origin.metric, const ['unit']);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle(title: 'Launch Preview'),
-        const SizedBox(height: 8),
-        WorldTickEventItem(
-          tick: previewTick,
-          tickNumber: 1,
-          fallbackBody: globalBody,
-          locationsById: _originLocationsById(origin.allLocations),
-          dateLabel: currentTime,
-          timeAgoLabel: '',
-          stackedContent: true,
-          contentLabelStyle: _originTickContentLabelStyle,
-          contentTextStyle: _originTickContentTextStyle,
-          contentTimestampStyle: _originTickContentTimestampStyle,
-          metricUnit: metricUnit,
-        ),
-      ],
-    );
-  }
-}
-
 class _DiscussSection extends StatelessWidget {
   const _DiscussSection({required this.origin, required this.controller});
 

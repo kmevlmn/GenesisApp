@@ -53,15 +53,20 @@ class GenesisApp extends StatelessWidget {
             return AppRouter.onGenerateRoute(settings);
           },
           builder: (context, child) {
-            return AnnotatedRegion<SystemUiOverlayStyle>(
-              value: kGenesisDefaultSystemUiOverlayStyle,
-              child: GenesisTelemetryTapRegion(
-                child: GenesisBottomSystemBarBoundary(
-                  child: InternalBuildIndicator(
-                    child: ForceUpgradeGate(
-                      child: DeveloperDebugFloatingButton(
-                        navigatorKey: genesisNavigatorKey,
-                        child: child ?? const SizedBox.shrink(),
+            // Root overlays and builder decorations sit outside page Material
+            // widgets, so they also need the application's default font.
+            return DefaultTextStyle(
+              style: GenesisTypography.body,
+              child: AnnotatedRegion<SystemUiOverlayStyle>(
+                value: kGenesisDefaultSystemUiOverlayStyle,
+                child: GenesisTelemetryTapRegion(
+                  child: GenesisBottomSystemBarBoundary(
+                    child: InternalBuildIndicator(
+                      child: ForceUpgradeGate(
+                        child: DeveloperDebugFloatingButton(
+                          navigatorKey: genesisNavigatorKey,
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   ),

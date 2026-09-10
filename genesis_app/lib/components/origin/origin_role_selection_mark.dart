@@ -71,9 +71,16 @@ class _OriginRoleCheckboxMark extends StatelessWidget {
       width: 26,
       height: 26,
       decoration: BoxDecoration(
-        color: selected ? GenesisColors.brand : Colors.white10,
+        color: selected
+            ? GenesisColors.redPrimary
+            : GenesisColors.darkFaintFill,
         borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(
+          color: selected
+              ? GenesisColors.redPrimary
+              : GenesisColors.darkFaintFill,
+          width: 2,
+        ),
         boxShadow: const [
           BoxShadow(
             color: Color(0x33000000),
@@ -83,7 +90,11 @@ class _OriginRoleCheckboxMark extends StatelessWidget {
         ],
       ),
       child: selected
-          ? const Icon(Icons.check, size: 18, color: Colors.white)
+          ? const Icon(
+              Icons.check,
+              size: 18,
+              color: GenesisColors.darkTextPrimary,
+            )
           : null,
     );
   }

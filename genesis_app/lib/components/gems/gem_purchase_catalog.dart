@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../network/models/gem_product.dart';
 import '../../platform/billing/billing_models.dart';
 import '../../utils/gem_amount.dart';
+import '../../ui/tokens/genesis_typography.dart';
 import 'gem_assets.dart';
 import 'gem_colors.dart';
 
@@ -164,6 +165,8 @@ class GemProductCard extends StatelessWidget {
       fallback: defaultTagColor,
     );
     const tagTextStyle = TextStyle(
+      fontFamily: GenesisTypography.fontFamily,
+      fontFamilyFallback: GenesisTypography.fontFamilyFallback,
       fontSize: 10,
       height: 14 / 10,
       fontWeight: FontWeight.w400,

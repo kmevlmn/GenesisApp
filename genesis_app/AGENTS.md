@@ -163,9 +163,17 @@ HTTP 映射层的图片规则：
 - `GenesisActionBox` 统一使用深色样式，包括从浅色页面打开的情况；主题仅作用于弹窗，不能改变调用页面的主题。
 - 主面板与独立 Cancel 面板均使用 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.4)`（40% 不透明度），叠加局限于面板圆角内的背景模糊（`sigmaX / sigmaY = GenesisBlur.strong`（14））；外边框为 1px `darkFaintFill`（约 12% 白），分隔线同样使用 `darkFaintFill`。这些参数在公共组件中集中管理，不在页面重复配置；透明度只作用于面板填充，不给整个弹窗或文字增加 Opacity。
 - 标题与普通操作使用 `darkTextPrimary`，说明正文使用 `darkTextSecondary`，UID / WID / 时间等辅助信息和禁用操作使用 `darkTextTertiary`。
-- 公共弹窗内的红色文字统一使用 `GenesisColors.redSecondary`，包括主要操作、危险操作和红色强调正文，不使用品牌红 `redPrimary`。主要操作默认继承公共组件颜色，调用处不重复覆盖；Cancel、Reject 等普通操作使用一级白字。
+- 公共弹窗的红色操作文字使用 `GenesisColors.redSecondary`；主要操作默认继承公共组件颜色，调用处不重复覆盖。Cancel、Reject 等普通操作使用一级白字；红色强调正文同样使用 `redSecondary`。
 - 自定义标题、正文和输入框也须引用公共 token；输入文字和光标使用 `darkTextPrimary`，Placeholder 使用 `darkInputPlaceholder`，输入填充使用 `darkFaintFill`，不额外描边。保留各交互所需的输入行数和布局。
 - 保留公共弹窗的尺寸、圆角和交互；Report / 消息长按浮动菜单仍按浮动菜单专项规范执行。
+
+## 全局字体规则
+
+- 应用文字统一使用 `GenesisTypography.fontFamily`（Inter）及 `fontFamilyFallback`；中文等 Inter 不含的字形按公共 fallback 显示，图标字体和操作系统原生界面不属于应用文字字体。
+- 普通 `Text` / `Text.rich` 可继承全局主题，不能仅凭局部 `TextStyle` 未写 `fontFamily` 判定遗漏。局部深色主题应保留原主题字体。App builder 在页面 Material 外的装饰和根 Overlay 也必须有公共 `DefaultTextStyle`。
+- 原始 `RichText`、独立 `TextPainter`、替换式 `DefaultTextStyle` 和 `inherit: false` 样式不保证继承页面字体，必须显式引用公共字体或通过 `GenesisTypography.withFallback` 补齐。手动测量和实际显示必须使用同一套字体，避免宽度、截断和基线不一致。
+- `ButtonStyle.textStyle` / `styleFrom(textStyle: ...)` 会替换按钮的主题文字样式，不能按普通 Text 的合并规则处理；自定义按钮文字样式必须包含公共字体。公共主次按钮通过 `GenesisPrimaryButton.defaultTextStyle` 集中管理。
+- 不在页面添加分平台系统字体或独立的 `monospace`；新增字体例外必须在本规范写明用途。斜体继续遵守下一节。
 
 ## iOS 字体倾斜规则
 
@@ -244,6 +252,13 @@ HTTP 映射层的图片规则：
 - 默认按钮 24×24、删除 SVG 14px、圆角 6px；不透明底色使用 `GenesisColors.darkFaintSurface`（`#313133`），1px 描边使用 `darkFaintFill`，图标使用 `darkTextPrimary`。不叠加背景模糊。
 - 禁用时整体不透明度为 45%，禁止执行删除；可以通过 `onDisabledPressed` 提示不可删除的原因。按钮位置、删除回调和确认流程由调用方负责。
 - 本规范用于独立图标按钮；Report 菜单内的 Delete 文字操作继续遵守浮动菜单规范。
+
+## 数字角标规范
+
+- 未读及地图事件数字角标统一由 `GenesisCountBadge`（`lib/ui/components/genesis_count_badge.dart`）绘制，不在页面重复实现数字排版。
+- `GenesisUnreadBadge` 管理未读数小于等于 0 时隐藏，默认高度 16、字号 10、字重 600；`WorldEventCountBadge` 保留地图紧凑规格：高度 14、字号 9.5、字重 800。
+- 单位数为等宽高圆形，多位数按内容扩展为胶囊，左右 padding 4；超过 99 显示 `99+`。底色引用 `GenesisColors.redPrimary`，数字使用纯白、显式 Inter 及公共 fallback、行高 1，水平和垂直居中；不继承页面文字样式，不添加分平台的文字位移补偿。
+- 角标相对图标或头像的外部定位仍由调用方管理，不将定位偏移应用到内部数字。
 
 ## 深色 Toast 设计规范
 

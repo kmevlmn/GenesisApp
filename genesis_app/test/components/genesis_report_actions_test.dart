@@ -9,6 +9,8 @@ import 'package:genesis_flutter_android/components/common/genesis_report_actions
 
 import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 
+import '../support/font_expectations.dart';
+
 void main() {
   testWidgets('report button menu appears to the left with icon', (
     tester,
@@ -23,6 +25,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Report'), findsOneWidget);
+    expectInterText(tester, find.text('Report'));
     expect(find.byType(SvgPicture), findsOneWidget);
     final reportText = tester.widget<Text>(find.text('Report'));
     expect(reportText.style?.fontSize, 12);
@@ -143,6 +146,7 @@ void main() {
     final copyText = tester.widget<Text>(find.text('Copy'));
     final reportText = tester.widget<Text>(find.text('Report'));
     expect(copyText.style?.fontSize, 12);
+    expectInterText(tester, find.text('Copy'));
     expect(reportText.style?.fontSize, 12);
     expect(copyText.style?.color, Colors.white);
     expect(reportText.style?.color, Colors.white);

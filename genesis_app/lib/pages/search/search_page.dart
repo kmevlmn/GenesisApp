@@ -27,6 +27,7 @@ import '../../ui/components/genesis_origin_list_card_layout.dart';
 import '../../ui/components/genesis_world_list_card_layout.dart';
 import '../../ui/components/secend_tabs.dart';
 import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/tokens/genesis_typography.dart';
 import '../../ui/tokens/genesis_origin_card_geometry.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/entity_deleted.dart';

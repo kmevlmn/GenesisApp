@@ -212,7 +212,8 @@ class _DeveloperCaptureDetailSection extends StatelessWidget {
       content,
       key: contentKey,
       style: const TextStyle(
-        fontFamily: 'monospace',
+        fontFamily: GenesisTypography.fontFamily,
+        fontFamilyFallback: GenesisTypography.fontFamilyFallback,
         fontSize: 11,
         height: 1.35,
         color: Color(0xFF333333),

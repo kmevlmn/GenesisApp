@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import '../../ui/tokens/genesis_blur.dart';
+import '../../ui/tokens/genesis_typography.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -40,6 +41,8 @@ class MemoryModelEntryButton extends StatelessWidget {
     final borderRadius = compact ? 11.5 : 19.0;
     final iconSize = compact ? 16.0 : 18.0;
     final labelStyle = TextStyle(
+      fontFamily: GenesisTypography.fontFamily,
+      fontFamilyFallback: GenesisTypography.fontFamilyFallback,
       fontSize: 12,
       height: 16 / 12,
       fontWeight: FontWeight.w400,

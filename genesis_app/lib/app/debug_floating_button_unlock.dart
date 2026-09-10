@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../components/common/genesis_center_toast.dart';
+import '../ui/tokens/genesis_typography.dart';
 import 'debug_floating_button_visibility.dart';
 
 const String _debugFloatingButtonPassword = '6688';
@@ -130,6 +131,8 @@ class _DebugPasswordDialogState extends State<_DebugPasswordDialog> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     textStyle: const TextStyle(
+                      fontFamily: GenesisTypography.fontFamily,
+                      fontFamilyFallback: GenesisTypography.fontFamilyFallback,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),

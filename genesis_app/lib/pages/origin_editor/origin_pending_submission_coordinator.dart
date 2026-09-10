@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/tokens/genesis_typography.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../app/genesis_navigator.dart';
 import '../../components/common/genesis_action_box.dart';
@@ -504,6 +505,8 @@ Widget _successActionBoxTitle({
   required String trailingText,
 }) {
   const baseStyle = TextStyle(
+    fontFamily: GenesisTypography.fontFamily,
+    fontFamilyFallback: GenesisTypography.fontFamilyFallback,
     color: GenesisColors.darkTextPrimary,
     fontSize: 15,
     height: 1.16,

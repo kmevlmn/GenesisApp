@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../ui/tokens/genesis_typography.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';

@@ -9,6 +9,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/tokens/genesis_typography.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../app/bootstrap/service_registry.dart';
@@ -44,6 +45,8 @@ class WorldBottomTags extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: DefaultTextStyle(
         style: const TextStyle(
+          fontFamily: GenesisTypography.fontFamily,
+          fontFamilyFallback: GenesisTypography.fontFamilyFallback,
           color: GenesisColors.darkTextPrimary,
           fontSize: 12,
           height: 1,
