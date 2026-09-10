@@ -374,45 +374,5 @@ extension _WorldPageTickFlow on _WorldPageState {
     );
   }
 
-  Future<bool> _ensureProfileFillLogin() async {
-    if (await _hasLocalLoginSession()) return true;
-    if (!mounted) return false;
-    final loggedIn = await showLoginSheet(
-      context: context,
-      onLogin: _loginWithProvider,
-    );
-    if (!mounted || !loggedIn) return false;
-    await showDailyCheckInAfterLogin(context);
-    if (!mounted) return false;
-    return _hasLocalLoginSession();
-  }
-
-  Future<bool> _hasLocalLoginSession() async {
-    final services = AppServicesScope.read(context);
-    return await services.sessionStore.readLoginUid() != null;
-  }
-
-  Future<bool> _loginWithProvider(IdentityProvider provider) async {
-    final services = AppServicesScope.read(context);
-    final session = await services.identityAuth.signIn(provider);
-    final user = await services.backendAuth.loginWithIdentity(session);
-    if (user.uid.trim().isNotEmpty) {
-      await services.sessionStore.saveUid(user.uid);
-    }
-    final cachedUserInfo = await services.sessionStore.readUserInfo();
-    final loginUserInfo = <String, dynamic>{
-      if (cachedUserInfo != null) ...cachedUserInfo,
-      'uid': user.uid,
-      'login_provider': provider.name,
-    };
-    if (user.nickname.trim().isNotEmpty) {
-      loginUserInfo['name'] = user.nickname;
-    }
-    if (user.avatar.trim().isNotEmpty) {
-      loginUserInfo['avatar'] = user.avatar;
-    }
-    await services.sessionStore.saveUserInfo(loginUserInfo);
-    services.notifySessionChanged();
-    return true;
-  }
+  Future<bool> _ensureProfileFillLogin() => ensureGenesisLogin(context);
 }

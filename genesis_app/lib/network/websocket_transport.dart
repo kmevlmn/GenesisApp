@@ -32,12 +32,15 @@ class IoWebSocketTransport implements NetworkWebSocketTransport {
     String frameLogName = 'NetworkWebSocketFrame',
     WebSocketFrameLogSink? frameLogSink,
     WebSocketCaptureController? captureController,
+    DevToolsWebSocketProfile Function(Uri)? frameProfileFactory,
   }) : _client = createProxyAwareHttpClient(proxy),
        _logFrames = logFrames,
        _logName = logName,
        _frameLogName = frameLogName,
        _frameLogSink = frameLogSink,
-       _captureController = captureController ?? webSocketCaptureController;
+       _captureController = captureController ?? webSocketCaptureController,
+       _frameProfileFactory =
+           frameProfileFactory ?? DevToolsWebSocketProfile.new;
 
   final HttpClient _client;
   final bool _logFrames;
@@ -45,6 +48,7 @@ class IoWebSocketTransport implements NetworkWebSocketTransport {
   final String _frameLogName;
   final WebSocketFrameLogSink? _frameLogSink;
   final WebSocketCaptureController _captureController;
+  final DevToolsWebSocketProfile Function(Uri) _frameProfileFactory;
 
   @override
   Future<NetworkWebSocket> connect(
@@ -71,7 +75,7 @@ class IoWebSocketTransport implements NetworkWebSocketTransport {
       captureConnection: _captureController.openConnection(uri),
       frameProfile: const bool.fromEnvironment('dart.vm.product')
           ? null
-          : DevToolsWebSocketProfile(uri),
+          : _frameProfileFactory(uri),
     );
   }
 }
@@ -110,6 +114,7 @@ class _IoNetworkWebSocket implements NetworkWebSocket {
           return message;
         })
         .handleError((Object error, StackTrace stackTrace) {
+          unawaited(_frameProfile?.close(reason: 'WebSocket stream error'));
           developer.log(
             'socket stream error',
             name: _logName,
@@ -120,6 +125,7 @@ class _IoNetworkWebSocket implements NetworkWebSocket {
         .transform(
           StreamTransformer<String, String>.fromHandlers(
             handleDone: (sink) {
+              unawaited(_frameProfile?.close());
               developer.log(
                 'socket closed code=${_socket.closeCode} reason=${_socket.closeReason ?? ''}',
                 name: _logName,
@@ -138,6 +144,7 @@ class _IoNetworkWebSocket implements NetworkWebSocket {
 
   @override
   Future<void> close([int? code, String? reason]) {
+    unawaited(_frameProfile?.close());
     developer.log(
       'closing socket code=${code ?? ''} reason=${reason ?? ''}',
       name: _logName,
@@ -158,12 +165,16 @@ class _IoNetworkWebSocket implements NetworkWebSocket {
       // Diagnostics must never affect the real socket.
     }
     if (_logFrames) {
-      final formatted = formatWebSocketFrameLog(
-        direction: direction,
-        message: message,
-      );
-      developer.log(formatted, name: _frameLogName);
-      _frameLogSink?.call(direction, formatted);
+      try {
+        final formatted = formatWebSocketFrameLog(
+          direction: direction,
+          message: message,
+        );
+        developer.log(formatted, name: _frameLogName);
+        _frameLogSink?.call(direction, formatted);
+      } catch (_) {
+        // A failing log sink must not skip profiling or socket delivery.
+      }
     }
     final frameProfile = _frameProfile;
     if (frameProfile != null) {

@@ -94,6 +94,8 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.horizontalInset = 16,
     this.backgroundColor = GenesisColors.darkBackground,
     this.foregroundColor = GenesisColors.darkTextPrimary,
+    this.titleWidget,
+    this.titleSideInset,
   });
 
   final bool centerTitle;
@@ -109,6 +111,10 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Key? titleKey;
   final VoidCallback? onTitleTap;
   final TextStyle? titleStyle;
+  final Widget? titleWidget;
+
+  /// Opt into a title centered on the whole page, independent of side actions.
+  final double? titleSideInset;
   final SystemUiOverlayStyle? systemOverlayStyle;
 
   @override
@@ -142,24 +148,39 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
       ),
-      title: GestureDetector(
-        key: titleKey,
-        behavior: HitTestBehavior.translucent,
-        onTap: onTitleTap,
-        child: centerTitle
-            ? PageTitleText(
-                pageName: pageName,
-                style: TextStyle(color: foregroundColor).merge(titleStyle),
-              )
-            : Text(
-                pageName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GenesisUiTheme.of(context).pageTitleStyle
-                    .copyWith(color: foregroundColor)
-                    .merge(titleStyle),
+      flexibleSpace: titleWidget != null && titleSideInset != null
+          ? SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: titleSideInset!),
+                child: Center(child: titleWidget),
               ),
-      ),
+            )
+          : null,
+      title: titleWidget != null && titleSideInset != null
+          ? null
+          : GestureDetector(
+              key: titleKey,
+              behavior: HitTestBehavior.translucent,
+              onTap: onTitleTap,
+              child:
+                  titleWidget ??
+                  (centerTitle
+                      ? PageTitleText(
+                          pageName: pageName,
+                          style: TextStyle(
+                            color: foregroundColor,
+                          ).merge(titleStyle),
+                        )
+                      : Text(
+                          pageName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GenesisUiTheme.of(context).pageTitleStyle
+                              .copyWith(color: foregroundColor)
+                              .merge(titleStyle),
+                        )),
+            ),
       actions: actions?.isNotEmpty == true
           ? actions
           : (!centerTitle

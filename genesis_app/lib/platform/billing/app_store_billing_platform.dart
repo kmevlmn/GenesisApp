@@ -138,6 +138,7 @@ class AppStoreBillingPlatform implements BillingPlatform {
   Future<bool> buyConsumable({
     required BillingStoreProduct product,
     required String billingAccountId,
+    bool Function()? onStoreHandoff,
   }) async {
     final nativeProduct = product.nativeProduct;
     if (nativeProduct is! ProductDetails) {
@@ -147,9 +148,10 @@ class AppStoreBillingPlatform implements BillingPlatform {
       throw const BillingPlatformException('unsupported_product_type');
     }
     final accepted = await _inAppPurchase.buyConsumable(
-      purchaseParam: PurchaseParam(
+      purchaseParam: Sk2PurchaseParam(
         productDetails: nativeProduct,
         applicationUserName: billingAccountId,
+        onStoreHandoff: onStoreHandoff,
       ),
       // The StoreKit adapter requires this flag when launching an iOS
       // consumable. The client does not call completePurchase; settlement

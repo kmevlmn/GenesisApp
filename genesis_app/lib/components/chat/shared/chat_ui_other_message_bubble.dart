@@ -18,7 +18,7 @@ class ChatOtherMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final defaultMaxBubbleWidth = _normalBubbleMaxWidth(context, style);
+    final defaultMaxBubbleWidth = chatNormalBubbleMaxWidth(context, style);
     final maxBubbleWidth = maxWidthCap == null
         ? defaultMaxBubbleWidth
         : math.min(defaultMaxBubbleWidth, maxWidthCap!);

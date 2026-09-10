@@ -1,6 +1,35 @@
 part of 'google_play_billing_service.dart';
 
 extension _GooglePlayBillingCheckout on GooglePlayBillingService {
+  Future<bool> _routeSubscription(
+    BillingPurchase purchase, {
+    List<GemProduct>? productCatalog,
+  }) async {
+    final intercept = _interceptPurchase;
+    if (intercept == null) return false;
+    // Known Gems attempts/receipts keep their existing path without another SKU query.
+    if (_attemptByStoreProductId.containsKey(purchase.productId) ||
+        productCatalog?.any(
+              (p) =>
+                  _storeProductIdFor(p, purchase.provider) ==
+                  purchase.productId,
+            ) ==
+            true) {
+      return false;
+    }
+    try {
+      if (purchase.purchaseToken.isNotEmpty &&
+          await _findPendingPurchase(
+                provider: purchase.provider,
+                purchaseToken: purchase.purchaseToken,
+              ) !=
+              null) {
+        return false;
+      }
+    } catch (_) {}
+    return intercept(purchase);
+  }
+
   Future<void> _start() async {
     _purchaseSubscription ??= _platform.purchaseStream.listen(
       (purchases) => unawaited(
@@ -14,6 +43,7 @@ extension _GooglePlayBillingCheckout on GooglePlayBillingService {
 
   void _handlePurchaseStreamError(Object error, StackTrace stackTrace) {
     if (_disposed) return;
+    _onPurchaseStreamError?.call();
     debugPrint('[Billing] purchase stream failed: $error');
     debugPrintStack(stackTrace: stackTrace);
     final activeAttempts = Map<String, BillingPurchaseAttempt>.of(

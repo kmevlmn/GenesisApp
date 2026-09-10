@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../app/telemetry/genesis_telemetry.dart';
 import '../platform/channels/genesis_method_channels.dart';
 import '../platform/device/device_id_service.dart';
+import '../utils/server_clock.dart';
 import 'api_client.dart';
 import 'api_exception.dart';
 import 'app_request_headers.dart';
@@ -31,6 +32,7 @@ class GatewayRequestInterceptor {
     TransportRequest request,
     ApiRequestSender send,
   ) async {
+    request.cancellationToken?.throwIfCancelled();
     if (!isGatewaySignedRequest(request.uri)) {
       return send(_stripVerifiedHeaders(request));
     }
@@ -40,11 +42,14 @@ class GatewayRequestInterceptor {
     var registrationRetried = false;
 
     while (true) {
+      request.cancellationToken?.throwIfCancelled();
       final context = await _coordinator.signingContext();
+      request.cancellationToken?.throwIfCancelled();
       TransportRequest signed;
       final signStopwatch = Stopwatch()..start();
       try {
         signed = await _signer.sign(request, context);
+        request.cancellationToken?.throwIfCancelled();
         signStopwatch.stop();
         _gatewayTelemetry(
           'gateway.sign',
@@ -56,6 +61,7 @@ class GatewayRequestInterceptor {
           },
         );
       } on ApiException catch (error) {
+        request.cancellationToken?.throwIfCancelled();
         signStopwatch.stop();
         _gatewayTelemetry(
           'gateway.sign',
@@ -85,7 +91,17 @@ class GatewayRequestInterceptor {
         }
         rethrow;
       }
+      request.cancellationToken?.throwIfCancelled();
       final response = await send(signed);
+      request.cancellationToken?.throwIfCancelled();
+      // These writes have no idempotency key. Preserve signing, but leave any
+      // retry after a server response to the caller, including Gateway errors.
+      if (request.method == 'POST' &&
+          RegExp(
+            r'^/aitown-chat/api/v1/worlds/[^/]+/locations/[^/]+/llm-messages/(batch|select)$',
+          ).hasMatch(request.uri.path)) {
+        return response;
+      }
       final errNo = gatewayErrNo(response.body);
       if (errNo == 20502 && !timeRetried) {
         timeRetried = true;
@@ -404,6 +420,7 @@ class GatewayAuthCoordinator {
   final HttpTransport _transport;
   late final ApiClient _client;
   int? _serverTimeOffsetMs;
+  final ServerClock serverClock = ServerClock();
   Future<void>? _prepareFuture;
   Future<void>? _registrationRecoveryFuture;
 
@@ -563,6 +580,9 @@ class GatewayAuthCoordinator {
       );
       final offset = serverTimeMs - DateTime.now().millisecondsSinceEpoch;
       _serverTimeOffsetMs = offset;
+      serverClock.synchronize(
+        DateTime.fromMillisecondsSinceEpoch(serverTimeMs, isUtc: true),
+      );
       stopwatch.stop();
       _gatewayTelemetry(
         'gateway.time_sync',

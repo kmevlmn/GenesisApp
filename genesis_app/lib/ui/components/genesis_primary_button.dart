@@ -23,6 +23,7 @@ class GenesisPrimaryButton extends StatelessWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: GenesisSpacing.page),
     this.fontWeight,
     this.fontSize,
+    this.fontFamily,
     this.borderRadius,
     this.minimumSize,
     this.tapTargetSize,
@@ -60,6 +61,7 @@ class GenesisPrimaryButton extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final FontWeight? fontWeight;
   final double? fontSize;
+  final String? fontFamily;
   final BorderRadius? borderRadius;
   final Size? minimumSize;
   final MaterialTapTargetSize? tapTargetSize;
@@ -115,10 +117,12 @@ class GenesisPrimaryButton extends StatelessWidget {
             disabledBackgroundColor: resolvedDisabledBackground,
             disabledForegroundColor: resolvedDisabledForeground,
             side: side,
-            textStyle: defaultTextStyle.copyWith(
-              fontSize: fontSize,
-              fontWeight: fontWeight,
-            ),
+            textStyle: GenesisTypography.resolve(context, defaultTextStyle)
+                .copyWith(
+                  fontFamily: fontFamily,
+                  fontSize: fontSize,
+                  fontWeight: fontWeight,
+                ),
             shape: RoundedRectangleBorder(
               borderRadius: borderRadius ?? defaultBorderRadius,
             ),
@@ -220,9 +224,10 @@ class GenesisSecondaryButton extends StatelessWidget {
           foregroundColor: foregroundColor,
           disabledForegroundColor: disabledForegroundColor,
           side: side,
-          textStyle: GenesisPrimaryButton.defaultTextStyle.copyWith(
-            fontWeight: fontWeight,
-          ),
+          textStyle: GenesisTypography.resolve(
+            context,
+            GenesisPrimaryButton.defaultTextStyle,
+          ).copyWith(fontWeight: fontWeight),
           shape: RoundedRectangleBorder(
             borderRadius:
                 borderRadius ?? GenesisPrimaryButton.defaultBorderRadius,

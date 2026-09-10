@@ -9,8 +9,8 @@ import '../app/bootstrap/polling_scheduler.dart';
 import '../app/gems/daily_check_in_coordinator.dart';
 import '../app/startup/app_startup_coordinator.dart';
 import '../app/telemetry/genesis_telemetry.dart';
+import '../components/auth/login_guard.dart';
 import '../components/bottom_tabs.dart';
-import '../components/login_sheet.dart';
 import '../network/api_client.dart';
 import '../network/models/unread_summary.dart';
 import '../platform/auth/auth_session.dart';
@@ -70,6 +70,10 @@ class _AppShellPageState extends State<AppShellPage>
   var _worldoForYouContentReady = false;
   var _worldoFirstActivationPending = false;
   ValueListenable<int>? _sessionRevisionListenable;
+  ValueListenable<String?>? _pendingLoginCheckInUid;
+  ModalRoute<dynamic>? _mainRoute;
+  bool _dailyCheckInScheduled = false;
+  bool _dailyCheckInRunning = false;
   final Map<int, Widget> _tabPageCache = <int, Widget>{};
   PageStorageBucket _sessionPageStorageBucket = PageStorageBucket();
   var _sessionTabGeneration = 0;
@@ -127,6 +131,7 @@ class _AppShellPageState extends State<AppShellPage>
   void dispose() {
     _attDelayTimer?.cancel();
     _sessionRevisionListenable?.removeListener(_handleSessionChanged);
+    _pendingLoginCheckInUid?.removeListener(_schedulePendingDailyCheckIn);
     AppStartupCoordinator.postLaunchWorkAllowedListenable.removeListener(
       _handlePostLaunchWorkAllowed,
     );
@@ -152,6 +157,7 @@ class _AppShellPageState extends State<AppShellPage>
     final isFirstObservedResume = !_hasSeenResumed;
     _lifecycleState = state;
     if (state == AppLifecycleState.resumed) {
+      _schedulePendingDailyCheckIn();
       _hasSeenResumed = true;
       _startInitialBillingRecoveryIfReady();
       if (!isFirstObservedResume &&
@@ -211,11 +217,57 @@ class _AppShellPageState extends State<AppShellPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final sessionRevision = AppServicesScope.of(context).sessionRevision;
-    if (identical(_sessionRevisionListenable, sessionRevision)) return;
-    _sessionRevisionListenable?.removeListener(_handleSessionChanged);
-    _sessionRevisionListenable = sessionRevision;
-    sessionRevision.addListener(_handleSessionChanged);
+    _mainRoute = ModalRoute.of(context);
+    final services = AppServicesScope.of(context);
+    final pendingCheckIn = services.pendingLoginCheckInUid;
+    if (!identical(_pendingLoginCheckInUid, pendingCheckIn)) {
+      _pendingLoginCheckInUid?.removeListener(_schedulePendingDailyCheckIn);
+      _pendingLoginCheckInUid = pendingCheckIn;
+      pendingCheckIn.addListener(_schedulePendingDailyCheckIn);
+    }
+    final sessionRevision = services.sessionRevision;
+    if (!identical(_sessionRevisionListenable, sessionRevision)) {
+      _sessionRevisionListenable?.removeListener(_handleSessionChanged);
+      _sessionRevisionListenable = sessionRevision;
+      sessionRevision.addListener(_handleSessionChanged);
+    }
+    _schedulePendingDailyCheckIn();
+  }
+
+  bool _canShowLoginCheckIn() {
+    return mounted &&
+        _mainRoute?.isCurrent == true &&
+        (_lifecycleState == null ||
+            _lifecycleState == AppLifecycleState.resumed);
+  }
+
+  void _schedulePendingDailyCheckIn() {
+    if (_dailyCheckInScheduled ||
+        _dailyCheckInRunning ||
+        _pendingLoginCheckInUid?.value == null ||
+        !_canShowLoginCheckIn()) {
+      return;
+    }
+    _dailyCheckInScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _dailyCheckInScheduled = false;
+      if (_canShowLoginCheckIn()) unawaited(_showPendingDailyCheckIn());
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Future<void> _showPendingDailyCheckIn() async {
+    if (_dailyCheckInRunning) return;
+    _dailyCheckInRunning = true;
+    try {
+      await showPendingDailyCheckInAfterLogin(
+        context,
+        canShow: _canShowLoginCheckIn,
+      );
+    } finally {
+      _dailyCheckInRunning = false;
+      _schedulePendingDailyCheckIn();
+    }
   }
 
   void _startMessagesPolling() {
@@ -336,18 +388,7 @@ class _AppShellPageState extends State<AppShellPage>
     }
   }
 
-  Future<bool> _ensureMainTabLogin() async {
-    if (await _hasLocalLoginSession()) return true;
-    if (!mounted) return false;
-    final loggedIn = await showLoginSheet(
-      context: context,
-      onLogin: _loginWithProvider,
-    );
-    if (!mounted || !loggedIn) return false;
-    await showDailyCheckInAfterLogin(context);
-    if (!mounted) return false;
-    return _hasLocalLoginSession();
-  }
+  Future<bool> _ensureMainTabLogin() => ensureGenesisLogin(context);
 
   Future<bool> _hasLocalLoginSession() async {
     final services = AppServicesScope.read(context);
@@ -587,7 +628,7 @@ class _AppShellPageState extends State<AppShellPage>
           key: ValueKey<String>('me-session-$_sessionTabGeneration'),
           onLoggedOut: _handleMeLoggedOut,
           onLogin: _loginWithProvider,
-          onLoginCompleted: () => showDailyCheckInAfterLogin(context),
+          onLoginCompleted: () => scheduleDailyCheckInAfterLogin(context),
           activationListenable: _meTabActivationNotifier,
           reselectionListenable: _meTabReselectionNotifier,
           isActiveListenable: _meTabActiveNotifier,

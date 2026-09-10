@@ -8,13 +8,22 @@ import 'package:flutter/rendering.dart'
         SliverMultiBoxAdaptorParentData;
 
 import '../../components/chat/shared/chat_ui.dart';
+import '../../features/location_chat_reply/edit/edit.dart';
+import '../../features/location_chat_reply/go_on/go_on.dart';
+import '../../features/location_chat_reply/inspiration/inspiration.dart';
+import '../../features/location_chat_reply/regenerate/regenerate.dart';
+import 'location_chat_reply_actions.dart';
+import 'location_chat_reply_card_switcher.dart';
 
 enum LocationChatViewportMode { initializing, followingLatest, detached }
 
 enum LocationChatBottomReason {
   sentMessage,
+  replyGeneration,
   unseenMessageNotice,
   composerFocus,
+  inspirationExpanded,
+  editPromptExpanded,
 }
 
 enum LocationChatBottomBehavior { jump, animate }
@@ -92,6 +101,7 @@ class LocationChatScrollCoordinator extends ChangeNotifier {
   void requestBottom({
     required LocationChatBottomReason reason,
     required LocationChatBottomBehavior behavior,
+    Duration duration = bottomAnimationDuration,
   }) {
     if (_disposed) return;
     final generation = ++_commandGeneration;
@@ -104,12 +114,56 @@ class LocationChatScrollCoordinator extends ChangeNotifier {
         case LocationChatBottomBehavior.jump:
           _jumpTo(target);
         case LocationChatBottomBehavior.animate:
-          _animateTo(target);
+          _animateTo(
+            target,
+            duration,
+            generation,
+            settleAtLatest: reason == LocationChatBottomReason.replyGeneration,
+          );
       }
     });
   }
 
+  /// Reveal the entire edited row when it fits, otherwise keep its end visible.
+  void revealEditedMessage({
+    required BuildContext messageContext,
+    required BuildContext viewportContext,
+  }) {
+    if (_disposed || !controller.hasClients) return;
+    final messageBox = messageContext.findRenderObject();
+    final viewportBox = viewportContext.findRenderObject();
+    if (messageBox is! RenderBox ||
+        viewportBox is! RenderBox ||
+        !messageBox.hasSize ||
+        !viewportBox.hasSize) {
+      return;
+    }
+    final messageTop = messageBox.localToGlobal(Offset.zero).dy;
+    final messageBottom = messageTop + messageBox.size.height;
+    final viewportTop = viewportBox.localToGlobal(Offset.zero).dy + 12;
+    final viewportBottom = viewportTop + viewportBox.size.height - 24;
+    double delta = 0;
+    if (messageBottom - messageTop > viewportBottom - viewportTop ||
+        messageBottom > viewportBottom) {
+      delta = messageBottom - viewportBottom;
+    } else if (messageTop < viewportTop) {
+      delta = messageTop - viewportTop;
+    }
+    if (delta.abs() < 0.5) return;
+    _cancelPendingCommands();
+    _jumpTo(
+      (controller.position.pixels + delta).clamp(
+        controller.position.minScrollExtent,
+        controller.position.maxScrollExtent,
+      ),
+    );
+  }
+
   bool handleScrollNotification(ScrollNotification notification) {
+    // Nested horizontal carousels must not change conversation anchoring.
+    if (notification.metrics.axis != Axis.vertical || notification.depth != 0) {
+      return false;
+    }
     if (notification is ScrollStartNotification &&
         notification.dragDetails != null) {
       _userDragActive = true;
@@ -198,12 +252,24 @@ class LocationChatScrollCoordinator extends ChangeNotifier {
     controller.jumpTo(target);
   }
 
-  void _animateTo(double target) {
-    controller.animateTo(
+  Future<void> _animateTo(
+    double target,
+    Duration duration,
+    int generation, {
+    required bool settleAtLatest,
+  }) async {
+    await controller.animateTo(
       target,
-      duration: bottomAnimationDuration,
+      duration: duration,
       curve: Curves.easeOut,
     );
+    if (settleAtLatest &&
+        _commandIsCurrent(generation) &&
+        controller.hasClients &&
+        shouldFollowLatest) {
+      // Content may have grown while the request and scroll ran together.
+      _jumpTo(controller.position.maxScrollExtent);
+    }
   }
 
   @override
@@ -222,6 +288,7 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
     required this.coordinator,
     required this.messages,
     required this.topTitle,
+    this.active = true,
     this.onMessageLongPressStart,
     this.onFailedMessageTap,
     this.onCharactersMovedLocationTap,
@@ -232,6 +299,28 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
     this.onOldestEdgeLoadingCollapsed,
     this.showDateDividers = true,
     this.messageLayoutId,
+    this.replyActionsMessageId,
+    this.replyActionsIdentity,
+    this.replyActionsAnchorIndex,
+    this.replyPresentationRevision = 0,
+    this.replyStatus,
+    this.replyCards = const [],
+    this.replyCurrentCardId = 0,
+    this.replyCardBindingIdentity,
+    this.replyCardSwitchEnabled = true,
+    this.onReplyCardSelected,
+    this.onReplyCardTransitionChanged,
+    this.isMember = true,
+    this.regenerateFeature = const LocationChatRegenerateFeature.disabled(),
+    this.goOnFeature = const LocationChatGoOnFeature.disabled(),
+    this.editFeature = const LocationChatEditFeature.disabled(),
+    this.inspirationFeature = const LocationChatInspirationFeature.disabled(),
+    this.replyCardIndex = 0,
+    this.replyCardCount = 0,
+    this.replyCardsConfirmed = false,
+    this.onPreviousReplyCard,
+    this.onNextReplyCard,
+    this.inspirationIdentity,
     this.selfMessageBubbleMaxWidthCap,
     this.otherMessageBubbleMaxWidthCap,
     this.style,
@@ -240,6 +329,7 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
   final LocationChatScrollCoordinator coordinator;
   final List<ChatMessageVm> messages;
   final String topTitle;
+  final bool active;
   final ChatMessageLongPressStart? onMessageLongPressStart;
   final ChatMessageTap? onFailedMessageTap;
   final ChatCharacterMovementTap? onCharactersMovedLocationTap;
@@ -250,6 +340,36 @@ class LocationChatAnchoredMessageList extends StatefulWidget {
   final VoidCallback? onOldestEdgeLoadingCollapsed;
   final bool showDateDividers;
   final String Function(ChatMessageVm message)? messageLayoutId;
+
+  /// Presentation-only marker; does not determine round or action eligibility.
+  final String? replyActionsMessageId;
+
+  /// Stable world/location/round identity, independent of candidate message IDs.
+  final String? replyActionsIdentity;
+
+  /// Inserts the controls before this projected message index (length = tail).
+  final int? replyActionsAnchorIndex;
+
+  /// Change only for explicit card switches, never for streaming text updates.
+  final int replyPresentationRevision;
+  final Widget? replyStatus;
+  final List<LocationChatReplyCard> replyCards;
+  final int replyCurrentCardId;
+  final String? replyCardBindingIdentity;
+  final bool replyCardSwitchEnabled;
+  final bool Function(int cardId)? onReplyCardSelected;
+  final ValueChanged<bool>? onReplyCardTransitionChanged;
+  final bool isMember;
+  final LocationChatRegenerateFeature regenerateFeature;
+  final LocationChatGoOnFeature goOnFeature;
+  final LocationChatEditFeature editFeature;
+  final LocationChatInspirationFeature inspirationFeature;
+  final int replyCardIndex;
+  final int replyCardCount;
+  final bool replyCardsConfirmed;
+  final VoidCallback? onPreviousReplyCard;
+  final VoidCallback? onNextReplyCard;
+  final String? inspirationIdentity;
   final double? selfMessageBubbleMaxWidthCap;
   final double? otherMessageBubbleMaxWidthCap;
   final ChatUiStyleConfig? style;
@@ -265,10 +385,176 @@ class _LocationChatAnchoredMessageListState
   final GlobalKey _messageContentKey = GlobalKey();
   final Map<String, GlobalKey> _messageLayoutKeys = <String, GlobalKey>{};
   final GlobalKey _scrollViewportKey = GlobalKey();
+  final GlobalKey _replyControlLayoutKey = GlobalKey();
+  final _cardSwitcherKey = GlobalKey<LocationChatReplyCardSwitcherState>();
+  bool _cardTransitionBusy = false;
+  ({double contentOffset, double pixels, int commandGeneration})?
+  _replySwitchAnchor;
+  int _deferredHistoryPrefixCount = 0;
+
+  String? get _replyIdentity =>
+      widget.replyActionsIdentity ?? widget.replyActionsMessageId;
+
+  LocationChatReplyCard? get _currentReplyCard => widget.replyCards
+      .where((card) => card.id == widget.replyCurrentCardId)
+      .firstOrNull;
+
+  ChatMessageVm? get _messageBeforeReplyCard {
+    final id = _currentReplyCard?.messages.firstOrNull?.localId;
+    final index = id == null
+        ? _replyInsertionIndex ?? 0
+        : _renderedMessages.indexWhere((message) => message.localId == id);
+    return index > 0 ? _renderedMessages[index - 1] : null;
+  }
+
+  List<int> _timelineEntries(int count) {
+    final card = _currentReplyCard;
+    final firstId = card?.messages.firstOrNull?.localId;
+    final start = card == null
+        ? -1
+        : firstId == null
+        ? _replyInsertionIndex ?? count
+        : _renderedMessages.indexWhere((message) => message.localId == firstId);
+    final length = card?.messages.length ?? 0;
+    return [
+      for (var i = 0; i <= count; i++) ...[
+        if (i == start) -2,
+        if (i == _replyInsertionIndex) -1,
+        if (i < count && !(start >= 0 && i >= start && i < start + length)) i,
+      ],
+    ];
+  }
+
+  Key _entryKey(int entry) => ValueKey<String>(switch (entry) {
+    -2 => 'location-chat-reply-deck:$_replyIdentity',
+    -1 => 'location-chat-reply-control:$_replyIdentity',
+    _ =>
+      'location-chat-message-row:${_messageLayoutId(_renderedMessages[entry])}',
+  });
+
+  Widget _buildEntry(int entry, ChatUiStyleConfig style, {bool lazy = true}) =>
+      switch (entry) {
+        -2 => KeyedSubtree(
+          key: _entryKey(entry),
+          child: _buildReplyDeck(style),
+        ),
+        -1 => _buildReplyControls(style),
+        _ => _buildMessageRow(entry, style, lazy: lazy),
+      };
+
+  void _captureCardLayoutAnchor() {
+    final offset = _contentOffset(_replyControlLayoutKey.currentContext);
+    if (offset == null) return;
+    _replySwitchAnchor = (
+      contentOffset: offset,
+      pixels: widget.coordinator.controller.position.pixels,
+      commandGeneration: widget.coordinator.commandGeneration,
+    );
+    _layoutCorrectionExtentSignal = _layoutCorrectionExtentSignal == 0
+        ? _locationChatLayoutCorrectionExtentSignal
+        : 0;
+    setState(() {});
+  }
+
+  void _setCardTransitionBusy(bool busy) {
+    if (!mounted || _cardTransitionBusy == busy) return;
+    setState(() => _cardTransitionBusy = busy);
+    widget.onReplyCardTransitionChanged?.call(busy);
+  }
+
+  void _switchReplyCard(int delta) {
+    if (_cardTransitionBusy) return;
+    if (_currentReplyCard != null) {
+      _cardSwitcherKey.currentState?.switchBy(delta);
+    } else {
+      (delta < 0 ? widget.onPreviousReplyCard : widget.onNextReplyCard)?.call();
+    }
+  }
+
+  Widget _buildReplyDeck(
+    ChatUiStyleConfig style,
+  ) => LocationChatReplyCardSwitcher(
+    key: _cardSwitcherKey,
+    identity: widget.replyCardBindingIdentity ?? _replyIdentity!,
+    cards: widget.replyCards,
+    currentCardId: widget.replyCurrentCardId,
+    enabled:
+        widget.active &&
+        widget.replyCardSwitchEnabled &&
+        !widget.replyCardsConfirmed,
+    onCommit: (id) => widget.onReplyCardSelected?.call(id) ?? false,
+    onBusyChanged: _setCardTransitionBusy,
+    onWillChangeLayout: _captureCardLayoutAnchor,
+    cardBuilder: (card) => ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 48),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < card.messages.length; i++)
+            KeyedSubtree(
+              key: card.id == widget.replyCurrentCardId
+                  ? _messageLayoutKeys.putIfAbsent(
+                      _messageLayoutId(card.messages[i]),
+                      GlobalKey.new,
+                    )
+                  : ValueKey('preview-${card.messages[i].localId}'),
+              child: ChatMessageRow(
+                key: ValueKey(card.messages[i].localId),
+                message: card.messages[i],
+                imageViewerMessages: card.messages,
+                style: i == card.messages.length - 1
+                    ? style.copyWith(
+                        rowBottomPadding:
+                            LocationChatReplyActions.contentBottomGap,
+                        systemMessageMargin: style.systemMessageMargin.copyWith(
+                          bottom: LocationChatReplyActions.contentBottomGap,
+                        ),
+                      )
+                    : style,
+                selfMessageBubbleMaxWidthCap:
+                    widget.selfMessageBubbleMaxWidthCap,
+                otherMessageBubbleMaxWidthCap:
+                    widget.otherMessageBubbleMaxWidthCap,
+                onMessageLongPressStart: widget.onMessageLongPressStart,
+                onFailedMessageTap: widget.onFailedMessageTap,
+                onCharactersMovedLocationTap:
+                    widget.onCharactersMovedLocationTap,
+                showDateDivider:
+                    widget.showDateDividers &&
+                    shouldShowChatDateDivider(
+                      i > 0
+                          ? card.messages[i - 1].createdAt
+                          : _messageBeforeReplyCard?.createdAt,
+                      card.messages[i].createdAt,
+                    ),
+              ),
+            ),
+          if (card.status != null) card.status!,
+        ],
+      ),
+    ),
+  );
+
+  int? get _replyInsertionIndex {
+    if (_replyIdentity == null) return null;
+    if (widget.replyActionsIdentity != null) {
+      return ((widget.replyActionsAnchorIndex ?? widget.messages.length) -
+              _deferredHistoryPrefixCount)
+          .clamp(0, _renderedMessages.length);
+    }
+    final index = _renderedMessages.indexWhere(
+      (message) => message.localId == widget.replyActionsMessageId,
+    );
+    return index < 0 ? null : index + 1;
+  }
+
   final BackdropKey _messageBackdropKey = BackdropKey();
   late final AnimationController _oldestEdgeLoadingController;
   late final Animation<double> _oldestEdgeLoadingAnimation;
   late List<ChatMessageVm> _renderedMessages;
+  bool _inspirationExpanded = false;
+  bool _editPromptExpanded = false;
+  int _inspirationPage = 0;
   List<ChatMessageVm>? _pendingMessages;
   late List<String> _messageLocalIds;
   int _historyCommitGeneration = 0;
@@ -305,6 +591,37 @@ class _LocationChatAnchoredMessageListState
   @override
   void didUpdateWidget(LocationChatAnchoredMessageList oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final oldReplyIdentity =
+        oldWidget.replyActionsIdentity ?? oldWidget.replyActionsMessageId;
+    final presentationChanged =
+        oldWidget.replyPresentationRevision != widget.replyPresentationRevision;
+    if (presentationChanged &&
+        oldReplyIdentity == _replyIdentity &&
+        _replyIdentity != null &&
+        oldWidget.coordinator == widget.coordinator) {
+      final contentOffset = _contentOffset(
+        _replyControlLayoutKey.currentContext,
+      );
+      _replySwitchAnchor = contentOffset == null
+          ? null
+          : (
+              contentOffset: contentOffset,
+              pixels: widget.coordinator.controller.position.pixels,
+              commandGeneration: widget.coordinator.commandGeneration,
+            );
+      _layoutCorrectionExtentSignal = _layoutCorrectionExtentSignal == 0
+          ? _locationChatLayoutCorrectionExtentSignal
+          : 0;
+    } else if (oldReplyIdentity != _replyIdentity) {
+      _replySwitchAnchor = null;
+    }
+    if (oldWidget.active != widget.active ||
+        oldReplyIdentity != _replyIdentity ||
+        oldWidget.inspirationIdentity != widget.inspirationIdentity) {
+      _inspirationExpanded = false;
+      _editPromptExpanded = false;
+      _inspirationPage = 0;
+    }
     if (oldWidget.coordinator != widget.coordinator) {
       oldWidget.coordinator.removeListener(_handleCoordinatorChanged);
       widget.coordinator.addListener(_handleCoordinatorChanged);
@@ -323,7 +640,27 @@ class _LocationChatAnchoredMessageListState
 
     if (widget.oldestEdgeLoading || _loadingCollapsePending) {
       _pendingMessages = List<ChatMessageVm>.of(widget.messages);
+      // Hold only prepended history for the loader collapse. The active round
+      // must keep streaming and respond to card switches immediately.
+      if (widget.replyActionsIdentity != null) {
+        final firstId = _renderedMessages.isEmpty
+            ? null
+            : _messageLayoutId(_renderedMessages.first);
+        final firstIndex = firstId == null
+            ? 0
+            : widget.messages.indexWhere(
+                (message) => _messageLayoutId(message) == firstId,
+              );
+        _deferredHistoryPrefixCount = presentationChanged || firstIndex < 0
+            ? 0
+            : firstIndex;
+        _replaceRenderedMessages(
+          widget.messages.sublist(_deferredHistoryPrefixCount),
+          rebuild: false,
+        );
+      }
     } else {
+      _deferredHistoryPrefixCount = 0;
       _replaceRenderedMessages(widget.messages, rebuild: false);
     }
 
@@ -367,6 +704,7 @@ class _LocationChatAnchoredMessageListState
 
       final nextMessages = _pendingMessages ?? widget.messages;
       _pendingMessages = null;
+      _deferredHistoryPrefixCount = 0;
       _loadingCollapsePending = false;
       _historyCommitScheduled = false;
       _replaceRenderedMessages(nextMessages, rebuild: true);
@@ -394,6 +732,7 @@ class _LocationChatAnchoredMessageListState
     }
 
     final shouldPreserveAnchor =
+        _replySwitchAnchor == null &&
         widget.coordinator.isDetached &&
         _requiresAnchorRestore(previousLocalIds, nextLocalIds);
     final visibleLayoutAnchor = shouldPreserveAnchor
@@ -622,27 +961,17 @@ class _LocationChatAnchoredMessageListState
     required ChatUiStyleConfig style,
     required bool hasOldestEdgeContent,
   }) {
-    final renderedMessageCount = _anchorRestorePending
+    final renderedMessageCount =
+        _anchorRestorePending && _replySwitchAnchor == null
         ? (_anchorRestoreMessageCount ?? _renderedMessages.length).clamp(
             0,
             _renderedMessages.length,
           )
         : _renderedMessages.length;
-    final messageIndexByLayoutId = <String, int>{
-      for (var index = 0; index < renderedMessageCount; index += 1)
-        _messageLayoutId(_renderedMessages[index]): index,
+    final entries = _timelineEntries(renderedMessageCount);
+    final indices = <Key, int>{
+      for (var i = 0; i < entries.length; i++) _entryKey(entries[i]): i,
     };
-
-    int? findChildIndex(Key key) {
-      if (key case ValueKey<String>(:final value)) {
-        const prefix = 'location-chat-message-row:';
-        if (!value.startsWith(prefix)) return null;
-        final messageIndex =
-            messageIndexByLayoutId[value.substring(prefix.length)];
-        return messageIndex;
-      }
-      return null;
-    }
 
     final padding = style.messageListPadding;
     final horizontalPadding = EdgeInsets.only(
@@ -657,7 +986,7 @@ class _LocationChatAnchoredMessageListState
       // Keep the retained anchor in the same sliver layout transaction. Once
       // its exact variable-height offset has been applied, the next frame
       // returns to the normal lazy cache window.
-      scrollCacheExtent: _anchorRestorePending
+      scrollCacheExtent: _anchorRestorePending || _replySwitchAnchor != null
           ? const ScrollCacheExtent.pixels(
               _locationChatAnchorRestoreCacheExtent,
             )
@@ -694,9 +1023,9 @@ class _LocationChatAnchoredMessageListState
         SliverPadding(
           padding: horizontalPadding,
           sliver: SliverList.builder(
-            itemCount: renderedMessageCount,
-            itemBuilder: (context, index) => _buildMessageRow(index, style),
-            findChildIndexCallback: findChildIndex,
+            itemCount: entries.length,
+            itemBuilder: (context, index) => _buildEntry(entries[index], style),
+            findChildIndexCallback: (key) => indices[key],
             addAutomaticKeepAlives: false,
             addRepaintBoundaries: true,
           ),
@@ -751,12 +1080,10 @@ class _LocationChatAnchoredMessageListState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (
-                      var index = 0;
-                      index < _renderedMessages.length;
-                      index += 1
-                    )
-                      _buildMessageRow(index, style, lazy: false),
+                    for (final entry in _timelineEntries(
+                      _renderedMessages.length,
+                    ))
+                      _buildEntry(entry, style, lazy: false),
                   ],
                 ),
               ),
@@ -775,6 +1102,7 @@ class _LocationChatAnchoredMessageListState
       shouldStopAtOldestMessage: () =>
           widget.coordinator.shouldStopAtOldestMessage,
       takeDetachedLayoutCorrection: _takeDetachedLayoutCorrection,
+      takePresentationLayoutCorrection: _takeReplySwitchLayoutCorrection,
     );
   }
 
@@ -850,6 +1178,31 @@ class _LocationChatAnchoredMessageListState
     );
   }
 
+  double? _takeReplySwitchLayoutCorrection() {
+    final anchor = _replySwitchAnchor;
+    if (anchor == null) return null;
+    if (anchor.commandGeneration != widget.coordinator.commandGeneration) {
+      _replySwitchAnchor = null;
+      return null;
+    }
+    final nextOffset = _contentOffset(_replyControlLayoutKey.currentContext);
+    if (nextOffset == null) return null;
+    _replySwitchAnchor = null;
+    _detachedLayoutAnchor = null;
+    _anchorRestorePending = false;
+    _anchorRestoreMessageCount = null;
+    _scheduleDetachedAnchorSnapshot();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+    // SingleChildScrollView can clamp pixels before calling scroll physics.
+    // Use the position captured before layout so shrinking is corrected once.
+    return anchor.pixels +
+        nextOffset -
+        anchor.contentOffset -
+        widget.coordinator.controller.position.pixels;
+  }
+
   double? _takeDetachedLayoutCorrection() {
     final anchor = _detachedLayoutAnchor;
     if (anchor == null) return null;
@@ -878,7 +1231,10 @@ class _LocationChatAnchoredMessageListState
   }
 
   double? _messageContentOffset(String localId) {
-    final messageContext = _messageLayoutKeys[localId]?.currentContext;
+    return _contentOffset(_messageLayoutKeys[localId]?.currentContext);
+  }
+
+  double? _contentOffset(BuildContext? messageContext) {
     if (!_isActive(messageContext)) return null;
     final messageRenderObject = messageContext!.findRenderObject();
     if (messageRenderObject == null || !messageRenderObject.attached) {
@@ -970,21 +1326,37 @@ class _LocationChatAnchoredMessageListState
         : _renderedMessages[messageIndex - 1];
     final layoutId = _messageLayoutId(current);
     final layoutKey = _messageLayoutKeys.putIfAbsent(layoutId, GlobalKey.new);
+    final showReplyActions = messageIndex + 1 == _replyInsertionIndex;
     final row = KeyedSubtree(
       key: layoutKey,
-      child: ChatMessageRow(
-        key: ValueKey(layoutId),
-        message: current,
-        imageViewerMessages: _renderedMessages,
-        style: style,
-        selfMessageBubbleMaxWidthCap: widget.selfMessageBubbleMaxWidthCap,
-        otherMessageBubbleMaxWidthCap: widget.otherMessageBubbleMaxWidthCap,
-        onMessageLongPressStart: widget.onMessageLongPressStart,
-        onFailedMessageTap: widget.onFailedMessageTap,
-        onCharactersMovedLocationTap: widget.onCharactersMovedLocationTap,
-        showDateDivider:
-            widget.showDateDividers &&
-            shouldShowChatDateDivider(previous?.createdAt, current.createdAt),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ChatMessageRow(
+            key: ValueKey(layoutId),
+            message: current,
+            imageViewerMessages: _renderedMessages,
+            style: showReplyActions
+                ? style.copyWith(
+                    rowBottomPadding: LocationChatReplyActions.contentBottomGap,
+                    systemMessageMargin: style.systemMessageMargin.copyWith(
+                      bottom: LocationChatReplyActions.contentBottomGap,
+                    ),
+                  )
+                : style,
+            selfMessageBubbleMaxWidthCap: widget.selfMessageBubbleMaxWidthCap,
+            otherMessageBubbleMaxWidthCap: widget.otherMessageBubbleMaxWidthCap,
+            onMessageLongPressStart: widget.onMessageLongPressStart,
+            onFailedMessageTap: widget.onFailedMessageTap,
+            onCharactersMovedLocationTap: widget.onCharactersMovedLocationTap,
+            showDateDivider:
+                widget.showDateDividers &&
+                shouldShowChatDateDivider(
+                  previous?.createdAt,
+                  current.createdAt,
+                ),
+          ),
+        ],
       ),
     );
     if (!lazy) return row;
@@ -993,6 +1365,63 @@ class _LocationChatAnchoredMessageListState
       child: row,
     );
   }
+
+  Widget _buildReplyControls(ChatUiStyleConfig style) => KeyedSubtree(
+    key: ValueKey<String>('location-chat-reply-control:$_replyIdentity'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_currentReplyCard == null)
+          if (widget.replyStatus case final status?) status,
+        Padding(
+          key: _replyControlLayoutKey,
+          padding: EdgeInsets.only(bottom: style.rowBottomPadding),
+          child: IgnorePointer(
+            key: ValueKey('reply-actions-input-blocker-$_replyIdentity'),
+            ignoring: _cardTransitionBusy,
+            child: LocationChatReplyActions(
+              key: ValueKey('reply-actions-$_replyIdentity'),
+              inspirationFeature: widget.inspirationFeature,
+              editFeature: widget.editFeature,
+              isMember: widget.isMember,
+              regenerateFeature: widget.regenerateFeature,
+              goOnFeature: widget.goOnFeature,
+              cardIndex: widget.replyCardIndex,
+              cardCount: widget.replyCardCount,
+              cardsConfirmed: widget.replyCardsConfirmed,
+              onPreviousCard: () => _switchReplyCard(-1),
+              onNextCard: () => _switchReplyCard(1),
+              editPromptExpanded: _editPromptExpanded,
+              onEditPromptExpandedChanged: (expanded) {
+                setState(() => _editPromptExpanded = expanded);
+                if (expanded) {
+                  widget.coordinator.requestBottom(
+                    reason: LocationChatBottomReason.editPromptExpanded,
+                    behavior: LocationChatBottomBehavior.animate,
+                  );
+                }
+              },
+              inspirationExpanded: _inspirationExpanded,
+              inspirationPage: _inspirationPage,
+              onInspirationPageChanged: (page) => _inspirationPage = page,
+              onInspirationExpandedChanged: (expanded) {
+                setState(() => _inspirationExpanded = expanded);
+                widget.inspirationFeature.onExpandedChanged?.call(expanded);
+                if (expanded) {
+                  widget.coordinator.requestBottom(
+                    reason: LocationChatBottomReason.inspirationExpanded,
+                    behavior: LocationChatBottomBehavior.animate,
+                  );
+                }
+              },
+              style: style,
+              selfMessageBubbleMaxWidthCap: widget.selfMessageBubbleMaxWidthCap,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class LocationChatBottomAnchoringScrollPhysics extends ClampingScrollPhysics {
@@ -1003,6 +1432,7 @@ class LocationChatBottomAnchoringScrollPhysics extends ClampingScrollPhysics {
     this.oldestMessageStopOffset,
     this.shouldStopAtOldestMessage,
     this.takeDetachedLayoutCorrection,
+    this.takePresentationLayoutCorrection,
   });
 
   final ValueGetter<bool> shouldFollowLatest;
@@ -1010,6 +1440,7 @@ class LocationChatBottomAnchoringScrollPhysics extends ClampingScrollPhysics {
   final ValueGetter<double?>? oldestMessageStopOffset;
   final ValueGetter<bool>? shouldStopAtOldestMessage;
   final ValueGetter<double?>? takeDetachedLayoutCorrection;
+  final ValueGetter<double?>? takePresentationLayoutCorrection;
 
   @override
   LocationChatBottomAnchoringScrollPhysics applyTo(ScrollPhysics? ancestor) {
@@ -1020,6 +1451,7 @@ class LocationChatBottomAnchoringScrollPhysics extends ClampingScrollPhysics {
       oldestMessageStopOffset: oldestMessageStopOffset,
       shouldStopAtOldestMessage: shouldStopAtOldestMessage,
       takeDetachedLayoutCorrection: takeDetachedLayoutCorrection,
+      takePresentationLayoutCorrection: takePresentationLayoutCorrection,
     );
   }
 
@@ -1053,6 +1485,13 @@ class LocationChatBottomAnchoringScrollPhysics extends ClampingScrollPhysics {
     required bool isScrolling,
     required double velocity,
   }) {
+    final presentationCorrection = takePresentationLayoutCorrection?.call();
+    if (presentationCorrection != null && presentationCorrection.isFinite) {
+      return (newPosition.pixels + presentationCorrection).clamp(
+        newPosition.minScrollExtent,
+        newPosition.maxScrollExtent,
+      );
+    }
     if (!shouldFollowLatest()) {
       final currentPixels = newPosition.pixels.clamp(
         newPosition.minScrollExtent,

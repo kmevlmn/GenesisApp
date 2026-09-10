@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 abstract class HttpTransport {
   Future<TransportResponse> send(TransportRequest request);
 }
@@ -69,6 +72,86 @@ class TransportRequest {
   final NetworkProgressCallback? onSendProgress;
   final NetworkProgressCallback? onReceiveProgress;
   final NetworkCancellationToken? cancellationToken;
+
+  TransportRequest withCancellationToken(NetworkCancellationToken token) =>
+      TransportRequest(
+        method: method,
+        uri: uri,
+        headers: headers,
+        bodyBytes: bodyBytes,
+        timeoutMs: timeoutMs,
+        decodeResponseBody: decodeResponseBody,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
+        cancellationToken: token,
+      );
+}
+
+/// One deadline covers preparation, sending, headers and the entire body.
+/// The child token also prevents delayed preparation from sending after expiry.
+Future<T> runWithNetworkDeadline<T>({
+  required Duration timeout,
+  required Future<T> Function(NetworkCancellationToken token) action,
+  NetworkCancellationToken? cancellationToken,
+}) async {
+  cancellationToken?.throwIfCancelled();
+  final token = NetworkCancellationToken();
+  final result = Completer<T>();
+  void cancel(Object error) {
+    if (result.isCompleted) return;
+    result.completeError(error);
+    token.cancel();
+  }
+
+  final removeListener = cancellationToken?.addCancelListener(
+    () => cancel(const NetworkRequestCancelledException()),
+  );
+  final timer = Timer(timeout, () {
+    cancel(TimeoutException('HTTP request deadline exceeded.', timeout));
+  });
+  // Always observe late completion, including errors from aborted native tasks.
+  unawaited(
+    Future<T>.sync(() => action(token)).then<void>(
+      (value) {
+        if (!result.isCompleted) result.complete(value);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!result.isCompleted) result.completeError(error, stackTrace);
+      },
+    ),
+  );
+  try {
+    return await result.future;
+  } finally {
+    timer.cancel();
+    removeListener?.call();
+  }
+}
+
+Future<Uint8List> readTransportResponseBytes(
+  Stream<List<int>> stream, {
+  required int totalBytes,
+  NetworkProgressCallback? onReceiveProgress,
+  NetworkCancellationToken? cancellationToken,
+}) async {
+  final output = BytesBuilder(copy: false);
+  final iterator = StreamIterator<List<int>>(stream);
+  final removeListener = cancellationToken?.addCancelListener(() {
+    unawaited(iterator.cancel());
+  });
+  try {
+    cancellationToken?.throwIfCancelled();
+    while (await iterator.moveNext()) {
+      cancellationToken?.throwIfCancelled();
+      output.add(iterator.current);
+      onReceiveProgress?.call(output.length, totalBytes);
+    }
+    cancellationToken?.throwIfCancelled();
+    return output.takeBytes();
+  } finally {
+    removeListener?.call();
+    await iterator.cancel();
+  }
 }
 
 class TransportResponse {

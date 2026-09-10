@@ -115,15 +115,13 @@ class _HomeGemWalletEntry extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Top up Gems',
+      label: 'Membership',
       child: GestureDetector(
         key: const ValueKey<String>('home-gem-wallet-entry'),
         behavior: HitTestBehavior.opaque,
-        onTap: () async {
+        onTap: () {
           final navigator = Navigator.of(context);
-          if (!await ensureGenesisLogin(navigator.context)) return;
-          if (!navigator.mounted) return;
-          navigator.pushNamed(RouteNames.gemWallet);
+          navigator.pushNamed(RouteNames.gemWallet, arguments: 'subscription');
         },
         child: SizedBox(
           width: 36,
@@ -132,13 +130,26 @@ class _HomeGemWalletEntry extends StatelessWidget {
             child: SizedBox(
               key: const ValueKey<String>('home-gem-wallet-icon'),
               width: 36,
-              height: 30,
-              child: Transform.translate(
-                offset: const Offset(0, -3.2),
-                child: Transform.scale(
-                  scale: 1.125,
+              height: 36,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: proGold, width: 0.8),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF841A32),
+                      Color(0xFF590C20),
+                      Color(0xFF3C0716),
+                    ],
+                    stops: [0, 0.55, 1],
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
                   child: SvgPicture.asset(
-                    gemStackIconAsset,
+                    proCrownFilledIconAsset,
                     key: const ValueKey<String>('home-gem-wallet-artwork'),
                     fit: BoxFit.contain,
                   ),

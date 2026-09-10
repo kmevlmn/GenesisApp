@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'http_transport.dart';
+import 'membership_request_privacy.dart';
 
 const int defaultNetworkCaptureMaxRecords = 200;
 const int defaultNetworkCaptureMaxBodyBytes = 40 * 1024 * 1024;
@@ -174,6 +175,7 @@ class NetworkCaptureController extends ChangeNotifier {
   }
 
   String? begin(TransportRequest request) {
+    if (isPrivateMembershipRequest(request.uri)) return null;
     if (!available || !_enabled) return null;
     final id = '${DateTime.now().microsecondsSinceEpoch}-${_nextId++}';
     final record = NetworkCaptureRecord(

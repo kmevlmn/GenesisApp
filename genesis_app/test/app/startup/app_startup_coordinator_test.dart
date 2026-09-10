@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:genesis_flutter_android/network/http_transport.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/app/bootstrap/service_registry.dart';
@@ -53,6 +55,7 @@ class _FakeCollectClient implements CollectTelemetryClient {
   Future<void> collectBatch(
     List<CollectEvent> events, {
     Map<String, String> headers = const <String, String>{},
+    NetworkCancellationToken? cancellationToken,
   }) async {
     onCollect?.call();
     this.headers.add(Map<String, String>.of(headers));
@@ -170,6 +173,9 @@ void main() {
       lifecycleEvents.add(NativeAppLifecycleEvent.foreground);
       lifecycleEvents.add(NativeAppLifecycleEvent.foreground);
       await GenesisTelemetry.waitForCollectWritesForTesting();
+      // Lifecycle notifications also start a check. Wait for that actual check
+      // to finish before requesting a second drain of newly queued events.
+      await _waitUntil(() => !uploader.isCheckingForTesting);
       await uploader.checkNow(force: true);
 
       expect(

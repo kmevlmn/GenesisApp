@@ -1,14 +1,17 @@
+import 'package:genesis_flutter_android/network/chatroom/chatroom_http_models.dart';
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/app/config/app_config.dart';
 import 'package:genesis_flutter_android/app/telemetry/firebase_analytics_monitoring.dart';
+import 'package:genesis_flutter_android/app/telemetry/genesis_telemetry.dart';
 import 'package:genesis_flutter_android/network/api_client.dart';
 import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/network/genesis_api.dart';
 import 'package:genesis_flutter_android/network/gateway_auth.dart';
 import 'package:genesis_flutter_android/network/models/gem_purchase_report.dart';
+import 'package:genesis_flutter_android/network/models/membership_product.dart';
 import 'package:genesis_flutter_android/network/http_transport.dart';
 import 'package:genesis_flutter_android/network/local_mock_genesis_transport.dart';
 import 'package:genesis_flutter_android/network/models/search_v2.dart';
@@ -370,6 +373,124 @@ void main() {
         ),
         throwsA(isA<ApiException>()),
       );
+    },
+  );
+
+  test(
+    'membership products send the requested provider and parse server configuration',
+    () async {
+      for (final provider in MembershipProvider.values) {
+        final apiTransport = _FakeTransport(
+          handler: (request) => TransportResponse(
+            statusCode: 200,
+            headers: const {'content-type': 'application/json'},
+            body: jsonEncode({
+              'err_no': 0,
+              'err_msg': 'succ',
+              'data': {
+                'list': [
+                  {
+                    'title': 'Server yearly title',
+                    'benefits': [
+                      {
+                        'code': 'server_benefit',
+                        'title': 'Server benefit title',
+                        'icon_key': 'blue_gem',
+                        'display_type': 'enhanced',
+                      },
+                    ],
+                    'plan_code': 'pro_yearly',
+                    'provider': provider.name,
+                    'store_product_id': 'test_store_product',
+                    if (provider == MembershipProvider.google)
+                      'base_plan_id': 'test-annual',
+                    if (provider == MembershipProvider.google)
+                      'offer_id': 'test-offer',
+                    'billing_months': 12,
+                    'monthly_gems_cent': 180025,
+                    'price_currency_code': 'EUR',
+                    'price_amount': 12345,
+                    'can_purchase': true,
+                    'purchase_block_reason': '',
+                  },
+                ],
+              },
+            }),
+          ),
+        );
+        final api = _apiWith(
+          apiTransport,
+          _FakeTransport(
+            handler: (_) => const TransportResponse(
+              statusCode: 200,
+              headers: {},
+              body: '{"status":"ok"}',
+            ),
+          ),
+        );
+        final result = await api.v1.membership.products(provider: provider);
+        expect(apiTransport.requests.single.method, 'GET');
+        expect(
+          apiTransport.requests.single.uri.path,
+          '/api/v1/membership/products',
+        );
+        expect(apiTransport.requests.single.uri.queryParameters, {
+          'provider': provider.name,
+        });
+        expect(result.products.single.monthlyGemsCent, 180025);
+        expect(result.products.single.billingMonths, 12);
+        expect(result.products.single.priceCurrencyCode, 'EUR');
+        expect(result.products.single.priceAmount, 12345);
+        expect(result.products.single.canPurchase, isTrue);
+        expect(result.products.single.purchaseBlockReason, '');
+        expect(result.products.single.title, 'Server yearly title');
+        expect(result.products.single.benefits.single.code, 'server_benefit');
+        expect(
+          result.products.single.benefits.single.title,
+          'Server benefit title',
+        );
+        expect(
+          result.products.single.benefits.single.displayType.name,
+          'enhanced',
+        );
+        expect(
+          result.products.single.offerId,
+          provider == MembershipProvider.google ? 'test-offer' : '',
+        );
+      }
+    },
+  );
+
+  test(
+    'membership products propagate business errors and reject malformed successful lists',
+    () async {
+      for (final code in [10001, 4004, 5000, 0]) {
+        final apiTransport = _FakeTransport(
+          handler: (_) => TransportResponse(
+            statusCode: 200,
+            headers: const {'content-type': 'application/json'},
+            body: jsonEncode({
+              'err_no': code,
+              'err_msg': 'test error',
+              'data': {},
+            }),
+          ),
+        );
+        final api = _apiWith(
+          apiTransport,
+          _FakeTransport(
+            handler: (_) => const TransportResponse(
+              statusCode: 200,
+              headers: {},
+              body: '{}',
+            ),
+          ),
+        );
+        await expectLater(
+          api.v1.membership.products(provider: MembershipProvider.google),
+          throwsA(code == 0 ? isA<FormatException>() : isA<ApiException>()),
+        );
+      }
     },
   );
 
@@ -1165,6 +1286,228 @@ void main() {
         'Your account is logged in on another device.',
       );
       expect(apiTransport.lastRequest!.uri.path, '/api/v1/user/info');
+    },
+  );
+
+  test(
+    'message mutation errors notify once and preserve business exceptions',
+    () async {
+      var code = 1001;
+      final messages = <String>[];
+      final transport = _FakeTransport(
+        handler: (_) => TransportResponse(
+          statusCode: 200,
+          headers: const {'content-type': 'application/json'},
+          body: jsonEncode({
+            'err_no': code,
+            'err_msg': 'server message $code',
+            'data': false,
+          }),
+        ),
+      );
+      final api = GenesisApi(
+        transport: transport,
+        useMock: false,
+        sessionStore: MemoryUserSessionStore(),
+        appHeaderProvider: () async => {},
+        onSessionExpired: (_) async => fail('Unexpected session expiry'),
+        onPageNotFound: (_) async =>
+            fail('Message errors must only show a toast'),
+        onChatroomMessageMutationError: messages.add,
+      );
+      for (final errorCode in [
+        1001,
+        1009,
+        2011,
+        2012,
+        2013,
+        2014,
+        2004,
+        1404,
+        9999,
+      ]) {
+        code = errorCode;
+        for (final edit in [true, false]) {
+          messages.clear();
+          final operation = edit
+              ? api.chatroomHttp.batchMutateLlmMessages(
+                  worldId: 'w/a',
+                  locationId: 'l b',
+                  conversationRoundId: 1,
+                  operations: [
+                    ChatroomLlmMessageOperation.edit(
+                      globalMessageId: 1,
+                      content: 'edit',
+                    ),
+                  ],
+                )
+              : api.chatroomHttp.batchMutateLlmMessages(
+                  worldId: 'w/a',
+                  locationId: 'l b',
+                  conversationRoundId: 1,
+                  operations: [
+                    ChatroomLlmMessageOperation.delete(globalMessageId: 1),
+                  ],
+                );
+          await expectLater(
+            operation,
+            throwsA(
+              isA<ApiException>()
+                  .having((e) => e.code, 'code', code)
+                  .having((e) => e.message, 'message', 'server message $code'),
+            ),
+          );
+          expect(messages, ['server message $code']);
+        }
+      }
+      expect(transport.requests, hasLength(18));
+      messages.clear();
+      await expectLater(
+        api.chatroomHttp.getMessages(worldId: 'w', locationId: 'l'),
+        throwsA(isA<ApiException>()),
+      );
+      expect(
+        messages,
+        isEmpty,
+        reason: 'Background history must not show a mutation toast',
+      );
+    },
+  );
+
+  test(
+    'inspiration business errors toast once while session expiry stays separate',
+    () async {
+      var code = 2012;
+      final toasts = <String>[];
+      final expired = <String>[];
+      final transport = _FakeTransport(
+        handler: (_) => TransportResponse(
+          statusCode: 200,
+          headers: const {'content-type': 'application/json'},
+          body: jsonEncode({
+            'err_no': code,
+            'err_msg': 'server message $code',
+            'data': null,
+          }),
+        ),
+      );
+      final api = GenesisApi(
+        transport: transport,
+        useMock: false,
+        sessionStore: MemoryUserSessionStore(),
+        appHeaderProvider: () async => {},
+        onChatroomMessageMutationError: toasts.add,
+        onSessionExpired: (message) async {
+          expired.add(message);
+        },
+        onPageNotFound: (_) async =>
+            fail('Inspiration errors should toast, not navigate'),
+      );
+      for (final errorCode in [2012, 5002, 1404, 10001]) {
+        code = errorCode;
+        toasts.clear();
+        await expectLater(
+          api.chatroomHttp.getInspirations(
+            worldId: 'w/a',
+            locationId: 'l b',
+            conversationRoundId: 1,
+          ),
+          throwsA(isA<ApiException>().having((e) => e.code, 'code', code)),
+        );
+        expect(toasts, code == 10001 ? isEmpty : ['server message $code']);
+      }
+      expect(expired, hasLength(1));
+      expect(transport.requests, hasLength(4));
+    },
+  );
+
+  test(
+    'message mutations keep session expiry and response errors separate',
+    () async {
+      Object? envelope = {'err_no': 10001, 'err_msg': 'expired', 'data': false};
+      final toasts = <String>[];
+      final expired = <String>[];
+      final api = GenesisApi(
+        transport: _FakeTransport(
+          handler: (_) => TransportResponse(
+            statusCode: 200,
+            headers: const {'content-type': 'application/json'},
+            body: jsonEncode(envelope),
+          ),
+        ),
+        useMock: false,
+        sessionStore: MemoryUserSessionStore(),
+        appHeaderProvider: () async => {},
+        onSessionExpired: (message) async {
+          expired.add(message);
+        },
+        onChatroomMessageMutationError: toasts.add,
+      );
+      for (final edit in [true, false]) {
+        await expectLater(
+          edit
+              ? api.chatroomHttp.batchMutateLlmMessages(
+                  worldId: 'w',
+                  locationId: 'l',
+                  conversationRoundId: 1,
+                  operations: [
+                    ChatroomLlmMessageOperation.edit(
+                      globalMessageId: 1,
+                      content: 'edit',
+                    ),
+                  ],
+                )
+              : api.chatroomHttp.batchMutateLlmMessages(
+                  worldId: 'w',
+                  locationId: 'l',
+                  conversationRoundId: 1,
+                  operations: [
+                    ChatroomLlmMessageOperation.delete(globalMessageId: 1),
+                  ],
+                ),
+          throwsA(isA<ApiException>().having((e) => e.code, 'code', 10001)),
+        );
+      }
+      expect(expired, hasLength(2));
+      expect(toasts, isEmpty);
+      for (final response in [
+        {'err_no': 0, 'err_msg': 'succ', 'data': false},
+        {'err_no': '2012', 'err_msg': 'malformed code', 'data': false},
+        {'err_msg': 'missing code', 'data': false},
+      ]) {
+        envelope = response;
+        await expectLater(
+          api.chatroomHttp.batchMutateLlmMessages(
+            worldId: 'w',
+            locationId: 'l',
+            conversationRoundId: 1,
+            operations: [
+              ChatroomLlmMessageOperation.delete(globalMessageId: 1),
+            ],
+          ),
+          throwsA(isA<ApiException>()),
+        );
+        expect(toasts, isEmpty);
+      }
+      envelope = {
+        'err_no': 0,
+        'err_msg': 'succ',
+        'data': {
+          'start_conversation_round_id': 1,
+          'end_conversation_round_id': 1,
+          'newest_message_id': 0,
+        },
+      };
+      expect(
+        await api.chatroomHttp.batchMutateLlmMessages(
+          worldId: 'w',
+          locationId: 'l',
+          conversationRoundId: 1,
+          operations: [ChatroomLlmMessageOperation.delete(globalMessageId: 1)],
+        ),
+        isA<ChatroomMessageMutationResult>(),
+      );
+      expect(toasts, isEmpty);
     },
   );
 
@@ -3996,6 +4339,22 @@ void main() {
     test(
       'successful ${provider.name} login records login and login_first',
       () async {
+        final collectStore = MemoryCollectEventStore();
+        final collectUploader = CollectTelemetryUploader(store: collectStore)
+          ..configure(enabled: true);
+        GenesisTelemetry.setCollectUploaderForTesting(collectUploader);
+        addTearDown(GenesisTelemetry.resetForTesting);
+        GenesisTelemetry.setUserId('u_previous');
+        await GenesisTelemetry.collectLogAndWait(
+          actionType: 'event',
+          action: 'before_session_expired',
+        );
+        GenesisTelemetry.clearUser();
+        await GenesisTelemetry.collectLogAndWait(
+          actionType: 'event',
+          action: 'after_session_expired',
+        );
+
         final analytics = _RecordingFirebaseAnalyticsClient();
         FirebaseAnalyticsMonitoring.resetForTesting();
         FirebaseAnalyticsMonitoring.setClientForTesting(analytics);
@@ -4063,6 +4422,18 @@ void main() {
           }),
         ]);
         expect(deviceInfoLoginUids, <String>['u_login']);
+        final identityEvents = collectStore.eventsForTesting.where(
+          (event) => const {
+            'before_session_expired',
+            'after_session_expired',
+            'login',
+          }.contains(event.action),
+        );
+        expect(identityEvents.map((event) => (event.action, event.userId)), [
+          ('before_session_expired', 'u_previous'),
+          ('after_session_expired', ''),
+          ('login', 'u_login'),
+        ]);
       },
     );
   }

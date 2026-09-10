@@ -1,0 +1,75 @@
+import 'package:flutter/material.dart';
+
+import '../../app/bootstrap/app_services_scope.dart';
+import '../../app/bootstrap/service_registry.dart';
+import '../../platform/session/user_session_store.dart';
+import 'gem_colors.dart';
+
+/// Resolves purchase tabs before building either catalog; never requests login.
+class PurchaseSessionBuilder extends StatefulWidget {
+  const PurchaseSessionBuilder({super.key, required this.builder});
+
+  final Widget Function(BuildContext context, bool showBuyGems) builder;
+
+  @override
+  State<PurchaseSessionBuilder> createState() => _PurchaseSessionBuilderState();
+}
+
+class _PurchaseSessionBuilderState extends State<PurchaseSessionBuilder> {
+  AppServices? _services;
+  Future<String?>? _loginUid;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final services = AppServicesScope.maybeOf(context);
+    if (identical(services, _services)) return;
+    _services?.sessionRevision.removeListener(_sessionChanged);
+    _services = services;
+    services?.sessionRevision.addListener(_sessionChanged);
+    _loginUid = services?.sessionStore.readLoginUid();
+  }
+
+  void _sessionChanged() {
+    setState(() {
+      _loginUid = _services?.sessionStore.readLoginUid();
+    });
+  }
+
+  @override
+  void dispose() {
+    _services?.sessionRevision.removeListener(_sessionChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_services == null) return widget.builder(context, false);
+    return FutureBuilder<String?>(
+      future: _loginUid,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const ColoredBox(
+            color: Colors.white,
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: kGemAccentColor,
+                ),
+              ),
+            ),
+          );
+        }
+        // A different account must not retain the previous tabs or Gems data.
+        final uid = snapshot.hasError ? null : snapshot.data;
+        return KeyedSubtree(
+          key: ValueKey(uid),
+          child: widget.builder(context, uid != null),
+        );
+      },
+    );
+  }
+}

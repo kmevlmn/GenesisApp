@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:cronet_http/cronet_http.dart';
 import 'package:cupertino_http/cupertino_http.dart';
@@ -11,6 +10,7 @@ import '../app/telemetry/firebase_performance_monitoring.dart';
 import 'dio_http_transport.dart';
 import 'http_transport.dart';
 import 'io_http_transport.dart';
+import 'membership_request_privacy.dart';
 import 'static_image_network_config.dart';
 
 typedef HttpProtocolResolver = String? Function(http.StreamedResponse response);
@@ -42,11 +42,21 @@ class PlatformHttp3Transport implements HttpTransport {
   final HttpRequestPerformanceMetricReady _performanceMetricReady;
 
   @override
-  Future<TransportResponse> send(TransportRequest request) async {
-    if (request.uri.scheme.toLowerCase() != 'https') {
+  Future<TransportResponse> send(TransportRequest request) {
+    // Native http clients unconditionally profile bodies when DevTools is on.
+    // The Dio path supports per-request exclusion for membership credentials.
+    if (request.uri.scheme.toLowerCase() != 'https' ||
+        isPrivateMembershipRequest(request.uri)) {
       return _nonHttpsTransport.send(request);
     }
+    return runWithNetworkDeadline(
+      timeout: Duration(milliseconds: request.timeoutMs),
+      cancellationToken: request.cancellationToken,
+      action: (token) => _send(request.withCancellationToken(token)),
+    );
+  }
 
+  Future<TransportResponse> _send(TransportRequest request) async {
     request.cancellationToken?.throwIfCancelled();
     final metric = await startPerformanceMetric(
       request,
@@ -54,8 +64,10 @@ class PlatformHttp3Transport implements HttpTransport {
       urlFilter: _performanceMetricUrlFilter,
       ready: _performanceMetricReady,
     );
+    final stopMetric = performanceMetricStopper(metric);
     final abortCompleter = Completer<void>();
     void abort() {
+      stopMetric();
       if (!abortCompleter.isCompleted) abortCompleter.complete();
     }
 
@@ -63,6 +75,7 @@ class PlatformHttp3Transport implements HttpTransport {
       abort,
     );
     try {
+      request.cancellationToken?.throwIfCancelled();
       final nativeRequest = http.AbortableRequest(
         request.method,
         request.uri,
@@ -74,35 +87,18 @@ class PlatformHttp3Transport implements HttpTransport {
         request.onSendProgress?.call(requestBody.length, requestBody.length);
       }
 
-      final timeout = Duration(milliseconds: request.timeoutMs);
-      final streamedResponse = await _client
-          .send(nativeRequest)
-          .timeout(
-            timeout,
-            onTimeout: () {
-              abort();
-              throw TimeoutException(
-                'HTTP request timed out after ${request.timeoutMs} ms.',
-              );
-            },
-          );
+      final streamedResponse = await _client.send(nativeRequest);
       request.cancellationToken?.throwIfCancelled();
 
       final protocol = normalizeHttpProtocolVersion(
         _protocolResolver(streamedResponse),
       );
       recordPerformanceMetricProtocol(metric, protocol);
-      if (protocol == 'http/1.1') {
-        abort();
-        throw http.ClientException(
-          'HTTPS requires HTTP/2 or HTTP/3, but negotiated HTTP/1.1.',
-          request.uri,
-        );
-      }
 
-      final bodyBytes = await _readResponseBytes(
-        streamedResponse,
-        timeout: timeout,
+      final bodyBytes = await readTransportResponseBytes(
+        streamedResponse.stream,
+        totalBytes:
+            nonNegativeContentLength(streamedResponse.contentLength) ?? -1,
         onReceiveProgress: request.onReceiveProgress,
         cancellationToken: request.cancellationToken,
       );
@@ -128,26 +124,9 @@ class PlatformHttp3Transport implements HttpTransport {
       rethrow;
     } finally {
       removeCancelListener?.call();
-      unawaited(stopPerformanceMetric(metric));
+      stopMetric();
     }
   }
-}
-
-Future<Uint8List> _readResponseBytes(
-  http.StreamedResponse response, {
-  required Duration timeout,
-  required NetworkProgressCallback? onReceiveProgress,
-  required NetworkCancellationToken? cancellationToken,
-}) async {
-  final output = BytesBuilder(copy: false);
-  final totalBytes = nonNegativeContentLength(response.contentLength) ?? -1;
-  await for (final chunk in response.stream.timeout(timeout)) {
-    cancellationToken?.throwIfCancelled();
-    output.add(chunk);
-    onReceiveProgress?.call(output.length, totalBytes);
-  }
-  cancellationToken?.throwIfCancelled();
-  return output.takeBytes();
 }
 
 http.Client createPlatformHttp3Client() {

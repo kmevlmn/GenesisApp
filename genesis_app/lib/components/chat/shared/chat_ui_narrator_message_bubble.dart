@@ -44,7 +44,23 @@ class ChatNarratorMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final usesScenePlate = style.useScenePlateBubbleGeometry;
     final narratorTextStyle = chatNarratorMessageTextStyle(style);
+    final editor = ChatMessageEditorScope.controllerOf(
+      context,
+      message.localId,
+    );
     return ChatSystemMessage(
+      content: editor == null
+          ? null
+          : _ChatMessageTextEditor(
+              messageId: message.localId,
+              controller: editor,
+              style: usesScenePlate
+                  ? genesisSoftItalicStyle(
+                      narratorTextStyle,
+                      platform: Theme.of(context).platform,
+                    )
+                  : narratorTextStyle,
+            ),
       text: message.text,
       fullWidth: true,
       textAlign: TextAlign.left,

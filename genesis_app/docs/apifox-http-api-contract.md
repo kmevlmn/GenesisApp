@@ -1467,6 +1467,96 @@ Query：
 }
 ```
 
+### POST `/aitown-chat/api/v1/worlds/{world_id}/locations/{location_id}/llm-messages/batch`
+
+2026-09-08：依据批量接口设计 `PLAN.md`，本接口替代旧的单条 PATCH / DELETE；客户端已移除旧请求入口。前后端需要协调切换。
+一次请求仅修改同一世界、地点、轮次内的 1～100 条已完成角色/旁白回复，整批原子提交。操作人必须是该轮发起人，普通聊天和 Go on 均适用，不限最新轮次。用户消息、Tick、隐藏 Go on 触发记录、生成中消息不可操作。复用现有 Bearer 登录凭证和 Gateway 签名。
+
+```json
+{"conversation_round_id":7358,"operations":[{"action":"edit","global_message_id":8701,"content":"修改后的完整回复"},{"action":"delete","global_message_id":8702}]}
+```
+
+- 轮次与全局消息 ID 使用正整数 int64；不经过浮点转换。
+- `operations` 为 1～100 项，ID 不得重复；操作只能为 `edit` / `delete`。
+- 编辑的 `content` 必填且不能全空白，首尾空格及换行原样发送；删除不携带 `content`。
+- 操作数组顺序不改变消息排列；任一目标校验失败时整批不生效。纯编辑不受删除开关限制。
+
+成功响应（不再返回布尔值）：
+
+```json
+{"err_no":0,"err_msg":"succ","data":{"start_conversation_round_id":7358,"end_conversation_round_id":7362,"newest_message_id":84}}
+```
+
+起止轮次是需要完整刷新的闭区间。纯编辑只刷新提交轮次；含删除时可能扩大到序号实际变化的后续轮次。`newest_message_id` 为整个地点最新序号，允许降低至 0。客户端严格校验响应范围及整数类型；HTTP 200 本身不代表成功。
+
+错误响应：`{"err_no":2013,"err_msg":"LLM reply already deleted","data":false}`。
+
+| 错误号 | 含义 |
+| --- | --- |
+| 10001 | 未登录，沿用全局登录失效流程 |
+| 1001 | 参数非法（空批次、超限、重复 ID、非法 action 等） |
+| 1009 | 编辑内容缺失或全空白 |
+| 2011 | 目标不存在、世界/地点/轮次不匹配或不可操作 |
+| 2012 | 非轮次发起人 |
+| 2013 | 批次存在已删除目标 |
+| 2014 | 含删除操作但环境未启用删除 |
+| 2004 | 存储或地点锁操作失败 |
+
+除 `10001` 外，非零业务错误通过全局 Toast 显示服务端 `err_msg`，同时抛出保留错误码的异常；调用方保留草稿、不重复弹提示。
+`ChatroomHttpApi.batchMutateLlmMessages` 返回 `ChatroomMessageMutationResult`；`WorldChatroomService` 同名入口会合并 HTTP 返回范围与 WS 待刷新范围，并阻止同轮在途重复提交。`isMutatingLlmMessages` 可用于提交状态判断。
+写成功与后续同步失败分别报告。网络超时、中断或响应格式异常时服务层安排权威快照确认结果，所有批量写入均不自动重发（包含 Gateway 返回验签错误的情况）。
+
+本次继续只接入网络和同步能力，不连接编辑页 Save、删除按钮。后端事务、地点锁和 MySQL 原子性需在服务端工程验证，本地 mock 仅用于客户端契约与整批校验回归。
+
+### LLM 轮次卡片查询、候选修改与最终选择
+
+2026-09-08：依据 `llm-round-cards-client-guide.md` 1.1 版。本地仅提供协议入口，不启用候选业务或交互；服务端部署状态另行联调确认。
+
+| 方法与路径 | 客户端入口 |
+| --- | --- |
+| GET `/aitown-chat/api/v1/worlds/{world_id}/locations/{location_id}/llm-messages/cards` | `ChatroomHttpApi.getLlmCards` |
+| POST `/aitown-chat/api/v1/worlds/{world_id}/locations/{location_id}/llm-messages/select` | `ChatroomHttpApi.selectLlmCard` |
+| POST 同基础路径 `/batch`，带正数 `card_id` | `ChatroomHttpApi.batchMutateLlmCardMessages` |
+
+不提供 HTTP `/regenerate` 或 Go On；分别通过已认证 V2 WS 的 `regenerate_llm_card` 和 `go_on`。
+复用 Bearer / 现有 Gateway 签名，不发送操作者 UID。GET query 仅 `conversation_round_id`（正整数 int64），无 `pn/rn`，支持取消令牌。
+
+GET 不创建卡组。响应 data 包含 `conversation_round_id`、`original_card_id`、`selected_card_id`、`active_card_id`、`confirmed`、`can_regenerate`、`can_confirm`、`list`、`total`。无卡组为空列表及 0 值卡片 ID，全部卡片按 `card_index` 升序一次返回，`total=list.length`，最多 10 条（包含成功、失败和在途尝试）。
+`ChatroomLlmCardsResponse.list` 为类型化 `ChatroomLlmCard` 列表。每张卡包含 cardId/cardIndex/isOriginal/generationState/canEdit/canDelete/messages/billing/createdAt/error，并保留 rawJson。查询验证返回轮次与请求一致。
+`ChatroomLlmCardMessage.message` 复用 `ChatroomV2Message`，正文为 `payload.content`；外加固定 cardId/cardMessageIndex/globalMessageId，保留原始 JSON。候选查询不返回 message_id/location_message_id，连原卡也不例外；未成功卡 messages 为空。删除后索引可以为 1、3，不补位。数字 ID 严格按 Dart int 解析，拒绝字符串或浮点数；移动端大于 2^53 的 ID 保持无损。
+
+候选编辑复用 `/batch`：
+
+```json
+{"conversation_round_id":7358,"card_id":9902,"operations":[{"action":"edit","global_message_id":8701,"content":"修改后的正文"},{"action":"delete","global_message_id":8702}]}
+```
+
+仅 body 是否提供 card_id 决定分支：省略为正式消息，正整数为候选；null、0、负数、字符串不能回退。公开正式入口 `batchMutateLlmMessages` 及返回类型保持不变，候选入口要求正数 cardId，两者共享 1～100 个操作的校验及发送逻辑。edit 原样保存，delete 不带 content，目标 ID 不重复。
+
+候选成功 data 为 `{conversation_round_id, card}`，card 与 GET 卡片结构相同。返回 `ChatroomCardMutationResult` 并验证轮次/卡片匹配；不返回正式刷新范围，不修改缓存、不选卡或触发正式历史刷新。至少保留一条消息、权限及 confirmed 状态由后端校验，2020/2021/2025 等错误码按现有业务异常透传。
+
+候选批量写没有持久化请求幂等，不自动重试，包括 Gateway 响应后的重试；结果不明须由后续业务先 GET /cards 核对。重生成可显式复用请求 ID 恢复同一尝试；选卡可显式复用同卡及请求记录；Go On 不具备业务幂等，不能盲目重发。
+
+选卡请求：
+
+```json
+{"conversation_round_id":7358,"card_id":9902,"client_msg_id":"select-7358-1"}
+```
+
+轮次/卡片 ID 必须是正整数，`client_msg_id` 非空且最多 128 字符，重试由调用方复用同一 ID、同一卡。请求不自动重发（包括 Gateway 错误后的重发）。
+成功 `err_no=0` 的 data 与 WS `ack.payload.selection` 相同：
+
+```json
+{"conversation_round_id":7358,"selected_card_id":9902,"confirmed":true,"start_conversation_round_id":7358,"end_conversation_round_id":7359,"newest_message_id":14}
+```
+
+返回 `ChatroomCardSelection`，包含完整闭区间与整个地点最新序号，允许最新序号为 0；HTTP 层校验确认结果与请求轮次/卡片匹配。这里只返回结果，不自动确认其他卡、不修改历史或安排范围刷新，后续业务接入时复用已有范围刷新流程。
+
+已在指南中明确的业务码：2020 已固定其他卡；2021 卡组未确认时尝试批量编辑/删除；2023 重生成次数达到上限。完整错误码表在未附的 OpenAPI 中，客户端不猜测，所有非零码保留原始 code/message。
+HTTP 10001 沿用全局登录失效流程，其余非零业务错误通过现有全局 Toast 显示 err_msg。响应形状异常不能视为确认成功。
+
+本地 HTTP mock 的卡片查询返回带轮次的空组；选卡和任何带 card_id 的 batch 返回 HTTP 501，明确未模拟生成/候选修改/选卡后端，不伪造确认或计费成功。协议成功响应使用隔离 transport 测试验证。
+
 ### GET `/aitown-chat/api/v2/messages`
 
 获取指定世界、指定地点的 V2 历史消息。HTTP V2 不读取 `x-app-version`，始终返回完整 V2 DTO；`limit` 默认 20，最大 100。
@@ -1477,6 +1567,9 @@ Query：
 - `location_id*`: string，地点 ID
 - `since`: integer，严格使用 `location_message_id` 的向前分页游标；`0` 表示获取最新页
 - `limit`: integer，默认 `20`，最大 `100`
+- `start_conversation_round_id` / `end_conversation_round_id`: 配对的 int64 闭区间。省略或均为 0 表示不限范围，否则必须均为正数且结束不小于起始。
+
+范围过滤先于分页；首请求 `since=0, limit=100`，后续使用本页最小正 `location_message_id`，保留同一轮次范围，直到 `has_more=false`。`newest_message_id` 始终表示整个地点最新序号，允许降低为 0；不能把它或轮次 ID 用作分页游标。
 
 响应 `data`：
 
@@ -1484,7 +1577,7 @@ Query：
 - `has_more`: boolean，是否还有更早的地点消息
 - `newest_message_id`: integer，当前请求地点最新的 `location_message_id`，不受 `since` 当前页影响
 
-下一页 `since` 必须使用本页最后一条消息的 `location_message_id`，不得改用 world `message_id`。示例：
+下一页 `since` 必须使用本页最小正 `location_message_id`，不得改用 world `message_id`。示例：
 
 ```json
 {
@@ -2124,19 +2217,19 @@ query：
 
 ### POST `https://collect.worldo.ai/api/v1/collect`
 
-批量提交客户端行为事件。客户端在事件发生时先写入独立 SQLite 队列；冷启动的 `startup_first_report` 和 `launch_startup` 在 Collect recorder 准备完成后立即记录，早于 `runApp` 和 Firebase/Telemetry 完整初始化。Telemetry 初始化完成后再由独立上传器消费；每次按 FIFO 最多领取 500 条，批次成功后删除，失败时整批恢复为待发送状态。
+批量提交客户端行为事件。客户端在事件发生时先写入独立 SQLite 队列；冷启动的 `startup_first_report` 和 `launch_startup` 在 Collect recorder 准备完成后立即记录，早于 `runApp` 和 Firebase/Telemetry 完整初始化。Telemetry 初始化完成后再由独立上传器消费；每次按 FIFO 最多领取 100 条，客户端批次同时限制为 256 KiB。只有收到 2xx、有效 JSON 对象且 `err_no=0` 后才删除；所有未确认成功的事件保留原 `event_id` 和内容并恢复待发送。HTTP 400/413/422 可拆批重试，失败单条和超限单条仍保留；不再写入会被清理的内存 dead letter。失败记录移到队尾，给后续未尝试事件发送机会。
 
-请求 header 在实际上传时按当前上下文生成：
+请求 header 在实际上传时按事件入队时保存的身份和环境快照生成；不同上下文分批，重新登录不改写旧事件的 UID：
 
 - `X-Platform`: `android` 或 `ios`
-- `X-App-Version`: 当前 App version name
+- `X-App-Version`: 事件发生时的 App version name
 - `x-app-environment`: `production` 或 `test`
 - `X-Device-ID`: 当前设备 ID；允许匿名事件明确省略
-- `X-UID`: 已登录用户 uid；未登录或允许匿名事件不传
+- `X-UID`: 事件发生时已登录用户 uid；未登录或允许匿名事件不传
 
 请求 body：
 
-- `events*`: array，本批事件，按本地入队顺序排列，最多 500 条
+- `events*`: array，本批事件，按本地入队顺序排列；客户端默认最多 100 条，接口原约定上限为 500 条
 - `events[].event_id*`: string，客户端生成的 UUID v4；重试保持不变，供服务端幂等去重
 - `events[].action_type*`: string，事件类型，例如 `pageview`、`event`、`monitor`、`pay_event`；`api_req_start`、`api_req_success`、`api_req_fail_tech`、`api_req_fail_biz` 使用 `monitor`
 - `events[].action*`: string，页面名或事件名
@@ -2169,7 +2262,7 @@ query：
 }
 ```
 
-成功判定：HTTP 状态码为 2xx，且 JSON 响应中的 `err_no` 为数值 `0` 或字符串 `"0"`。非 2xx、超时、网络异常、无效 JSON 或非零 `err_no` 都视为整批失败，不支持单批部分成功。
+成功判定：HTTP 状态码为 2xx，且 JSON 响应中的 `err_no` 为数值 `0` 或字符串 `"0"`。非 2xx、超时、网络异常、无效 JSON 或非零 `err_no` 都视为该次请求失败，不支持在一个响应内确认部分事件。客户端因大小限制或请求被拒绝而拆成多个子请求时，每个成功子批次会按 `event_id` 独立确认，只重试尚未成功的部分；本地删除失败的已成功事件保持 in-flight。写库超时后的迟到记录会与内存副本按同一 ID 归并，避免两个队列再次发送。 内存备用队列不再按原 300 条阈值淘汰未确认数据；数据库恢复后补写入库。若数据库始终不可写且进程退出，内存记录仍有丢失风险，详见 [失败保留策略](/Users/long/Project/GenesisApp_2/genesis_app/docs/collect-failure-retention.md)。
 
 响应示例：
 
@@ -2357,3 +2450,90 @@ World：
 - `GET /api/points/{pointId}/messages`
 - `POST /api/points/{pointId}/messages/enqueue`
 - `GET /health`
+
+
+## Gems 购买等待时限（2026-09-09 调整）
+
+- Android、iOS 均采用两段超时：点击购买进入 `purchaseGem` 时启动 90 秒准备计时，覆盖商店初始化、购买 UUID、商品查询和调起支付；准备阶段切换不重置截止时间。Google 在 SDK 返回成功调起支付后停表；Apple 在原生商品查询和未完成交易检查结束、正式调用 StoreKit `Product.purchase` 前通知 Dart 停表。Apple 没有独立的支付页可见回调，此处以交给 StoreKit 为边界。用户在系统支付页操作或停留期间不计时。
+- 截止前尚未发起支付时，超时关闭等待弹窗并提示重试；迟到的初始化、UUID 或商品查询结果不能继续拉起系统支付，也不能修改下一次购买状态。
+- SDK 调起调用尚未确认接管时仍受准备时限约束；超时沿用待确认提示并保留购买上下文。iOS 原生查询迟到时再次检查本次请求是否仍有效，过期则不调用 `Product.purchase`。`store_no_callback` 保留为准备/调起等待超时的埋点标记，不代表用户付款失败或服务端收到商店通知；迟到的真实购买回调继续按原流程上报和恢复。
+- 收到本次购买结果后按原有状态处理：取消/错误结束等待；pending 进入原待确认流程；成功持久化凭据并上报。第二段 report 使用 HTTP 请求自身的超时和原重试策略，不再复用 90 秒准备计时，正常上报期间保留原等待弹窗。超时不删除未确认的付款凭据。
+- iOS 通过本地 `third_party/in_app_purchase_storekit` 补充与请求关联的原生通知；使用当前 StoreKit 2 路径，详见其 `WORLDO_PATCH.md`。更新这部分需要重新构建原生 App，热重载不能更新 Swift 代码。
+
+## Debug 手动会员设置（2026-09-09 核对）
+
+来源：[Apifox 手动会员设置](https://app.apifox.com/link/project/8297783/apis/api-512807631)。
+
+- `POST /api_internal/v1/membership/set`；沿用当前配置的 API host，路径从根目录解析，不能拼在 `/api/v1/` 下。接口依赖部署侧内部网络边界；客户端不添加文档示例中的调试身份、内部密钥或操作人字段。
+- 请求只含 `uid`（非空，最多 32 字符）、`plan_code`（`pro_monthly` 或 `pro_yearly`）、`expires_at`（正整数 Unix 秒），以及可选 `reason`（最多 512 字符，空白时省略）。首次设置必须为未来到期，已有手动会员允许过去到期；十年上限及账户是否已有手动会员由服务端校验。
+- 新入口位于 Debug → switch → 现有 VIP 面板，在原强制登录开关下方。UID 默认填当前真实登录 UID，并可编辑；输入截止时间与备注，选择套餐，点击 Submit 才提交。请求期间禁用编辑及重复点击，失败保留输入并展示错误；仅 Debug 构建显示。
+- 通过 `GenesisApi.v1.membership.setManual` 调用。HTTP 200 仍检查业务 envelope，非零 err_no 为失败；结果展示服务端 uid、plan_code、expires_at、membership_status。响应的发放详情不直接写入钱包。
+- 设置目标为当前登录 UID 时，成功后调用既有 `refreshAfterMembershipChanged()` 重新获取 `/api/v1/gem/wallet`；设置其他 UID 不覆盖当前账号会员。刷新失败单独展示，不将已经成功的设置自动重发。
+- 接口创建或更新独立 manual 会员，不修改商店订阅、不自动续费；按服务端规则发放 Blue Gems。客户端不计算发放额度、不改动原 Gems 购买或余额处理。mock 明确返回不可用，不伪造设置成功。
+
+## Pro 会员商品列表（2026-09-09 核对）
+
+来源：[Apifox 会员商品列表](https://app.apifox.com/link/project/8297783/apis/api-512137864)，使用最新 OpenAPI 的 `/api/v1/membership/products`、`MembershipProductListResp`、`MembershipProductInfo` 核对。
+
+- `GET /api/v1/membership/products?provider=google|apple`，最新契约已公开，无需登录；复用现有 Gateway 签名链路，不发送文档中的调试身份头。
+- 响应为 `{err_no, err_msg, data: {list: [...]}}`；成功但无配置时 `list=[]`。业务错误 `4004` 参数错误、`5000` 服务不可用，继续使用统一错误处理。
+- 每项提供 `title`、`benefits`、`plan_code`（`pro_monthly`/`pro_yearly`）、`provider`、`store_product_id`、`billing_months`（1/12）、`monthly_gems_cent`、`price_currency_code`、`price_amount` 及 `can_purchase`、`purchase_block_reason`。Google 还必含 `base_plan_id`，可选 `offer_id`；Apple 不返回 base plan。商品接口模型只保留当前文档字段，不兼容旧版接口。`list`、商品内的非空 `title`、`benefits`、价格字段及购买资格字段按当前必填约束解析；缺失时不填默认值，价格未配置仍按文档接受空币种和显式 null 金额。本地购买和恢复记录使用独立的订单商品标识模型，不要求价格、权益或购买资格字段，避免历史订单阻断新购买及恢复。
+- `monthly_gems_cent` 是每个会员月的额度，100 cent = 1 Gem；年付也是逐月发放。月付和年付允许配置不同额度，权益文案由商品内的 `benefits` 返回。
+- 商品与展示价格均由 `GenesisApi.v1.membership.products` 读取。`price_amount` 是完整计费周期价格，单位为币种主单位的百分之一，配合 `price_currency_code` 展示；空币种与 null 金额表示未配置。页面加载不再通过商店查询商品或补价格。点击购买时仍由 SDK 获取结算商品及 offer token，并精确匹配商品 ID、base plan 和可选 offer。
+- 年付卡片使用接口全年价格除以 `billing_months` 后的月均价格；底部按钮使用接口完整周期价格。币种和月额度相同且年付更便宜时，以月付价格乘 12 与年付全年价格比较计算 Save 百分比，不写死金额或折扣。实际支付金额仍由商店确认。
+- 共享 `ProSubscriptionContent` 同时覆盖钱包页和购买弹层，保留原有布局、样式及两个套餐卡片，绑定接口价格、折扣与权益数据；首次加载时与 Buy Gems 一致，在内容区居中显示 24×24、线宽 2.5、`kGemAccentColor` 的转圈；请求完成后显示原有内容。不新增错误、登录、空列表、停售或首购优惠的 UI。缺少数据时金额和折扣文字留空，不回退到预览价格；账号切换会清空并重取，旧请求不能覆盖新账号状态。缺少商品或价格时，点击原按钮可重新查询。
+- 页面点击会检查 `can_purchase/purchase_block_reason`，不允许购买时沿用居中 Toast 说明原因；不改变按钮、卡片的颜色、尺寸或可点击样式。实际调起商店前再次请求最新商品资格，匹配原选中的套餐及平台商品标识，失败或配置改变时不使用旧数据继续付款。有效年付不能再次购买年付或降为月付，有效月付不能重复购买月付；过期后是否可购买重新依据服务端，不用历史已完成记录永久阻止购买。
+- 登录资格按服务端会话判断；游客商品查询使用与 guest prepare 一致的设备 ID，通过 `X-Device-ID` 请求头传递并复用 Gateway 签名，不把 uid/device_id 放入 URL。不缓存购买资格。资格允许时，按选中商品进入现有商店购买及上报流程。订阅切换的扣款与生效以商店和服务端核验结果为准。
+- report、restore、游客 claim 取得有效状态后通知商品页面静默刷新资格，保留当前展示内容；刷新本身不再次触发商店恢复，避免循环请求。无论服务端当前商品资格如何，本地未确认的付款、pending/accepted 订单和未处理恢复记录仍会阻止所属账号再次调起 VIP 购买，并继续原恢复重试。
+- 钱包页和购买弹层初始仅加载当前 TAB，另一个 TAB 首次切换到时加载，后续切换复用已加载内容。
+- 商品配置和价格展示已连接底部购买按钮，两个入口共享同一购买服务。展示权益不作为当前账号的功能权限判断。
+- 每个 `data.list[]` 商品自带 `title` 和 `benefits`，顶层不再返回或解析 `benefits`。页面顶部标题和权益区绑定当前选中商品，切换年/月套餐时一起更新，保持原有字号、颜色和布局；周期卡片与按钮的 Yearly/Monthly 周期标签保持原样。仅返回一个套餐时选中该套餐。`title` 直接使用服务端文案，不在客户端补 Pro 或套餐默认标题；缺失或空白视为无效响应。权益由服务端读取月付、年付共用配置，客户端按所选商品数组顺序显示，`code` 仅要求在该数组内唯一；`display_type=enhanced/locked/included` 分别复用原有箭头、灰色锁定和勾选样式。加载中、失败或空列表不补标题与权益；商品未配置价格时仍展示其标题与权益。
+- `icon_key` 映射本地图标，客户端支持 `blue_gem`、`character_slots`、`inspiration`、`edit_reply`、`memory`、`save_conversation`、`chat_background`、`no_watermark`、`custom_character`、`community_world`；未知标识按契约使用通用权益图标，保留标题和状态。
+- 本地 mock 返回契约允许的 `data: {list: []}`，不再包含顶层 `benefits`，不伪造商品、价格、标题或权益。
+
+## Pro 会员购买与上报（2026-09-08 核对）
+
+来源：[Apifox 项目](https://app.apifox.com/project/8297783)，已核对会员购买上报、游客 prepare / report 的最新 OpenAPI。
+
+- 登录购买沿用 `/user/info` 的账号 UUID，Google 传 `obfuscatedExternalAccountId`，Apple 传 `appAccountToken`。游客购买先请求 `POST /api/v1/membership/guest/prepare`，参数为 `provider`、`device_id`；将返回的 `guest_id`、`account_uuid`、`claim_token` 安全持久化成功后再调起支付。
+- `MembershipPurchaseService` 保存所选套餐的 `provider/plan_code/store_product_id/base_plan_id/offer_id` 和本次 `request_id`，订单快照不保存展示价格、权益或购买资格；`StoreMembershipCheckoutPlatform` 精确匹配 SDK 商品，使用 `buyNonConsumable` 调起订阅购买。Google 必须命中配置的 base plan / offer，不擅自替换方案，也不 consume 订阅。
+- 点击 VIP 购买按钮立即复用 Gems 购买弹窗，保持原有尺寸、样式、动画和不可点击遮罩/返回关闭的交互，等待文案为 `Purchasing VIP...`；商店准备、付款和服务端确认期间持续显示。`completed` 后改为 `VIP purchase successful!`、`Your VIP purchase is confirmed.`，点击 OK 关闭；钱包页留在原页，购买弹层同时关闭。取消、失败、待付款、已接管待确认或延迟确认时关闭等待弹窗并显示对应 VIP 提示，保留购买页面。
+- VIP 弹窗按本次 `request_id` 订阅状态，后台恢复或其他订单不能改变当前弹窗。Android、iOS 的两段超时与 Gems 对齐：点击进入购买立即开始 90 秒准备计时，覆盖本地加载、身份/资格检查、商店商品查询、游客 prepare、UUID 获取、订单保存和发起支付；阶段切换不重置。Google 成功调起后停表，Apple 在原生准备完成、正式调用 `Product.purchase` 前通知 Dart 校验请求并停表，用户在系统支付页停留不计时。收到本次 SDK 购买结果后进入对应处理，后续 report 使用 HTTP 请求自身的超时和原退避重试，正常上报期间继续显示原等待弹窗。准备超时后结束等待，尚未发起的支付不得被迟到结果继续拉起，旧查询/发起结果不得覆盖后续购买或已收到的购买回调；已发起订单保留凭据和原请求键，迟到的真实回调继续上报、恢复及游客绑定。商店回调流异常、账号切换和页面销毁仍释放弹窗，包括正在 report 的弹窗。Gems 弹窗默认文案及原有 GEMS 上报、发货和恢复处理不变。
+- 登录购买上报 `POST /api/v1/membership/purchase/report`；游客上报 `POST /api/v1/membership/guest/purchase/report`，游客请求额外携带平级 `guest_id`、`claim_token`。共同字段为 `provider`、`plan_code`、`store_product_id`、`request_id`；Google 额外传 `purchase_token`；Apple 额外传 `transaction_id`。2026-09-09 用户确认服务端已从上报、恢复、绑定请求移除 `base_plan_id`，Apifox 尚未同步，本次客户端按用户确认执行；商品列表和发起购买继续保留该字段。不传金额、uid、任意 payload 或客户端猜测的生产环境。
+- 响应必须有合法业务 envelope、`data.status` 和 `report_id`。`completed`、`accepted`、`rejected` 均表示服务端可靠接管；未取得有效状态时保留凭据和原请求键，以退避计时、回前台及重启恢复重试。同一次重试不改变凭据或套餐；新 Google 续费订单即使沿用 token 也产生新的操作键。
+- report 先持久化购买记录再同步校验，当次成功直接返回 `completed`，不要求先返回 `accepted`。`completed` 表示官方校验及状态同步完成，不保证当前会员仍有效或额外发放；登录购买随后刷新 `/gem/wallet` 的会员摘要。`accepted` 仅表示可靠保存但仍在处理（包括待付款、平台超时、并发或人工核查），不显示购买成功，仍保留待处理记录并使用原请求键重试。`rejected` 是明确拒绝，保存并展示对应 reason，停止重报；`account_mismatch` 不 finish 其他账号的 Apple 交易。
+- Google 初次订阅 acknowledge 由服务端负责。已付款的 Apple 交易在服务端可靠接管、响应已本地保存后 finish；仍待付款且仅 accepted 时不 finish。平台先返回 pending 后，若服务端重试已取得 completed，则按官方确认完成后续 finish/清理，不再依赖另一次平台回调。已经取得 `completed/rejected` 的记录在 finish 或本地清理失败后仅重试剩余步骤，不重复上报。
+- 购买记录使用独立安全存储。官方确认 completed 或明确 rejected 并完成必要的平台 finish 后，先单独保存恢复套餐匹配、回调去重及游客认领所需的凭据、归属与拒绝原因，再删除对应待处理记录；待付款被明确拒绝也结束重试，不 finish 未付款交易。任何保存或清理失败都保留待处理记录重试。游客秘密继续保留供后续认领。账号切换后不把旧账号凭据作为新账号购买上报。调起失败/取消不发起购买上报；Android 不带商品 ID 的取消回调关联当前 VIP 操作。
+- `purchased/restored` 回调缺少凭据时不能直接上报或永久当作已付款：关闭当次等待并安排商店补查，重启恢复和下次点击购买也会补查。生产环境仅查询 VIP 订阅；真实订单继续用原 request_id 上报。仅在商店查询成功、未找到对应账号/商品订单，且本地既无 token 也无交易号、未取得服务端状态时，将该无凭据记录标为 `receipt_missing`，保留购买及游客身份供迟到回调匹配，再重新检查服务端购买资格。查询失败、部分交易证据、待付款及 accepted 仍保留拦截；超时、切换账号、并发到达的有效回调不得被迟到空结果覆盖。其他账号记录不影响当前账号的补查与购买。
+- GEMS 回调与商店恢复入口增加会员分流，已知 GEMS 操作和持久记录沿用原处理。VIP 不进入 Gem 上报、发货弹窗或 Gem 埋点路径；互相购买期间拦截重复调起。普通 GEMS 请求和 TAB 按需加载保持原逻辑。
+- 会员 prepare/report 的原始请求和响应体不进入网络捕获或 DevTools；原生 HTTP 客户端会自动采集 body，因此这几个接口使用支持按请求排除采集的 HTTP/2 传输。日志只记非敏感状态或错误类型。
+- Subscription 页商品数据就绪后查询商店订阅，启动与重试只处理本地未完成记录；已进入过 Subscription 后回前台也同步商店订阅。恢复调用 `POST /api/v1/membership/restore`，每次新操作使用独立于购买的新 `request_id`，同次失败重试保留原键。购买上报仍未完成时先补完原上报，不同时创建恢复操作。
+- Android 单独查询 `SUBS`，不查询或消费 GEMS。Apple 查询已验证交易历史并取每条订阅链最新交易，包含已 finish 的订阅。多笔凭据逐笔保存、去重和提交；未接管、`accepted`、finish 或本地清理失败都保留待处理记录重试。恢复取得 `completed/rejected` 并完成必要的平台 finish 后删除对应待处理记录；已完成的报告不会因清理失败重复提交。恢复 `completed` 只表示同步完成，随后刷新 `/gem/wallet` 的会员摘要，不在客户端额外加钱。
+- 恢复请求不再发送或要求 `base_plan_id`，已知 `plan_code` 的本地订单即使缺少 base plan 也能解析并上报。无缓存订单的 `plan_code` 是否也可省略尚待确认；Google 客户端无法仅凭共享商品 ID 确定月/年套餐，没有购买快照时继续安全保存凭据，暂不提交猜测套餐。游客购买继续使用游客上报，登录后的认领见下节；已有会员套餐变更仍另行接入。
+- 本地 mock 对 prepare/report/restore 返回 `5000`，不伪造购买身份、商店验单或会员发放。
+
+## 游客 Pro 购买与购买后强制登录（2026-09-08）
+
+来源：[Apifox 游客购买身份](https://app.apifox.com/link/project/8297783/apis/api-512243338)、[登录后认领游客购买](https://app.apifox.com/link/project/8297783/apis/api-512243340)，同时核对最新 OpenAPI 的游客购买上报及响应模型。
+
+- 首页皇冠直接进入 Subscription，未登录也能浏览商品和购买。点击购买时查询商店商品，调用公开的 `POST /api/v1/membership/guest/prepare`，请求仅包含 `provider/device_id`；先安全保存返回的 `guest_id/account_uuid/claim_token` 和所选商品，再把游客 UUID 传给平台支付。prepare 不创建真实用户、钱包或可用会员权益，也不把游客身份写进登录会话。
+- 所有 VIP 入口（首页皇冠、会员卡、签到订阅操作、聊天订阅提示）直接打开购买页或购买弹层，不预先要求登录。完整购买页和订阅购买弹层先读取本地登录状态：游客仅显示 Subscription，不构建 Buy Gems 内容，也不加载 Gems 商品、余额和任务；已登录保留双 Tab 和原有 Gems 行为。登录、退出或切换账号后重新确定可见 Tab。
+- 游客付款仍走 `POST /api/v1/membership/guest/purchase/report`。`completed` 表示购买验证与暂存完成，先显示现有带皇冠的 VIP 购买成功弹窗；点击 OK 后才弹出登录弹窗。该登录弹窗隐藏关闭按钮，遮罩点击、下滑、系统返回均不能退出；取消平台授权或登录失败后保留弹窗，只有登录成功才能继续。普通登录弹窗保持原来的可关闭行为。
+- 当次购买继续按成功弹窗 → OK → 强制登录处理；每次启动时优先读取独立的游客待绑定缓存，只要缓存标记购买已确认且尚未完成绑定、当前未登录，进入首页后就直接弹出不可关闭的登录弹窗，不再重放购买成功弹窗，也不等待网络恢复。待处理订单已清理、购买页面未打开、曾登录但绑定失败后又退出，都不会绕过该检查。购买取消、失败或仍待付款不会触发购买成功后的登录流程。
+- Debug 包的 Debug Page → switch → VIP 提供 `Force login after guest purchase` 开关，默认开启并本地保存。关闭时跳过购买成功后的强制登录和启动时的缓存拦截；已打开的强制登录弹窗也会关闭，不清游客凭据、不影响订单上报或之后正常登录时的 claim。重新开启后恢复检查。启动的首次弹窗判断会等待调试配置加载；Release/Profile 不展示开关且不读取该覆盖值，始终保持强制登录。
+- 登录成功后独立调用 `POST /api/v1/membership/claim`，body 仅为 `guest_id/claim_token`；归属由真实登录会话决定，不发送 uid、device_id、account_uuid 或 request_id。首次认领前安全保存所选登录账号，超时、失败和重启后保持该账号，切换到其他账号时不重新认领。认领失败不撤销登录成功。
+- 客户端 claim 成功响应模型按产品要求只保留 `status`，不再解析或校验其中的 guest_id、reason、membership。`completed` 后重新请求 `GET /api/v1/gem/wallet`，会员状态和 Blue Gems 只读取该接口，普通 Gems 仍使用 wallet 字段；不把 claim 状态直接当作会员有效。VIP 刷新会等待正在进行的旧 wallet 请求结束，再发起新请求，避免把绑定前的数据当作绑定后的结果；原 Gems 刷新行为不变。
+- claim 网络失败、业务错误、缺失或非法 status，以及 `accepted` 未完成状态，在本轮首次请求后按 15、30、60、120、240 秒最多退避重试 5 次。前后台切换、订单恢复和重复 recover 不绕过间隔或追加次数。`completed` 和 `rejected` 停止绑定重试；`rejected` 保留原归属，不转给其他账号。重试耗尽保留游客缓存，当前会话不再自动请求；下次启动或新的登录会话重新开启有上限的一轮重试，仍只能由已锁定的账号认领。
+- 因 claim 模型不再读取 reason，遇到 `accepted` 时，每轮将已有、非拒绝的已完成游客购买上报按原凭据及 request_id 补报一次，避免 `awaiting_purchase_report` 永久遗漏；没有凭据不猜测订单。处理中或需要人工处理均不清缓存，有限重试不代表承诺自动完成。普通 report/restore 的原有状态与重试逻辑不受 claim 次数限制。
+- 游客认领记录独立安全持久化，包含游客凭据、购买确认状态及关联购买操作、登录确认状态、归属和认领结果。购买待处理记录清理不会删除认领所需秘密；登录成功本身不清缓存。仅在 claim 返回 `completed` 后清理游客凭据与待绑定缓存，保留已归属真实账号的商店交易、套餐及原平台 UUID 用于恢复与去重；其他状态、网络失败继续保留。若本地仍有未确认的游客上报，先保留原凭据和请求重试，待上报收敛后再清理。
+- 清理前先持久化绑定完成状态并刷新当前账号 wallet，再移除交易记录中的游客凭据，最后删除对应待绑定缓存；wallet 刷新、写入或删除失败时保留 completed 记录继续剩余步骤，不会再次调用 claim 或重新要求已完成绑定的游客登录。账号切换时不会用旧绑定刷新新账号权益。缓存清理后不再因该游客订单触发登录弹窗。claim 路由与 prepare/report 一样排除原始 body 的网络捕获、DevTools 与原生请求采集；mock 对 claim 返回 `5000`，不伪造会员绑定。
+- VIP 服务监听统一 sessionRevision：普通登录、退出及接口触发的会话失效都会更新登录拦截与重试状态。账号变化会立即检查游客强制登录状态，不等待正在进行的网络恢复；已有恢复任务结束后再按新会话补跑，避免漏认领。登录购买 report 在异步落盘后也再次检查账号，防止切换期间把旧订单作为新账号请求发送。
+
+## Me 会员卡片状态（2026-09-08）
+
+来源：[Apifox 钱包及会员摘要](https://app.apifox.com/link/project/8297783/apis/api-484992736)，最新接口为 `GET /api/v1/gem/wallet`。`data.wallet` 与 `data.membership` 分别解析、分别展示。
+
+- 按本次明确的产品要求，普通 Gems 继续原样使用 `wallet.balance_cent`；会员卡片仅使用 `membership.blue_gems_cent`。客户端不对两个余额相加、相减或互相覆盖，原 GEMS 购买、消费判断和余额组件保持原逻辑。
+- `membership_status=1` 显示一张有效 Pro 卡片；`0`（未购买）及 `2`（失效）显示一张 Subscribe 卡片，替换两张固定预览。余额为零、关闭自动续费不改变有效状态；套餐类型和未来到期日不能覆盖服务端状态判断。
+- 有效卡片的日期读取 `membership.expires_at`（Unix 秒，转换为本地日期）；蓝宝石余额读取 `blue_gems_cent`，沿用现有金额格式。用户名旁 Pro 标识仅在会员有效时显示。
+- 会员数据跟随当前账号的钱包请求刷新，切换账号清空旧会员状态；无会员字段的旧响应仍兼容，会员字段解析异常不会阻断原钱包余额读取。当前卡片既有颜色、字号、间距保留。

@@ -18,14 +18,17 @@ class _FakeCollectClient implements CollectTelemetryClient {
 
   final Future<void> Function(List<CollectEvent> events)? onCollect;
   final List<List<CollectEvent>> batches = <List<CollectEvent>>[];
+  final List<NetworkCancellationToken?> cancellationTokens = [];
   final List<Map<String, String>> headers = <Map<String, String>>[];
 
   @override
   Future<void> collectBatch(
     List<CollectEvent> events, {
     Map<String, String> headers = const <String, String>{},
+    NetworkCancellationToken? cancellationToken,
   }) async {
     batches.add(List<CollectEvent>.of(events));
+    cancellationTokens.add(cancellationToken);
     this.headers.add(Map<String, String>.of(headers));
     await onCollect?.call(events);
   }
@@ -71,6 +74,16 @@ class _FaultInjectingCollectStore implements CollectEventStore {
   }
 
   @override
+  Future<void> deleteEvents(List<String> eventIds) async {
+    if (eventIds.isEmpty) return;
+    if (failNextDelete) {
+      failNextDelete = false;
+      throw StateError('delete unavailable');
+    }
+    await delegate.deleteEvents(eventIds);
+  }
+
+  @override
   Future<void> deleteClaimed(String batchId) async {
     if (failNextDelete) {
       failNextDelete = false;
@@ -80,8 +93,10 @@ class _FaultInjectingCollectStore implements CollectEventStore {
   }
 
   @override
-  Future<void> releaseClaimed(String batchId) =>
-      delegate.releaseClaimed(batchId);
+  Future<void> releaseClaimed(
+    String batchId, {
+    List<String> excludingEventIds = const [],
+  }) => delegate.releaseClaimed(batchId, excludingEventIds: excludingEventIds);
 
   @override
   Future<void> resetConnection() async {
@@ -591,12 +606,18 @@ void main() {
     await value.checkNow(force: true);
 
     expect(uploadCount, 2);
+    expect(client.cancellationTokens.first?.isCancelled, isTrue);
+    expect(client.cancellationTokens.last?.isCancelled, isFalse);
+    expect(
+      client.batches.last.single.eventId,
+      client.batches.first.single.eventId,
+    );
     expect(store.eventsForTesting, isEmpty);
     expect(value.health.consecutiveUploadFailures, 0);
   });
 
   test(
-    'a permanent poison event is isolated without blocking later events',
+    'a rejected event stays queued while valid siblings are uploaded',
     () async {
       final store = MemoryCollectEventStore();
       final acceptedActions = <String>[];
@@ -632,9 +653,10 @@ void main() {
       await value.checkNow();
 
       expect(acceptedActions, <String>['before_poison', 'after_poison']);
-      expect(value.deadLettersForTesting.single.action, 'poison');
-      expect(value.health.deadLetterCount, 1);
-      expect(store.eventsForTesting, isEmpty);
+      expect(value.deadLettersForTesting, isEmpty);
+      expect(value.health.deadLetterCount, 0);
+      expect(store.eventsForTesting.single.action, 'poison');
+      expect(store.pendingCountForTesting, 1);
     },
   );
 
@@ -663,31 +685,35 @@ void main() {
     },
   );
 
-  test('memory fallback is bounded and reports dropped events', () async {
-    final store = _FaultInjectingCollectStore()..failEnqueue = true;
-    final client = _FakeCollectClient();
-    final value = uploader(
-      store: store,
-      client: client,
-      memoryFallbackLimit: 2,
-    );
+  test(
+    'memory fallback keeps every unconfirmed event past its old limit',
+    () async {
+      final store = _FaultInjectingCollectStore()..failEnqueue = true;
+      final client = _FakeCollectClient();
+      final value = uploader(
+        store: store,
+        client: client,
+        memoryFallbackLimit: 2,
+      );
 
-    for (final action in <String>['oldest', 'middle', 'latest']) {
-      await value.enqueuePayload(<String, Object?>{
-        'action_type': 'event',
-        'action': action,
-      });
-    }
+      for (final action in <String>['oldest', 'middle', 'latest']) {
+        await value.enqueuePayload(<String, Object?>{
+          'action_type': 'event',
+          'action': action,
+        });
+      }
 
-    expect(value.health.memoryFallbackCount, 2);
-    expect(value.health.droppedEventCount, 1);
+      expect(value.health.memoryFallbackCount, 3);
+      expect(value.health.droppedEventCount, 0);
 
-    await value.checkNow(force: true);
-    expect(client.batches.single.map((event) => event.action), <String>[
-      'middle',
-      'latest',
-    ]);
-  });
+      await value.checkNow(force: true);
+      expect(client.batches.single.map((event) => event.action), <String>[
+        'oldest',
+        'middle',
+        'latest',
+      ]);
+    },
+  );
 
   test('a failed claim does not lock later checks', () async {
     final store = _FaultInjectingCollectStore();
@@ -1466,7 +1492,7 @@ void main() {
             .having(
               (error) => error.kind,
               'kind',
-              CollectUploadFailureKind.permanent,
+              CollectUploadFailureKind.transient,
             )
             .having((error) => error.errNo, 'errNo', 1001),
       ),

@@ -48,10 +48,18 @@ class GemBillingPurchaseDialog extends StatelessWidget {
     super.key,
     required this.state,
     required this.onConfirm,
+    this.processingLabel = 'Purchasing Gems',
+    this.successTitle = 'Purchase successful!',
+    this.successMessage,
+    this.successIconAsset = gemStackIconAsset,
   });
 
   final ValueListenable<GemBillingPurchaseDialogState> state;
   final VoidCallback onConfirm;
+  final String processingLabel;
+  final String successTitle;
+  final String? successMessage;
+  final String successIconAsset;
   static const double _processingHeight = 202;
   static const double _successContentHeight = 150;
   static const double _titleHorizontalPadding = 24;
@@ -74,7 +82,7 @@ class GemBillingPurchaseDialog extends StatelessWidget {
               children: [
                 if (isSuccess) ...[
                   SvgPicture.asset(
-                    gemStackIconAsset,
+                    successIconAsset,
                     width: gemStackIconWidth,
                     height: gemStackIconHeight,
                   ),
@@ -90,9 +98,11 @@ class GemBillingPurchaseDialog extends StatelessWidget {
                 if (isSuccess)
                   _GemBillingPurchaseGrantedMessage(
                     grantedText: value.grantedText,
+                    title: successTitle,
+                    message: successMessage,
                   )
                 else
-                  const _ProcessingPaymentText(),
+                  _ProcessingPaymentText(label: processingLabel),
               ],
             ),
             actions: isSuccess
@@ -109,9 +119,15 @@ class GemBillingPurchaseDialog extends StatelessWidget {
 }
 
 class _GemBillingPurchaseGrantedMessage extends StatelessWidget {
-  const _GemBillingPurchaseGrantedMessage({required this.grantedText});
+  const _GemBillingPurchaseGrantedMessage({
+    required this.grantedText,
+    required this.title,
+    this.message,
+  });
 
   final String grantedText;
+  final String title;
+  final String? message;
 
   static const _grantedTextStyle = TextStyle(
     fontSize: 14,
@@ -125,11 +141,11 @@ class _GemBillingPurchaseGrantedMessage extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'Purchase successful!',
-          key: ValueKey<String>('billing-purchase-success-title'),
+        Text(
+          title,
+          key: const ValueKey<String>('billing-purchase-success-title'),
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 16,
             height: 20 / 16,
             fontWeight: FontWeight.w600,
@@ -149,27 +165,31 @@ class _GemBillingPurchaseGrantedMessage extends StatelessWidget {
             child: Text.rich(
               key: const ValueKey<String>('billing-purchase-granted-line'),
               TextSpan(
-                children: [
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 2),
-                      child: SvgPicture.asset(
-                        gemIconAsset,
-                        key: const ValueKey<String>(
-                          'billing-purchase-granted-icon',
+                children: message != null
+                    ? [TextSpan(text: message)]
+                    : [
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 2),
+                            child: SvgPicture.asset(
+                              gemIconAsset,
+                              key: const ValueKey<String>(
+                                'billing-purchase-granted-icon',
+                              ),
+                              width: 12,
+                              height: 12,
+                            ),
+                          ),
                         ),
-                        width: 12,
-                        height: 12,
-                      ),
-                    ),
-                  ),
-                  TextSpan(
-                    text: grantedText,
-                    style: const TextStyle(color: GenesisColors.redSecondary),
-                  ),
-                  const TextSpan(text: ' Gems have been granted.'),
-                ],
+                        TextSpan(
+                          text: grantedText,
+                          style: const TextStyle(
+                            color: GenesisColors.redSecondary,
+                          ),
+                        ),
+                        const TextSpan(text: ' Gems have been granted.'),
+                      ],
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
@@ -184,7 +204,8 @@ class _GemBillingPurchaseGrantedMessage extends StatelessWidget {
 }
 
 class _ProcessingPaymentText extends StatefulWidget {
-  const _ProcessingPaymentText();
+  const _ProcessingPaymentText({required this.label});
+  final String label;
 
   @override
   State<_ProcessingPaymentText> createState() => _ProcessingPaymentTextState();
@@ -227,11 +248,7 @@ class _ProcessingPaymentTextState extends State<_ProcessingPaymentText> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                'Purchasing Gems',
-                textAlign: TextAlign.center,
-                style: style,
-              ),
+              Text(widget.label, textAlign: TextAlign.center, style: style),
               SizedBox(
                 width: 18,
                 child: Text(

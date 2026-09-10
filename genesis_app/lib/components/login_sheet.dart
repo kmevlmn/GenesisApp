@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 
 import 'common/genesis_bottom_sheet_panel.dart';
 import 'common/genesis_center_toast.dart';
@@ -14,9 +15,14 @@ import '../ui/components/genesis_safe_area.dart';
 import '../ui/theme/genesis_dark_theme.dart';
 
 class LoginSheet extends StatefulWidget {
-  const LoginSheet({super.key, required this.onLogin});
+  const LoginSheet({
+    super.key,
+    required this.onLogin,
+    this.isDismissible = true,
+  });
 
   final Future<bool> Function(IdentityProvider provider) onLogin;
+  final bool isDismissible;
 
   @override
   State<LoginSheet> createState() => _LoginSheetState();
@@ -74,60 +80,67 @@ class _LoginSheetState extends State<LoginSheet> {
     final maxHeight = media.size.height - media.padding.top - 18;
     final targetHeight = maxHeight < 342 ? maxHeight : 342.0;
 
-    return GenesisDarkTheme(
-      child: GenesisBottomSystemBarStyleScope(
-        style: const GenesisBottomSystemBarStyle(
-          color: GenesisColors.darkRaisedBackground,
-        ),
-        child: AnnotatedRegion<SystemUiOverlayStyle>(
-          value: const SystemUiOverlayStyle(
-            systemNavigationBarIconBrightness: Brightness.light,
+    return PopScope(
+      canPop: widget.isDismissible,
+      child: GenesisDarkTheme(
+        child: GenesisBottomSystemBarStyleScope(
+          style: const GenesisBottomSystemBarStyle(
+            color: GenesisColors.darkRaisedBackground,
           ),
-          child: GenesisBottomSheetPanel(
-            title: 'Sign up to continue',
-            height: targetHeight,
-            trailing: GenesisDarkCloseButton(
-              onPressed: _submittingProvider != null
-                  ? null
-                  : () {
-                      GenesisTelemetry.event(
-                        'login_cancel',
-                        category: 'auth',
-                        data: const <String, Object?>{'source': 'close_button'},
-                      );
-                      Navigator.of(context).pop(false);
-                    },
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: const SystemUiOverlayStyle(
+              systemNavigationBarIconBrightness: Brightness.light,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(
-                  width: double.infinity,
-                  child: Text(
-                    'Sign up and get 250 Gems!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: GenesisColors.redSecondary,
-                      height: 1.35,
+            child: GenesisBottomSheetPanel(
+              title: 'Sign up to continue',
+              height: targetHeight,
+              trailing: widget.isDismissible
+                  ? GenesisDarkCloseButton(
+                      onPressed: _submittingProvider != null
+                          ? null
+                          : () {
+                              GenesisTelemetry.event(
+                                'login_cancel',
+                                category: 'auth',
+                                data: const <String, Object?>{
+                                  'source': 'close_button',
+                                },
+                              );
+                              Navigator.of(context).pop(false);
+                            },
+                    )
+                  : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      'Sign up and get 250 Gems!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: GenesisColors.redSecondary,
+                        height: 1.35,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                LoginProviderButtons(
-                  loggingInProvider: _submittingProvider,
-                  onLogin: _submit,
-                  spacing: 12,
-                ),
-                const SizedBox(height: 14),
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 22),
-                    child: LoginLegalText(),
+                  const SizedBox(height: 12),
+                  LoginProviderButtons(
+                    loggingInProvider: _submittingProvider,
+                    onLogin: _submit,
+                    spacing: 12,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 22),
+                      child: LoginLegalText(),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -139,12 +152,48 @@ class _LoginSheetState extends State<LoginSheet> {
 Future<bool> showLoginSheet({
   required BuildContext context,
   required Future<bool> Function(IdentityProvider provider) onLogin,
+  bool isDismissible = true,
+  ValueListenable<bool>? forceLoginRequired,
 }) async {
-  final loggedIn = await showGenesisModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => LoginSheet(onLogin: onLogin),
-  );
-  return loggedIn == true;
+  if (forceLoginRequired?.value == false) return false;
+  // Forget the field's focus before pushing the route so closing login cannot
+  // restore it and briefly reopen the keyboard.
+  FocusManager.instance.primaryFocus?.unfocus();
+  ModalRoute<bool>? loginRoute;
+  void dismissWhenNoLongerRequired() {
+    if (forceLoginRequired?.value != false) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (forceLoginRequired?.value != false) return;
+      final route = loginRoute;
+      final navigator = route?.navigator;
+      if (route == null || !route.isActive || navigator == null) return;
+      // Debug Page may be above login: dismiss only this login route.
+      if (route.isCurrent) {
+        navigator.pop(false);
+      } else {
+        navigator.removeRoute(route, false);
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  forceLoginRequired?.addListener(dismissWhenNoLongerRequired);
+  try {
+    final loggedIn = await showGenesisModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: isDismissible,
+      enableDrag: isDismissible,
+      useRootNavigator: !isDismissible,
+      builder: (context) {
+        loginRoute = ModalRoute.of<bool>(context);
+        dismissWhenNoLongerRequired();
+        return LoginSheet(onLogin: onLogin, isDismissible: isDismissible);
+      },
+    );
+    return loggedIn == true;
+  } finally {
+    forceLoginRequired?.removeListener(dismissWhenNoLongerRequired);
+  }
 }

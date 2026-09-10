@@ -284,7 +284,7 @@ class _DeveloperTelemetryUploadPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Telemetry Debug Upload',
+            'Telemetry Upload',
             style: TextStyle(
               fontSize: 15,
               color: Colors.black,
@@ -293,7 +293,7 @@ class _DeveloperTelemetryUploadPanel extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Enable individual telemetry channels for debugging.',
+            'Automatic channels stay on. Others are for debugging.',
             style: TextStyle(
               fontSize: 12,
               color: Color(0xFF777777),
@@ -314,7 +314,8 @@ class _DeveloperTelemetryUploadPanel extends StatelessWidget {
           const Divider(height: 1, color: Color(0xFFE5E5E5)),
           _DeveloperTelemetryChannelSwitch(
             label: 'Collect',
-            value: state.debugOverrides.collect,
+            value: state.collectEnabled,
+            automatic: state.automaticEnabled,
             enabled: !savingChannels.contains(TelemetryChannel.collect),
             switchKey: const ValueKey<String>(
               'developer-telemetry-collect-switch',
@@ -323,7 +324,8 @@ class _DeveloperTelemetryUploadPanel extends StatelessWidget {
           ),
           _DeveloperTelemetryChannelSwitch(
             label: 'Firebase Analytics',
-            value: state.debugOverrides.analytics,
+            value: state.analyticsEnabled,
+            automatic: state.automaticEnabled,
             enabled: !savingChannels.contains(TelemetryChannel.analytics),
             switchKey: const ValueKey<String>(
               'developer-telemetry-analytics-switch',
@@ -332,7 +334,8 @@ class _DeveloperTelemetryUploadPanel extends StatelessWidget {
           ),
           _DeveloperTelemetryChannelSwitch(
             label: 'Firebase Performance',
-            value: state.debugOverrides.performance,
+            value: state.performanceEnabled,
+            automatic: state.isReleaseBuild && state.isProductionFlavor,
             enabled: !savingChannels.contains(TelemetryChannel.performance),
             switchKey: const ValueKey<String>(
               'developer-telemetry-performance-switch',
@@ -342,7 +345,8 @@ class _DeveloperTelemetryUploadPanel extends StatelessWidget {
           ),
           _DeveloperTelemetryChannelSwitch(
             label: 'Firebase Crashlytics',
-            value: state.debugOverrides.crashlytics,
+            value: state.crashlyticsEnabled,
+            automatic: state.automaticEnabled,
             enabled: !savingChannels.contains(TelemetryChannel.crashlytics),
             switchKey: const ValueKey<String>(
               'developer-telemetry-crashlytics-switch',
@@ -361,6 +365,7 @@ class _DeveloperTelemetryChannelSwitch extends StatelessWidget {
   const _DeveloperTelemetryChannelSwitch({
     required this.label,
     required this.value,
+    required this.automatic,
     required this.enabled,
     required this.switchKey,
     required this.onChanged,
@@ -369,6 +374,7 @@ class _DeveloperTelemetryChannelSwitch extends StatelessWidget {
 
   final String label;
   final bool value;
+  final bool automatic;
   final bool enabled;
   final Key switchKey;
   final ValueChanged<bool> onChanged;
@@ -379,17 +385,31 @@ class _DeveloperTelemetryChannelSwitch extends StatelessWidget {
     return Column(
       children: [
         SizedBox(
-          height: 46,
+          height: automatic ? 60 : 46,
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black,
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (automatic)
+                      const Text(
+                        'On automatically',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF777777),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               SizedBox(
@@ -400,7 +420,7 @@ class _DeveloperTelemetryChannelSwitch extends StatelessWidget {
                   child: Switch(
                     key: switchKey,
                     value: value,
-                    onChanged: enabled ? onChanged : null,
+                    onChanged: enabled && !automatic ? onChanged : null,
                   ),
                 ),
               ),

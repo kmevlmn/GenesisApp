@@ -49,6 +49,7 @@ class GenesisBottomSheetPanel extends StatelessWidget {
     this.titleBottomSpacing = 20,
     this.titleTextStyle,
     this.backgroundColor,
+    this.titleWidget,
     this.maintainBottomViewPadding = false,
     this.showHeader = true,
   });
@@ -70,6 +71,7 @@ class GenesisBottomSheetPanel extends StatelessWidget {
   final double titleBottomSpacing;
   final TextStyle? titleTextStyle;
   final Color? backgroundColor;
+  final Widget? titleWidget;
   final bool maintainBottomViewPadding;
   final bool showHeader;
 
@@ -96,16 +98,18 @@ class GenesisBottomSheetPanel extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          title,
-                          style:
-                              titleTextStyle ??
-                              (dark
-                                  ? titleStyle.copyWith(
-                                      color: GenesisColors.darkTextPrimary,
-                                    )
-                                  : titleStyle),
-                        ),
+                        child:
+                            titleWidget ??
+                            Text(
+                              title,
+                              style:
+                                  titleTextStyle ??
+                                  (dark
+                                      ? titleStyle.copyWith(
+                                          color: GenesisColors.darkTextPrimary,
+                                        )
+                                      : titleStyle),
+                            ),
                       ),
                       if (trailing != null) trailing!,
                     ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../components/gems/membership_guest_login_gate.dart';
 import 'package:flutter/services.dart';
 
 import '../components/developer_debug_floating_button.dart';
@@ -65,7 +66,13 @@ class GenesisApp extends StatelessWidget {
                       child: ForceUpgradeGate(
                         child: DeveloperDebugFloatingButton(
                           navigatorKey: genesisNavigatorKey,
-                          child: child ?? const SizedBox.shrink(),
+                          child: MembershipGuestLoginGate(
+                            service: AppServicesScope.read(
+                              context,
+                            ).membershipPurchases,
+                            navigatorKey: genesisNavigatorKey,
+                            child: child ?? const SizedBox.shrink(),
+                          ),
                         ),
                       ),
                     ),

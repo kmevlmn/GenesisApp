@@ -26,10 +26,15 @@ import '../../components/common/genesis_modal_routes.dart';
 import '../../components/common/genesis_report_actions.dart';
 import '../../components/gems/gem_balance_prompt.dart';
 import '../../components/gems/memory_model_entry_button.dart';
+import '../../features/location_chat_reply/edit/edit.dart';
+import '../../features/location_chat_reply/go_on/go_on.dart';
+import '../../features/location_chat_reply/inspiration/inspiration.dart';
+import '../../features/location_chat_reply/regenerate/regenerate.dart';
 import '../../components/world_new_badge.dart';
 import '../../network/chatroom/chatroom_connection_controller.dart';
 import '../../network/chatroom/chatroom_message_type.dart';
 import '../../network/chatroom/chatroom_models.dart';
+import '../../network/chatroom/chatroom_message_batch.dart';
 import '../../network/chatroom/chatroom_timeline_payload.dart';
 import '../../network/chatroom/world_chatroom_service.dart';
 import '../../network/genesis_api.dart';
@@ -40,6 +45,7 @@ import '../../network/models/world.dart';
 import '../../platform/device/android_sdk_version.dart';
 import '../../routers/app_router.dart';
 import '../../ui/components/genesis_character_avatar.dart';
+import '../../ui/components/genesis_primary_button.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/components/genesis_static_network_image.dart';
 import '../../ui/components/genesis_tab_bar.dart';
@@ -47,13 +53,23 @@ import '../../ui/tokens/genesis_colors.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/genesis_image_resource.dart';
 import '../../utils/genesis_ugc_text.dart';
+import '../../ui/components/genesis_delete_button.dart';
 import 'location_chat_scroll_coordinator.dart';
+import 'location_chat_reply_presentation.dart';
+import 'location_chat_reply_card_switcher.dart';
+import 'location_chat_loading_bubble.dart';
 import 'message_parsers/location_chat_message_parsers.dart';
 import '../world/world_constants.dart' show worldCharacterAvatarLogicalSize;
 
 part 'location_chat_panel_connection.dart';
 part 'location_chat_message_reconciler.dart';
 part 'location_chat_send_actions.dart';
+part '../../features/location_chat_reply/regenerate/src/location_chat_regenerate_binding.dart';
+part '../../features/location_chat_reply/go_on/src/location_chat_go_on_binding.dart';
+part 'location_chat_reply_binding.dart';
+part '../../features/location_chat_reply/edit/src/location_chat_edit_binding.dart';
+part '../../features/location_chat_reply/inspiration/src/location_chat_inspiration_binding.dart';
+part '../../features/location_chat_reply/edit/src/location_chat_edit_page.dart';
 part 'location_chat_message_window.dart';
 part 'location_chat_mentions.dart';
 part 'location_chat_composer_input.dart';
@@ -161,6 +177,7 @@ class LocationChatPage extends StatefulWidget {
     this.backgroundImageUrl,
     this.backgroundPreviewImageUrl,
     this.renderBackgroundImage = true,
+    this.isMember = true,
     this.service,
     this.connection,
     this.onCharactersMovedLocationTap,
@@ -177,6 +194,7 @@ class LocationChatPage extends StatefulWidget {
   final String? backgroundImageUrl;
   final String? backgroundPreviewImageUrl;
   final bool renderBackgroundImage;
+  final bool isMember;
   final WorldChatroomService? service;
   final ChatroomConnectionController? connection;
   final ChatCharacterMovementTap? onCharactersMovedLocationTap;
@@ -264,6 +282,7 @@ class _LocationChatPageState extends State<LocationChatPage> {
       backgroundImageUrl: widget.backgroundImageUrl,
       backgroundPreviewImageUrl: widget.backgroundPreviewImageUrl,
       renderBackgroundImage: widget.renderBackgroundImage,
+      isMember: widget.isMember,
       service: widget.service,
       connection: widget.connection,
       active: true,
@@ -292,6 +311,7 @@ class LocationChatPanel extends StatefulWidget {
     this.backgroundImageUrl,
     this.backgroundPreviewImageUrl,
     this.renderBackgroundImage = true,
+    this.isMember = true,
     this.openingPreviewMessages = const <WorldChatroomMessage>[],
     this.openingPreviewEntities = const <WorldChatroomEntity>[],
     this.service,
@@ -334,6 +354,7 @@ class LocationChatPanel extends StatefulWidget {
   final String? backgroundImageUrl;
   final String? backgroundPreviewImageUrl;
   final bool renderBackgroundImage;
+  final bool isMember;
   final List<WorldChatroomMessage> openingPreviewMessages;
   final List<WorldChatroomEntity> openingPreviewEntities;
   final WorldChatroomService? service;
@@ -369,6 +390,28 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
   ScrollController get _scrollController => _scrollCoordinator.controller;
   late final LocationChatMentionEditingController _textController;
   final _composerFocusNode = FocusNode();
+  ChatroomReplyActionsController? _replyController;
+  ChatroomInspirationController? _inspirationController;
+  ChatroomInspirationSource? _inspirationRequestSource;
+  ChatroomInspirationSource? _inspirationDisplayedSource;
+  List<String> _inspirationMessages = const [];
+  bool _inspirationLoading = false;
+  int _inspirationRequestGeneration = 0;
+  int _inspirationResetRevision = 0;
+  int? _inspirationEpoch;
+  final _restoredReplyLocations = <String>{};
+  bool _replyRebuildScheduled = false;
+  int _replyBindingGeneration = 0;
+  bool _preparingReplyAction = false;
+  bool _replyCardTransitionBusy = false;
+  bool _replyRequestLoading = false;
+  bool _replyStreamStarted = false;
+  bool _replyLoadingForRegeneration = false;
+  int? _replyLoadingSourceRound;
+  Set<int> _replyLoadingPreviousCardIds = const {};
+  Object? _lastReplyStatusError;
+  ValueNotifier<LocationChatEditExternalState>? _replyEditorState;
+  bool _replyEditorOpen = false;
   final Object _rosterTapRegionGroup = Object();
   final BackdropKey _surfaceBackdropKey = BackdropKey();
   final Stopwatch _panelStopwatch = Stopwatch()..start();
@@ -549,6 +592,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
     locationChatBubbleLayoutSettings.removeListener(
       _handleBubbleLayoutSettingsChanged,
     );
+    _detachReplyActions();
     _cancelOlderMessagesLoadSchedule();
     _selectedModelLoadGeneration++;
     _timelineVmCache.clear();
@@ -592,6 +636,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         oldWidget.service != widget.service ||
         oldWidget.worldId != widget.worldId ||
         oldWidget.locationId != widget.locationId;
+    if (changedChatTarget) _detachReplyActions();
     final becameActive = !oldWidget.active && widget.active;
     final becameInactive = oldWidget.active && !widget.active;
     if (becameActive) {
@@ -747,6 +792,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
                 joined &&
                 _hasDraftText &&
                 !_sending &&
+                !_replyCardTransitionBusy &&
                 !_sendAwaitingResponse &&
                 !inputBlocked,
             sending: false,
@@ -833,7 +879,36 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
       backdropGroupKey: _surfaceBackdropKey,
     );
     final headerHeight = _locationChatHeaderHeight(style);
-    final displayMessages = _locationChatDisplayMessages();
+    final replyState = _replyController?.stateFor(widget.locationId);
+    final replyGoOnPending =
+        _replyController
+            ?.statesFor(widget.locationId)
+            .any((state) => state.goOnPending) ??
+        false;
+    final replyPresentation = _replyPresentation(replyState);
+    final displayMessages = replyPresentation.messages;
+    final replyBlocked =
+        _sending ||
+        _sendAwaitingResponse ||
+        inputBlocked ||
+        widget.worldTickInProgress ||
+        _awaitingTickProgressMessage ||
+        replyGoOnPending ||
+        _preparingReplyAction;
+    final regenerateFeature = _regenerateFeature(replyBlocked, replyState);
+    final goOnFeature = _goOnFeature(
+      replyBlocked,
+      replyState,
+      replyGoOnPending,
+    );
+    final editFeature = _editFeature(
+      replyBlocked,
+      replyState,
+      style,
+      ordinaryMessageBubbleMaxWidthCaps.selfMessage,
+      ordinaryMessageBubbleMaxWidthCaps.otherMessage,
+    );
+    final inspirationFeature = _inspirationFeature();
     final managesKeyboardInset = locationChatManagesKeyboardInsetForTesting(
       platform: Theme.of(context).platform,
       androidSdkInt: _androidSdkInt,
@@ -844,8 +919,41 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
       child: LocationChatAnchoredMessageList(
         key: const ValueKey<String>('location-chat-message-list'),
         coordinator: _scrollCoordinator,
+        active: widget.active,
         messages: displayMessages,
         messageLayoutId: _locationChatMessageLayoutId,
+        replyActionsIdentity: replyState == null
+            ? null
+            : '${widget.worldId}/${widget.locationId}/${replyState.roundId}',
+        replyActionsAnchorIndex: replyPresentation.anchorIndex,
+        replyPresentationRevision: replyState?.presentationRevision ?? 0,
+        replyStatus: _replyStatusWidget(replyState, style),
+        replyCards: _replyCardPages(replyState, style),
+        replyCurrentCardId: replyState?.viewedCardId ?? 0,
+        replyCardBindingIdentity:
+            '$_replyBindingGeneration/${widget.worldId}/${widget.locationId}/${replyState?.roundId}',
+        replyCardSwitchEnabled:
+            !replyBlocked &&
+            !(replyState?.busy ?? true) &&
+            !(replyState?.frozen ?? true),
+        onReplyCardSelected: _commitReplyCard,
+        onReplyCardTransitionChanged: (busy) {
+          if (mounted) {
+            _setLocationChatState(() => _replyCardTransitionBusy = busy);
+          }
+        },
+        isMember: widget.isMember,
+        regenerateFeature: regenerateFeature,
+        goOnFeature: goOnFeature,
+        editFeature: editFeature,
+        replyCardIndex: math.max(0, (replyState?.cardPosition ?? 1) - 1),
+        replyCardCount: replyState?.cardCount ?? 0,
+        replyCardsConfirmed: replyState?.confirmed ?? false,
+        onPreviousReplyCard: () => _browseReplyCard(-1),
+        onNextReplyCard: () => _browseReplyCard(1),
+        inspirationFeature: inspirationFeature,
+        inspirationIdentity:
+            '${_currentInspirationSource?.key}:$_inspirationResetRevision',
         topTitle: '',
         oldestEdgeLoading: _showOlderMessagesLoading,
         onOldestEdgeLoadingCollapsed: _handleOlderMessagesLoadingCollapsed,

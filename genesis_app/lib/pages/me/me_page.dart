@@ -1,3 +1,5 @@
+import '../../components/gems/pro_membership_badge.dart';
+import '../../app/gems/gem_wallet_store.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -275,28 +277,44 @@ class _MePageState extends State<MePage> with RouteAware {
                     ),
                   ),
                   Expanded(
-                    child: UserProfileContent(
-                      data: data,
-                      originsListenable: _originsState,
-                      worldsListenable: _worldsState,
-                      avatarUrlListenable: _avatarUrl,
-                      displayNameListenable: _displayName,
-                      isUpdatingProfileListenable: _isUpdatingProfile,
-                      gemWalletStateListenable: gemWalletState,
-                      reselectionListenable: widget.reselectionListenable,
-                      isActiveListenable: widget.isActiveListenable,
-                      onEditAvatar: _editAvatar,
-                      onEditDisplayName: _editNickName,
-                      onRefresh: _refreshCurrentCollection,
-                      onRefreshOrigins: _refreshOrigins,
-                      onRefreshWorlds: _refreshWorlds,
-                      onWorldDeleted: _handleWorldDeleted,
-                      onCollectionTabChanged: _handleCollectionTabChanged,
-                      onCollapsedChanged: _handleProfileCollapsedChanged,
-                      originTabLabel: 'Worldo',
-                      worldTabLabel: 'Playing',
-                      showCollectionCounts: true,
-                      tabLabelFontSize: 14,
+                    child: ValueListenableBuilder<GemWalletState>(
+                      valueListenable: gemWalletState,
+                      builder: (context, wallet, _) => UserProfileContent(
+                        data: data,
+                        originsListenable: _originsState,
+                        worldsListenable: _worldsState,
+                        avatarUrlListenable: _avatarUrl,
+                        displayNameListenable: _displayName,
+                        displayNameTrailing: wallet.membership?.isActive == true
+                            ? SizedBox(
+                                width: 50,
+                                height: MediaQuery.textScalerOf(
+                                  context,
+                                ).scale(20),
+                                child: const Center(
+                                  child: ProMembershipBadge(
+                                    key: ValueKey('me-profile-crown-icon'),
+                                  ),
+                                ),
+                              )
+                            : null,
+                        isUpdatingProfileListenable: _isUpdatingProfile,
+                        gemWalletStateListenable: gemWalletState,
+                        reselectionListenable: widget.reselectionListenable,
+                        isActiveListenable: widget.isActiveListenable,
+                        onEditAvatar: _editAvatar,
+                        onEditDisplayName: _editNickName,
+                        onRefresh: _refreshCurrentCollection,
+                        onRefreshOrigins: _refreshOrigins,
+                        onRefreshWorlds: _refreshWorlds,
+                        onWorldDeleted: _handleWorldDeleted,
+                        onCollectionTabChanged: _handleCollectionTabChanged,
+                        onCollapsedChanged: _handleProfileCollapsedChanged,
+                        originTabLabel: 'Worldo',
+                        worldTabLabel: 'Playing',
+                        showCollectionCounts: true,
+                        tabLabelFontSize: 14,
+                      ),
                     ),
                   ),
                 ],

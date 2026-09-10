@@ -42,6 +42,7 @@ class _FakeBillingPlatform implements BillingPlatform {
   String? queriedOfferId;
   String? purchasedOfferToken;
   FutureOr<bool> Function()? buyHandler;
+  bool Function()? handoff;
   FutureOr<bool> Function()? availabilityHandler;
   FutureOr<BillingProductQueryResult> Function(String storeProductId)?
   queryHandler;
@@ -82,15 +83,18 @@ class _FakeBillingPlatform implements BillingPlatform {
   Future<bool> buyConsumable({
     required BillingStoreProduct product,
     required String billingAccountId,
+    bool Function()? onStoreHandoff,
   }) async {
     buyCount += 1;
     purchasedOfferToken = product.offerToken;
     expect(product.id, expectedStoreProductId);
     expect(product.type, BillingStoreProductType.inApp);
     expect(billingAccountId, '4b74ec68-7abc-4cce-a223-e997e31dc811');
+    handoff = onStoreHandoff;
     final handler = buyHandler;
-    if (handler != null) return handler();
-    return buyAccepted;
+    final accepted = handler == null ? buyAccepted : await handler();
+    if (accepted) onStoreHandoff?.call();
+    return accepted;
   }
 
   @override
@@ -292,6 +296,63 @@ void main() {
     service.dispose();
     await platform.close();
   });
+
+  test(
+    'VIP callbacks and recovery are intercepted before Gems UI, reporting and analytics',
+    () async {
+      service.dispose();
+      var interceptions = 0;
+      service = GooglePlayBillingService(
+        platform: platform,
+        pendingPurchaseStore: pendingStore,
+        loadBillingAccountId: () async => billingAccountId,
+        loadProductCatalog: () async => [_product],
+        reportPurchase: (request) async {
+          reports.add(request);
+          return const GemPurchaseReport(
+            status: GemPurchaseReportStatus.completed,
+            grantedGemsCent: 55000,
+          );
+        },
+        refreshWallet: () async => refreshCount++,
+        readUid: () async => currentUid,
+        analytics: analytics,
+        interceptPurchase: (purchase) async {
+          interceptions++;
+          return purchase.productId == 'vip-test';
+        },
+      );
+      service.events.listen(uiEvents.add);
+      const vip = BillingPurchase(
+        provider: BillingProvider.googlePlay,
+        productId: 'vip-test',
+        purchaseToken: 'vip-token',
+        transactionId: 'vip-order',
+        originalTransactionId: '',
+        originalJson: '',
+        purchaseTime: '',
+        status: BillingPurchaseStatus.purchased,
+        obfuscatedAccountId: '4b74ec68-7abc-4cce-a223-e997e31dc811',
+      );
+      await service.start();
+      platform.emit(vip);
+      await _settle();
+      platform.recoverablePurchases = [vip];
+      await service.recoverStorePurchases(productCatalog: [_product]);
+      expect(interceptions, 2);
+      expect(reports, isEmpty);
+      expect(uiEvents, isEmpty);
+      expect(analytics.records, isEmpty);
+      expect(await pendingStore.loadAll(), isEmpty);
+
+      await service.purchaseGem(_product);
+      platform.emit(_purchase(BillingPurchaseStatus.purchased));
+      await _settle();
+      expect(reports.single.productId, _product.productId);
+      expect(uiEvents.last.kind, BillingUiEventKind.success);
+      expect(interceptions, 2);
+    },
+  );
 
   test(
     'purchased callbacks repeat purchase and record purchase_first once',
@@ -1261,8 +1322,217 @@ void main() {
     );
   });
 
+  for (final stage in ['initialization', 'account', 'query', 'catalog']) {
+    test(
+      'click deadline covers a stuck $stage and ignores its late result',
+      () async {
+        service.dispose();
+        final availability = Completer<bool>();
+        final account = Completer<String>();
+        final query = Completer<BillingProductQueryResult>();
+        final catalog = Completer<List<GemProduct>>();
+        var accountCalls = 0;
+        var finished = false;
+        if (stage == 'initialization') {
+          platform.availabilityHandler = () => availability.future;
+        }
+        if (stage == 'query') platform.queryHandler = (_) => query.future;
+        if (stage == 'catalog') {
+          platform.queryHandler = (_) =>
+              const BillingProductQueryResult.failure('product_not_found');
+        }
+        service = GooglePlayBillingService(
+          platform: platform,
+          pendingPurchaseStore: pendingStore,
+          loadBillingAccountId: () async {
+            accountCalls++;
+            return stage == 'account' ? account.future : billingAccountId;
+          },
+          loadProductCatalog: () => catalog.future,
+          reportPurchase: (_) async => const GemPurchaseReport(
+            status: GemPurchaseReportStatus.completed,
+          ),
+          refreshWallet: () async {},
+          readUid: () async => currentUid,
+          analytics: analytics,
+          attemptTimeout: const Duration(milliseconds: 30),
+        );
+        service.events.listen(uiEvents.add);
+        final purchase = service
+            .purchaseGem(_product, payTrackId: 'stuck-$stage')
+            .then((_) => finished = true);
+        await _settle();
+        expect(service.state.value.hasBusyPurchase, isTrue);
+        await service.purchaseGem(_product, payTrackId: 'duplicate-$stage');
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await _settle();
+        expect(finished, isTrue);
+        expect(service.state.value.hasBusyPurchase, isFalse);
+        expect(platform.buyCount, 0);
+        expect(
+          analytics.records.where((e) => e.action == 'purchase_timeout'),
+          hasLength(1),
+        );
+        expect(uiEvents.single.kind, BillingUiEventKind.deferred);
+        expect(uiEvents.single.attemptId, 'stuck-$stage');
+        expect(
+          uiEvents.single.message,
+          'Purchase timed out. Please try again.',
+        );
+        availability.complete(true);
+        account.complete(billingAccountId);
+        query.complete(platform.queryResult);
+        catalog.complete([_product]);
+        await purchase;
+        await _settle();
+        expect(platform.buyCount, 0);
+        expect(accountCalls, stage == 'initialization' ? 0 : 1);
+        expect(uiEvents, hasLength(1));
+      },
+    );
+  }
+
+  test('late query failure cannot release a newer checkout', () async {
+    service.dispose();
+    final query = Completer<BillingProductQueryResult>();
+    platform.queryHandler = (_) => query.future;
+    service = GooglePlayBillingService(
+      platform: platform,
+      pendingPurchaseStore: pendingStore,
+      loadBillingAccountId: () async => billingAccountId,
+      loadProductCatalog: () async => [_product],
+      reportPurchase: (_) async =>
+          const GemPurchaseReport(status: GemPurchaseReportStatus.completed),
+      refreshWallet: () async {},
+      readUid: () async => currentUid,
+      analytics: analytics,
+      attemptTimeout: const Duration(milliseconds: 50),
+    );
+    await service.purchaseGem(_product, payTrackId: 'old-query');
+    platform.queryHandler = (_) => platform.queryResult;
+    await service.purchaseGem(_product, payTrackId: 'new-query');
+    expect(platform.buyCount, 1);
+    query.completeError(StateError('late failure'));
+    await _settle();
+    expect(service.state.value.hasBusyPurchase, isTrue);
+    expect(
+      analytics.records.where((e) => e.action == 'purchase_failed'),
+      isEmpty,
+    );
+  });
+
+  test('account failure cancels the click deadline', () async {
+    service.dispose();
+    service = GooglePlayBillingService(
+      platform: platform,
+      pendingPurchaseStore: pendingStore,
+      loadBillingAccountId: () async => throw StateError('lookup failed'),
+      loadProductCatalog: () async => [_product],
+      reportPurchase: (_) async =>
+          const GemPurchaseReport(status: GemPurchaseReportStatus.completed),
+      refreshWallet: () async {},
+      readUid: () async => currentUid,
+      analytics: analytics,
+      attemptTimeout: const Duration(milliseconds: 20),
+    );
+    await service.purchaseGem(_product);
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+    expect(service.state.value.hasBusyPurchase, isFalse);
+    expect(platform.buyCount, 0);
+    expect(
+      analytics.records.where((e) => e.action == 'purchase_timeout'),
+      isEmpty,
+    );
+  });
+
   test(
-    'store callback timeout starts before purchase launch returns',
+    'completed callback cannot become a timeout when launch returns late',
+    () async {
+      service.dispose();
+      final launch = Completer<bool>();
+      platform.buyHandler = () => launch.future;
+      service = GooglePlayBillingService(
+        platform: platform,
+        pendingPurchaseStore: pendingStore,
+        loadBillingAccountId: () async => billingAccountId,
+        loadProductCatalog: () async => [_product],
+        reportPurchase: (request) async {
+          reports.add(request);
+          return const GemPurchaseReport(
+            status: GemPurchaseReportStatus.completed,
+            grantedGemsCent: 55000,
+          );
+        },
+        refreshWallet: () async {},
+        readUid: () async => currentUid,
+        analytics: analytics,
+        attemptTimeout: const Duration(milliseconds: 30),
+      );
+      final purchase = service.purchaseGem(_product);
+      await _settle();
+      platform.emit(_purchase(BillingPurchaseStatus.purchased));
+      await _settle();
+      expect(reports, hasLength(1));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      launch.complete(false);
+      await purchase;
+      expect(
+        analytics.records.where((e) => e.action == 'purchase_success'),
+        hasLength(1),
+      );
+      expect(
+        analytics.records.where(
+          (e) =>
+              e.action == 'purchase_timeout' || e.action == 'purchase_failed',
+        ),
+        isEmpty,
+      );
+    },
+  );
+
+  test('old handoff cannot stop the next purchase preparation timer', () async {
+    service.dispose();
+    final oldLaunch = Completer<bool>();
+    platform.buyHandler = () => oldLaunch.future;
+    service = GooglePlayBillingService(
+      platform: platform,
+      pendingPurchaseStore: pendingStore,
+      loadBillingAccountId: () async => billingAccountId,
+      loadProductCatalog: () async => [_product],
+      reportPurchase: (_) async => throw StateError('unexpected report'),
+      refreshWallet: () async {},
+      readUid: () async => currentUid,
+      analytics: analytics,
+      attemptTimeout: const Duration(milliseconds: 60),
+    );
+    final old = service.purchaseGem(_product, payTrackId: 'old');
+    await _settle();
+    final oldHandoff = platform.handoff!;
+    platform.emit(_purchase(BillingPurchaseStatus.canceled));
+    await _settle();
+
+    final newQuery = Completer<BillingProductQueryResult>();
+    platform.queryHandler = (_) => newQuery.future;
+    final current = service.purchaseGem(_product, payTrackId: 'new');
+    await _settle();
+    expect(oldHandoff(), isFalse);
+    oldLaunch.complete(true);
+    await old;
+    await current;
+    expect(
+      analytics.records
+          .where((r) => r.action == 'purchase_timeout')
+          .map((r) => r.properties['attempt_id']),
+      ['new'],
+    );
+    expect(service.state.value.hasBusyPurchase, isFalse);
+    newQuery.complete(platform.queryResult);
+    await _settle();
+    expect(platform.buyCount, 1);
+  });
+
+  test(
+    'preparation timeout covers a purchase launch without handoff',
     () async {
       service.dispose();
       final releaseLaunch = Completer<bool>();
@@ -1445,49 +1715,125 @@ void main() {
     );
   });
 
-  test('missing store callback is tracked as a non-terminal timeout', () async {
-    service.dispose();
-    service = GooglePlayBillingService(
-      platform: platform,
-      pendingPurchaseStore: pendingStore,
-      loadBillingAccountId: () async => '4b74ec68-7abc-4cce-a223-e997e31dc811',
-      loadProductCatalog: () async => [_product],
-      reportPurchase: (request) async {
-        reports.add(request);
-        return const GemPurchaseReport(
-          status: GemPurchaseReportStatus.completed,
-          grantedGemsCent: 55000,
-        );
-      },
-      refreshWallet: () async => refreshCount += 1,
-      readUid: () async => 'u_1',
-      analytics: analytics,
-      attemptTimeout: const Duration(milliseconds: 10),
-    );
+  test(
+    'opened store flow has no deadline while waiting for the user',
+    () async {
+      service.dispose();
+      service = GooglePlayBillingService(
+        platform: platform,
+        pendingPurchaseStore: pendingStore,
+        loadBillingAccountId: () async =>
+            '4b74ec68-7abc-4cce-a223-e997e31dc811',
+        loadProductCatalog: () async => [_product],
+        reportPurchase: (request) async {
+          reports.add(request);
+          return const GemPurchaseReport(
+            status: GemPurchaseReportStatus.completed,
+            grantedGemsCent: 55000,
+          );
+        },
+        refreshWallet: () async => refreshCount += 1,
+        readUid: () async => 'u_1',
+        analytics: analytics,
+        attemptTimeout: const Duration(milliseconds: 10),
+      );
 
-    await service.purchaseGem(_product, payTrackId: 'track_id_timeout');
-    await Future<void>.delayed(const Duration(milliseconds: 20));
-    await _settle();
+      await service.purchaseGem(_product, payTrackId: 'track_id_timeout');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await _settle();
 
-    final timeout = analytics.records.singleWhere(
-      (record) => record.action == 'purchase_timeout',
-    );
-    expect(timeout.properties['attempt_id'], 'track_id_timeout');
-    expect(timeout.properties['timeout_type'], 'store_no_callback');
-    expect(
-      analytics.records.where((record) => record.action == 'purchase_failed'),
-      isEmpty,
-    );
-    expect(service.state.value.hasBusyPurchase, isFalse);
+      expect(
+        analytics.records.where(
+          (record) => record.action == 'purchase_timeout',
+        ),
+        isEmpty,
+      );
+      expect(
+        analytics.records.where((record) => record.action == 'purchase_failed'),
+        isEmpty,
+      );
+      expect(service.state.value.hasBusyPurchase, isTrue);
 
-    platform.emit(_purchase(BillingPurchaseStatus.purchased));
-    await _settle();
+      platform.emit(_purchase(BillingPurchaseStatus.purchased));
+      await _settle();
 
-    final success = analytics.records.singleWhere(
-      (record) => record.action == 'purchase_success',
-    );
-    expect(success.properties['attempt_id'], 'track_id_timeout');
-  });
+      final success = analytics.records.singleWhere(
+        (record) => record.action == 'purchase_success',
+      );
+      expect(success.properties['attempt_id'], 'track_id_timeout');
+    },
+  );
+
+  for (final provider in BillingProvider.values) {
+    for (final outcome in [
+      BillingPurchaseStatus.purchased,
+      BillingPurchaseStatus.canceled,
+      BillingPurchaseStatus.error,
+      BillingPurchaseStatus.pending,
+    ]) {
+      test(
+        '$provider store handoff ends preparation timeout before $outcome',
+        () async {
+          service.dispose();
+          await platform.close();
+          platform = _FakeBillingPlatform(
+            providerValue: provider,
+            expectedStoreProductId: provider == BillingProvider.appStore
+                ? _product.appleProductId
+                : _product.googleProductId,
+          );
+          final result = Completer<bool>();
+          if (provider == BillingProvider.appStore) {
+            platform.buyHandler = () async {
+              expect(platform.handoff!(), isTrue);
+              return result.future;
+            };
+          }
+          service = GooglePlayBillingService(
+            platform: platform,
+            pendingPurchaseStore: pendingStore,
+            loadBillingAccountId: () async => billingAccountId,
+            loadProductCatalog: () async => [_product],
+            reportPurchase: (request) async {
+              reports.add(request);
+              return const GemPurchaseReport(
+                status: GemPurchaseReportStatus.completed,
+                grantedGemsCent: 55000,
+              );
+            },
+            refreshWallet: () async {},
+            readUid: () async => currentUid,
+            analytics: analytics,
+            attemptTimeout: const Duration(milliseconds: 30),
+          );
+          final purchase = service.purchaseGem(_product);
+          await _settle();
+          await Future<void>.delayed(const Duration(milliseconds: 60));
+          expect(service.state.value.hasBusyPurchase, isTrue);
+          expect(
+            analytics.records.where((r) => r.action == 'purchase_timeout'),
+            isEmpty,
+          );
+          platform.emit(
+            _purchase(
+              outcome,
+              provider: provider,
+              storeProductId: platform.expectedStoreProductId,
+              transactionId: '12345',
+            ),
+          );
+          await _settle();
+          result.complete(true);
+          await purchase;
+          expect(
+            analytics.records.where((r) => r.action == 'purchase_timeout'),
+            isEmpty,
+          );
+          expect(service.state.value.hasBusyPurchase, isFalse);
+        },
+      );
+    }
+  }
 
   test('report timeout is not tracked again after app recovery', () async {
     service.dispose();

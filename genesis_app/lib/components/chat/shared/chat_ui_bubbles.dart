@@ -7,12 +7,14 @@ class ChatMessageBubble extends StatelessWidget {
     this.onLongPressStart,
     this.onTap,
     this.style,
+    this.borderRadius,
   });
 
   final ChatMessageVm message;
   final GestureLongPressStartCallback? onLongPressStart;
   final VoidCallback? onTap;
   final ChatUiStyleConfig? style;
+  final BorderRadius? borderRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -28,29 +30,41 @@ class ChatMessageBubble extends StatelessWidget {
     final background = message.isMe
         ? style.selfBubbleColor
         : style.otherBubbleColor;
-    final borderRadius = !style.useScenePlateBubbleGeometry
-        ? BorderRadius.circular(style.systemMessageBorderRadius)
-        : usesSelfScenePlate
-        ? kChatScenePlateSelfBubbleBorderRadius
-        : usesAiScenePlate
-        ? kChatScenePlateAiBubbleBorderRadius
-        : BorderRadius.only(
-            topLeft: Radius.zero,
-            topRight: Radius.circular(style.bubbleBorderRadius),
-            bottomRight: Radius.circular(style.bubbleBorderRadius),
-            bottomLeft: Radius.circular(style.bubbleBorderRadius),
-          );
+    final borderRadius =
+        this.borderRadius ??
+        (!style.useScenePlateBubbleGeometry
+            ? BorderRadius.circular(style.systemMessageBorderRadius)
+            : usesSelfScenePlate
+            ? kChatScenePlateSelfBubbleBorderRadius
+            : usesAiScenePlate
+            ? kChatScenePlateAiBubbleBorderRadius
+            : BorderRadius.only(
+                topLeft: Radius.zero,
+                topRight: Radius.circular(style.bubbleBorderRadius),
+                bottomRight: Radius.circular(style.bubbleBorderRadius),
+                bottomLeft: Radius.circular(style.bubbleBorderRadius),
+              ));
     final text = message.error == null
         ? message.text
         : '${message.text}\n${message.error}';
+    final editor = ChatMessageEditorScope.controllerOf(
+      context,
+      message.localId,
+    );
     final bubble = Container(
       key: ValueKey<String>('chat-message-bubble-${message.localId}'),
       padding: style.bubblePadding,
       decoration: BoxDecoration(color: background, borderRadius: borderRadius),
-      child: _InlineMarkdownText(
-        text: text.isEmpty ? '...' : text,
-        style: style.bubbleTextStyle,
-      ),
+      child: editor != null
+          ? _ChatMessageTextEditor(
+              messageId: message.localId,
+              controller: editor,
+              style: style.bubbleTextStyle,
+            )
+          : _InlineMarkdownText(
+              text: text.isEmpty ? '...' : text,
+              style: style.bubbleTextStyle,
+            ),
     );
     return GestureDetector(
       onTap: onTap,
@@ -58,7 +72,7 @@ class ChatMessageBubble extends StatelessWidget {
       child:
           (usesSelfScenePlate || usesAiScenePlate) &&
               style.bubbleBackdropBlurSigma > 0
-          ? _ChatStableBackdropSurface(
+          ? ChatStableBackdropSurface(
               borderRadius: borderRadius,
               sigma: style.bubbleBackdropBlurSigma,
               child: bubble,
@@ -68,8 +82,9 @@ class ChatMessageBubble extends StatelessWidget {
   }
 }
 
-class _ChatStableBackdropSurface extends StatelessWidget {
-  const _ChatStableBackdropSurface({
+class ChatStableBackdropSurface extends StatelessWidget {
+  const ChatStableBackdropSurface({
+    super.key,
     required this.borderRadius,
     required this.sigma,
     required this.child,

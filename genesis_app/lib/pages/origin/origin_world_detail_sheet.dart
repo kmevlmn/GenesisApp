@@ -121,7 +121,7 @@ class _OriginDetailDraggableSheet extends StatefulWidget {
   final ValueChanged<OriginCustomRoleDraft> onSaveProfileRole;
   final _OriginLocationChatRoleOption locationChatRole;
   final ValueChanged<String> onSelectLocationChatRole;
-  final Future<bool> Function(
+  final Future<_OriginLocationChatSendResult> Function(
     String locationId,
     String message,
     ChatMentionCatalog mentionCatalog,
@@ -1887,6 +1887,12 @@ class _OriginSheetHeaderContent extends StatelessWidget {
                   ),
                   GenesisInlineMetaLabel(
                     text: 'Originator: ${formatUidForDisplay(originator)}',
+                    trailing: origin.ownerDeleted
+                        ? null
+                        : const ProMembershipBadge(
+                            key: ValueKey('originator-membership-badge'),
+                            height: 14,
+                          ),
                     onTap: ownerUid.isEmpty || origin.ownerDeleted
                         ? null
                         : () => Navigator.of(context).pushNamed(

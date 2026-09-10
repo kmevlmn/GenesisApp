@@ -29,6 +29,7 @@ abstract interface class BillingPlatform {
   Future<bool> buyConsumable({
     required BillingStoreProduct product,
     required String billingAccountId,
+    bool Function()? onStoreHandoff,
   });
 }
 
@@ -195,6 +196,7 @@ class GooglePlayBillingPlatform implements BillingPlatform {
   Future<bool> buyConsumable({
     required BillingStoreProduct product,
     required String billingAccountId,
+    bool Function()? onStoreHandoff,
   }) async {
     final nativeProduct = product.nativeProduct;
     if (nativeProduct is! GooglePlayProductDetails) {
@@ -227,6 +229,7 @@ class GooglePlayBillingPlatform implements BillingPlatform {
           result.debugMessage ?? '',
         );
       }
+      onStoreHandoff?.call();
       return true;
     }
 
@@ -241,6 +244,7 @@ class GooglePlayBillingPlatform implements BillingPlatform {
     if (!accepted) {
       throw const BillingPlatformException('purchase_rejected');
     }
+    onStoreHandoff?.call();
     return true;
   }
 }

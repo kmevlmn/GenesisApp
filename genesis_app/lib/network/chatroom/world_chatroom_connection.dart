@@ -153,8 +153,19 @@ extension _WorldChatroomConnection on WorldChatroomService {
             joinedLocationId: joinedLocationId,
           ),
         );
-        unawaited(
-          refreshLatestMessages(locationId: joinedLocationId, limit: 20),
+        _backgroundHistoryRefresh(
+          refreshLocationHistory(locationId: joinedLocationId).then((_) async {
+            if (_disposed ||
+                _session != session ||
+                _desiredLocationId != joinedLocationId ||
+                _state.joinedLocationId != joinedLocationId) {
+              return;
+            }
+            await replyActions?.restoreLocationCards(
+              joinedLocationId,
+              reloadCards: false,
+            );
+          }),
         );
       }
       return joined;
@@ -180,6 +191,18 @@ extension _WorldChatroomConnection on WorldChatroomService {
       'event received type=${chatroomEventType(event)} '
       'world=$_worldId joined=${_state.joinedLocationId}',
     );
+    _replyActionsController?.receiveEvent(event);
+    if (event is ChatroomWaitingConversationRound &&
+        event.worldId == _worldId) {
+      final round = int.tryParse(event.conversationRoundId);
+      if (round != null && round > 0) {
+        _inspirations?.observe(
+          event.locationId,
+          roundId: round,
+          tailMessageId: 0,
+        );
+      }
+    }
     _prepareWorldRefreshForQueuedEvent(event);
     _eventQueue = _eventQueue.then((_) => _handleEvent(event)).catchError((
       Object error,
@@ -246,6 +269,8 @@ extension _WorldChatroomConnection on WorldChatroomService {
 
   Future<void> _handleConnectionLost() async {
     if (_userDisconnected || _disposed) return;
+    _suspendInspirations();
+    _replyActionsController?.invalidateCardsOnDisconnect();
     await _detachSession(disconnect: true);
     _setState(_state.copyWith(connected: false, joinedLocationId: ''));
     _scheduleReconnect();

@@ -470,7 +470,7 @@ class _ComposerSendButton extends StatelessWidget {
       key: const ValueKey('chat-composer-send-button'),
       width: style.composerSendButtonWidth,
       height: style.composerSendButtonHeight,
-      child: _ComposerSendButtonSurface(
+      child: ChatComposerSendButtonSurface(
         blurSigma: style.composerSendButtonBackdropBlurSigma,
         borderRadius: style.composerSendButtonBorderRadius,
         child: DecoratedBox(
@@ -540,8 +540,9 @@ class _ComposerSendButton extends StatelessWidget {
   }
 }
 
-class _ComposerSendButtonSurface extends StatelessWidget {
-  const _ComposerSendButtonSurface({
+class ChatComposerSendButtonSurface extends StatelessWidget {
+  const ChatComposerSendButtonSurface({
+    super.key,
     required this.blurSigma,
     required this.borderRadius,
     required this.child,

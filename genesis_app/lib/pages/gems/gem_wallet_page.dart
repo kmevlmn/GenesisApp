@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/debug_page_tracker.dart';
 import '../../app/gems/gem_task_analytics.dart';
 import '../../app/gems/gem_wallet_store.dart';
+import '../../app/membership/membership_catalog.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/common/genesis_center_toast.dart';
 import '../../components/common/genesis_modal_routes.dart';
@@ -18,7 +18,10 @@ import '../../components/gems/gem_assets.dart';
 import '../../components/gems/gem_billing_purchase_dialog.dart';
 import '../../components/gems/gem_colors.dart';
 import '../../components/gems/gem_purchase_catalog.dart';
+import '../../components/gems/pro_subscription_content.dart';
+import '../../components/gems/wallet_purchase_tabs.dart';
 import '../../components/page_header.dart';
+import '../../icons/custom_icon_assets.dart';
 import '../../network/models/gem_product.dart';
 import '../../network/models/gem_task.dart';
 import '../../network/models/gem_task_action.dart';
@@ -43,7 +46,10 @@ typedef DiscordLauncher = Future<bool> Function(Uri uri);
 class GemWalletPage extends StatefulWidget {
   const GemWalletPage({
     super.key,
+    this.showSubscriptionInitially = false,
+    this.showBuyGems = true,
     this.productsLoader,
+    this.membershipProductsLoader,
     this.tasksLoader,
     this.walletStore,
     this.billingService,
@@ -53,6 +59,9 @@ class GemWalletPage extends StatefulWidget {
   });
 
   final GemProductsLoader? productsLoader;
+  final MembershipCatalogLoader? membershipProductsLoader;
+  final bool showSubscriptionInitially;
+  final bool showBuyGems;
   final GemTasksLoader? tasksLoader;
   final GemWalletStore? walletStore;
   final BillingService? billingService;
@@ -92,7 +101,7 @@ Future<void> showGemBillingPurchaseOverlayPreview(BuildContext context) async {
 }
 
 class _GemWalletPageState extends State<GemWalletPage>
-    with WidgetsBindingObserver, RouteAware {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver, RouteAware {
   static final Uri _discordUri = Uri.parse('https://discord.gg/wuKHk7cyX7');
   List<GemProduct>? _products;
   List<GemTaskGroup>? _taskGroups;
@@ -115,13 +124,42 @@ class _GemWalletPageState extends State<GemWalletPage>
   bool _billingPurchaseDialogShowing = false;
   bool _billingPurchaseDialogDismissing = false;
   bool _storeRecoveryStarted = false;
+  late final TabController _purchaseTabs;
+  late bool _subscriptionVisited;
+  late bool _gemsVisited;
 
   @override
   void initState() {
     super.initState();
+    _subscriptionVisited =
+        !widget.showBuyGems || widget.showSubscriptionInitially;
+    _gemsVisited = !_subscriptionVisited;
+    _purchaseTabs = TabController(
+      length: widget.showBuyGems ? 2 : 1,
+      initialIndex: _subscriptionVisited ? 0 : 1,
+      vsync: this,
+    );
+    _purchaseTabs.addListener(_visitCurrentTab);
     WidgetsBinding.instance.addObserver(this);
-    _trackBuyGemsPageView();
-    unawaited(_refreshAll());
+    if (_gemsVisited) {
+      _trackBuyGemsPageView();
+      unawaited(_refreshAll());
+    }
+  }
+
+  void _visitCurrentTab() {
+    if (_purchaseTabs.index == 0) {
+      if (!_subscriptionVisited) {
+        setState(() => _subscriptionVisited = true);
+      }
+    } else if (!_gemsVisited) {
+      setState(() => _gemsVisited = true);
+      final billingService =
+          widget.billingService ?? AppServicesScope.maybeRead(context)?.billing;
+      if (billingService != null) _bindBillingService(billingService);
+      _trackBuyGemsPageView();
+      unawaited(_refreshAll());
+    }
   }
 
   @override
@@ -131,6 +169,8 @@ class _GemWalletPageState extends State<GemWalletPage>
     _billingEvents?.cancel();
     _disposeBillingPurchaseDialogState();
     _idleBillingState.dispose();
+    _purchaseTabs.removeListener(_visitCurrentTab);
+    _purchaseTabs.dispose();
     super.dispose();
   }
 
@@ -145,12 +185,14 @@ class _GemWalletPageState extends State<GemWalletPage>
     }
     final billingService =
         widget.billingService ?? AppServicesScope.maybeOf(context)?.billing;
-    if (billingService != null) _bindBillingService(billingService);
+    if (_gemsVisited && billingService != null) {
+      _bindBillingService(billingService);
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && _purchaseTabs.index == 1) {
       unawaited(_refreshAll(silent: _hasPageData));
     }
   }
@@ -175,7 +217,6 @@ class _GemWalletPageState extends State<GemWalletPage>
 
   @override
   Widget build(BuildContext context) {
-    final walletStateListenable = _walletStateListenable;
     return PopScope(
       canPop: !_billingPurchaseDialogShowing,
       child: Scaffold(
@@ -184,28 +225,51 @@ class _GemWalletPageState extends State<GemWalletPage>
           pageName: 'Buy Gems',
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
+          titleWidget: WalletPurchaseTabs(controller: _purchaseTabs),
+          titleSideInset: 56,
           systemOverlayStyle: kGenesisDefaultSystemUiOverlayStyle,
           actions: [
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () =>
-                  Navigator.of(context).pushNamed(RouteNames.gemRecords),
-              child: const Padding(
-                padding: EdgeInsets.fromLTRB(12, 10, 16, 10),
-                child: Text(
-                  'Records',
-                  style: TextStyle(
-                    color: Color(0xFF333333),
-                    fontSize: 12,
-                    height: 18 / 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+            if (widget.showBuyGems)
+              IconButton(
+                key: const ValueKey('wallet-records-button'),
+                tooltip: 'Records',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 56,
+                  height: 50,
+                ),
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(RouteNames.gemRecords),
+                icon: SvgPicture.asset(
+                  recordsIconAsset,
+                  key: const ValueKey('wallet-records-icon'),
+                  width: 20,
+                  height: 20,
                 ),
               ),
-            ),
           ],
         ),
-        body: SafeArea(child: _buildBody(walletStateListenable)),
+        body: SafeArea(
+          child: TabBarView(
+            key: const ValueKey('wallet-purchase-pages'),
+            controller: _purchaseTabs,
+            children: [
+              _WalletTabPage(
+                child: _subscriptionVisited
+                    ? ProSubscriptionContent(
+                        productsLoader: widget.membershipProductsLoader,
+                      )
+                    : const SizedBox.expand(),
+              ),
+              if (widget.showBuyGems)
+                _WalletTabPage(
+                  child: _gemsVisited
+                      ? _buildBody(_walletStateListenable)
+                      : const SizedBox.expand(),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -217,8 +281,9 @@ class _GemWalletPageState extends State<GemWalletPage>
     if (!_hasPageData && _productsError != null && _tasksError != null) {
       return _GemWalletError(onRetry: () => unawaited(_refreshAll()));
     }
-    return GenesisRefreshIndicator(
+    return RefreshIndicator(
       color: kGemAccentColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       onRefresh: () => _refreshAll(silent: true),
       child: _GemWalletContent(
         products: _products,
@@ -238,5 +303,27 @@ class _GemWalletPageState extends State<GemWalletPage>
         onJoinUsTap: _handleJoinUsRowTap,
       ),
     );
+  }
+}
+
+/// Preserve each tab's plan selection and list position during page swipes.
+class _WalletTabPage extends StatefulWidget {
+  const _WalletTabPage({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_WalletTabPage> createState() => _WalletTabPageState();
+}
+
+class _WalletTabPageState extends State<_WalletTabPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

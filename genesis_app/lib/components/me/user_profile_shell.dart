@@ -13,6 +13,7 @@ class UserProfileContent extends StatefulWidget {
     this.isUpdatingProfile = false,
     this.avatarUrlListenable,
     this.displayNameListenable,
+    this.displayNameTrailing,
     this.isUpdatingProfileListenable,
     this.gemWalletStateListenable,
     this.reselectionListenable,
@@ -44,6 +45,7 @@ class UserProfileContent extends StatefulWidget {
   final bool isUpdatingProfile;
   final ValueListenable<String>? avatarUrlListenable;
   final ValueListenable<String>? displayNameListenable;
+  final Widget? displayNameTrailing;
   final ValueListenable<bool>? isUpdatingProfileListenable;
   final ValueListenable<GemWalletState>? gemWalletStateListenable;
   final ValueListenable<int>? reselectionListenable;
@@ -397,6 +399,10 @@ class _UserProfileContentState extends State<UserProfileContent>
                                   widget.displayNameListenable,
                             ),
                           ),
+                          if (widget.displayNameTrailing != null) ...[
+                            const SizedBox(width: 6),
+                            widget.displayNameTrailing!,
+                          ],
                           if (widget.onEditDisplayName != null) ...[
                             const SizedBox(width: 4),
                             _ProfileEditButton(
@@ -438,6 +444,13 @@ class _UserProfileContentState extends State<UserProfileContent>
           ),
           if (data.isSelf) ...[
             const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _MembershipEntry(
+                stateListenable: widget.gemWalletStateListenable,
+              ),
+            ),
+            const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _GemsBalanceEntry(
@@ -618,6 +631,26 @@ class _UserProfileContentState extends State<UserProfileContent>
   }
 }
 
+class _MembershipEntry extends StatelessWidget {
+  const _MembershipEntry({this.stateListenable});
+  final ValueListenable<GemWalletState>? stateListenable;
+
+  @override
+  Widget build(BuildContext context) {
+    final listenable = stateListenable;
+    if (listenable == null) return const ProfileMembershipCard();
+    return ValueListenableBuilder<GemWalletState>(
+      valueListenable: listenable,
+      builder: (context, state, _) => ProfileMembershipCard(
+        isActive: state.membership?.isActive ?? false,
+        isExpired: state.membership?.status == 2,
+        membershipExpiresAt: state.membership?.expiresAt?.toLocal(),
+        blueBalanceCent: state.membership?.blueGemsCent,
+      ),
+    );
+  }
+}
+
 class _GemsBalanceEntry extends StatelessWidget {
   const _GemsBalanceEntry({this.stateListenable});
 
@@ -678,7 +711,7 @@ class _GemsBalanceEntry extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Balance',
+                          'Gems',
                           style: TextStyle(
                             fontSize: 12,
                             height: 14 / 12,
@@ -705,8 +738,11 @@ class _GemsBalanceEntry extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Flexible(
-                                    child: Text(
-                                      formatGemCent(balanceCent ?? 0),
+                                    child: Text.rich(
+                                      gemBalanceTextSpan(
+                                        balanceCent ?? 0,
+                                        fontSize: 18,
+                                      ),
                                       key: const ValueKey(
                                         'user-profile-gems-balance',
                                       ),
@@ -714,19 +750,8 @@ class _GemsBalanceEntry extends StatelessWidget {
                                         fontSize: 18,
                                         height: 22 / 18,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                        color: Color(0xF2FFFFFF),
                                       ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Text(
-                                    'Gems',
-                                    key: ValueKey('user-profile-gems-unit'),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      height: 14 / 11,
-                                      fontWeight: FontWeight.w400,
-                                      color: Color(0xFFFFD4DA),
                                     ),
                                   ),
                                 ],
@@ -747,12 +772,9 @@ class _GemsBalanceEntry extends StatelessWidget {
                       color: GenesisColors.brand,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Top Up',
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 16 / 13,
-                        fontWeight: FontWeight.w600,
+                      style: gemCardActionTextStyle.copyWith(
                         color: Colors.white,
                       ),
                     ),

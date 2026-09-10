@@ -58,33 +58,33 @@ void main() {
     expect(otherAdapter.forceClosed, true);
   });
 
-  test('rejects an HTTPS response that did not negotiate HTTP/2', () async {
-    final dio = Dio()
-      ..httpClientAdapter = _RecordingAdapter(protocolVersion: '1.1');
-    final transport = DioHttpTransport(
-      dio: dio,
-      performanceMetricUrlFilter: (_) => false,
-    );
-
-    await expectLater(
-      transport.send(
+  for (final protocol in ['1.1', '2.0', 'h3', null]) {
+    test('accepts HTTPS response over $protocol without replay', () async {
+      final adapter = _RecordingAdapter(protocolVersion: protocol);
+      final dio = Dio()..httpClientAdapter = adapter;
+      addTearDown(() => dio.close(force: true));
+      final transport = DioHttpTransport(
+        dio: dio,
+        performanceMetricUrlFilter: (_) => false,
+      );
+      final response = await transport.send(
         TransportRequest(
-          method: 'GET',
+          method: 'POST',
           uri: Uri.parse('https://api.worldo.ai/api/v1/health'),
           headers: const {},
-          bodyBytes: null,
+          bodyBytes: utf8.encode('{}'),
           timeoutMs: 5000,
         ),
-      ),
-      throwsA(
-        isA<DioException>().having(
-          (error) => error.message,
-          'message',
-          contains('negotiated protocol was 1.1'),
-        ),
-      ),
-    );
-  });
+      );
+      expect(response.statusCode, 200);
+      expect(response.body, 'ok');
+      expect(
+        response.httpProtocolVersion,
+        normalizeHttpProtocolVersion(protocol),
+      );
+      expect(adapter.requestedUris, hasLength(1));
+    });
+  }
 
   test('records negotiated HTTP/2 on HTTPS responses', () async {
     final dio = Dio()
@@ -444,7 +444,7 @@ void main() {
 class _RecordingAdapter implements HttpClientAdapter {
   _RecordingAdapter({required this.protocolVersion});
 
-  final String protocolVersion;
+  final String? protocolVersion;
   final List<Uri> requestedUris = <Uri>[];
   bool forceClosed = false;
 

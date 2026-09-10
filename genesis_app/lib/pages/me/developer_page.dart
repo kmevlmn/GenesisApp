@@ -12,12 +12,14 @@ import 'package:genesis_flutter_android/platform/device/device_id_service.dart';
 import '../../app/agent_control/agent_control_status.dart';
 import '../../app/config/app_endpoint_overrides.dart';
 import '../../app/config/app_config.dart';
+import '../../app/config/app_global_config.dart';
 import '../../app/debug_floating_button_visibility.dart';
 import '../../app/debug_page_tracker.dart';
 import '../../app/debug/location_chat_bubble_layout_settings.dart';
 import '../../app/debug/location_chat_header_effect_settings.dart';
 import '../../app/debug/origin_world_sheet_debug_settings.dart';
 import '../../app/debug/world_new_content_debug_settings.dart';
+import '../../app/debug/membership_guest_login_debug_settings.dart';
 import '../../components/common/genesis_center_toast.dart';
 import '../../components/common/genesis_bottom_sheet_panel.dart';
 import '../../components/common/genesis_modal_routes.dart';
@@ -50,11 +52,13 @@ import '../../ui/genesis_ui.dart';
 import '../../app/version/force_upgrade_gate.dart';
 import '../../network/models/app_version_check.dart';
 import 'about_us_page.dart';
+import 'developer_membership_set_form.dart';
 
 part 'developer_endpoint_actions.dart';
 part 'developer_version_actions.dart';
 part 'developer_previews.dart';
 part 'developer_components.dart';
+part 'developer_app_config_section.dart';
 part 'developer_capture_components.dart';
 part 'developer_network_tab.dart';
 part 'developer_websocket_tab.dart';
@@ -211,6 +215,8 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
   bool _savingOriginWorldSheetDebugSettings = false;
   bool _loadingWorldNewContentDebugSettings = kDebugMode;
   bool _savingWorldNewContentDebugSettings = false;
+  bool _loadingMembershipGuestLoginSetting = kDebugMode;
+  bool _savingMembershipGuestLoginSetting = false;
   final Set<TelemetryChannel> _savingTelemetryChannels = <TelemetryChannel>{};
   bool _showTilemapSettingsButton = tilemapSettingsButtonVisibility.value;
   bool _expandOriginWorldSheetOnEntry =
@@ -262,6 +268,7 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
     if (kDebugMode) {
       unawaited(_loadOriginWorldSheetDebugSettings());
       unawaited(_loadWorldNewContentDebugSettings());
+      unawaited(_loadMembershipGuestLoginSetting());
     }
     unawaited(locationChatBubbleLayoutSettings.load());
     unawaited(locationChatHeaderEffectSettings.load());
@@ -323,6 +330,30 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
     } finally {
       if (mounted) {
         _updateState(() => _savingTilemapSettingsButtonVisibility = false);
+      }
+    }
+  }
+
+  Future<void> _loadMembershipGuestLoginSetting() async {
+    await membershipGuestLoginDebugSettings.load();
+    if (!mounted) return;
+    _updateState(() => _loadingMembershipGuestLoginSetting = false);
+  }
+
+  Future<void> _setMembershipGuestForceLogin(bool enabled) async {
+    if (!kDebugMode ||
+        _loadingMembershipGuestLoginSetting ||
+        _savingMembershipGuestLoginSetting) {
+      return;
+    }
+    _updateState(() => _savingMembershipGuestLoginSetting = true);
+    try {
+      await membershipGuestLoginDebugSettings.setForceLogin(enabled);
+    } catch (error) {
+      if (mounted) showGenesisToast(context, 'Save failed: $error');
+    } finally {
+      if (mounted) {
+        _updateState(() => _savingMembershipGuestLoginSetting = false);
       }
     }
   }
@@ -591,6 +622,8 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
         ..._buildEndpointSection(),
         const SizedBox(height: 18),
         ..._buildVersionOverrideSection(),
+        const SizedBox(height: 18),
+        const _DeveloperAppConfigSection(),
       ],
     );
   }
@@ -711,6 +744,7 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
     double horizontalPadding, {
     ScrollController? scrollController,
   }) {
+    final services = AppServicesScope.read(context);
     return ListView(
       key: const PageStorageKey<String>('developer-test-switch-tab-scroll'),
       controller: scrollController,
@@ -802,6 +836,45 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
               onChanged: (value) {
                 unawaited(_setOriginWorldSheetExpandOnEntry(value));
               },
+            ),
+          ),
+          const SizedBox(height: 18),
+          _DeveloperTestSectionPanel(
+            key: const ValueKey<String>(
+              'developer-membership-guest-login-panel',
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ValueListenableBuilder<bool>(
+                  valueListenable: membershipGuestLoginDebugSettings.listenable,
+                  builder: (context, forceLogin, _) => _DeveloperToggleRow(
+                    sectionTitle: 'VIP',
+                    label: 'Force login after guest purchase',
+                    value: forceLogin,
+                    enabled:
+                        !_loadingMembershipGuestLoginSetting &&
+                        !_savingMembershipGuestLoginSetting,
+                    switchKey: const ValueKey<String>(
+                      'developer-membership-guest-force-login-switch',
+                    ),
+                    onChanged: (value) {
+                      unawaited(_setMembershipGuestForceLogin(value));
+                    },
+                  ),
+                ),
+                const SizedBox(height: 14),
+                DeveloperMembershipSetForm(
+                  loadUid: services.sessionStore.readLoginUid,
+                  onSubmit: services.api.v1.membership.setManual,
+                  onSaved: (result) async {
+                    if (await services.sessionStore.readLoginUid() ==
+                        result.uid) {
+                      await services.gemWallet.refreshAfterMembershipChanged();
+                    }
+                  },
+                ),
+              ],
             ),
           ),
         ],

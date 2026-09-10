@@ -200,7 +200,7 @@ String _rawImageUrl(ChatMessageVm message) {
   return imageUrl.isNotEmpty ? imageUrl : message.text.trim();
 }
 
-double _normalBubbleMaxWidth(BuildContext context, ChatUiStyleConfig style) {
+double chatNormalBubbleMaxWidth(BuildContext context, ChatUiStyleConfig style) {
   return _normalBubbleMaxWidthForWidth(MediaQuery.sizeOf(context).width, style);
 }
 

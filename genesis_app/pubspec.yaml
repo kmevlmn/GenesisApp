@@ -28,6 +28,7 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  intl: ^0.20.2
   flutter:
     sdk: flutter
 
@@ -39,12 +40,14 @@ dependencies:
   firebase_analytics: 12.4.3
   dio: ^5.11.0
   dio_http2_adapter: ^2.8.0
+  http2: ^2.3.1
   http: ^1.6.0
   cronet_http: ^1.9.0
   cupertino_http: ^3.0.2
   http_profile: ^0.1.0
   google_sign_in: ^7.2.0
   shared_preferences: ^2.5.3
+  flutter_secure_storage: ^10.0.0
   sign_in_with_apple: ^8.0.0
   crypto: ^3.0.7
   uuid: ^4.5.3
@@ -66,10 +69,14 @@ dependencies:
   in_app_purchase_platform_interface: ^1.4.1
 
 dependency_overrides:
+  dio_http2_adapter:
+    path: third_party/dio_http2_adapter
   firebase_performance:
     path: third_party/firebase_performance
   in_app_purchase_android:
     path: third_party/in_app_purchase_android
+  in_app_purchase_storekit:
+    path: third_party/in_app_purchase_storekit
   sign_in_with_apple:
     path: third_party/sign_in_with_apple
   path_provider_foundation: 2.4.2

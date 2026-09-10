@@ -25,27 +25,18 @@ extension _GooglePlayBillingTracking on GooglePlayBillingService {
   }
 
   void _scheduleAttemptTimeout(
-    GemProduct product,
-    String storeProductId,
-    String attemptId, {
+    String timerKey, {
     required DateTime startedAt,
+    required VoidCallback onTimeout,
   }) {
-    _cancelAttemptTimeout(storeProductId);
+    _cancelAttemptTimeout(timerKey);
     final elapsed = DateTime.now().difference(startedAt);
     final remaining = elapsed < _attemptTimeout
         ? _attemptTimeout - elapsed
         : Duration.zero;
-    _attemptTimeouts[storeProductId] = Timer(remaining, () {
-      _attemptTimeouts.remove(storeProductId);
-      final activeAttempt = _attemptByStoreProductId[storeProductId];
-      if (activeAttempt?.id != attemptId) return;
-      _trackTimeoutById(
-        attemptId: attemptId,
-        productId: product.productId,
-        storeProductId: storeProductId,
-        timeoutType: 'store_no_callback',
-      );
-      _setBusy(activeAttempt!.product.productId, false);
+    _attemptTimeouts[timerKey] = Timer(remaining, () {
+      _attemptTimeouts.remove(timerKey);
+      onTimeout();
     });
   }
 

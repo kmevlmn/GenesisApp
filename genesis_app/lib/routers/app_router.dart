@@ -29,6 +29,7 @@ import '../network/models/world.dart';
 import '../components/discuss/origin_discuss_list.dart';
 import '../ui/navigation/genesis_dark_page_route.dart';
 import '../components/chat/shared/chat_ui.dart';
+import '../components/gems/purchase_session_builder.dart';
 
 sealed class RouteNames {
   static const shell = '/';
@@ -40,6 +41,7 @@ sealed class RouteNames {
   static const world = '/world';
   static const chat = '/chat';
   static const locationChat = '/location_chat';
+  static const locationChatEdit = '/location_chat/edit';
   static const search = '/search';
   static const create = '/create';
   static const edit = '/edit';
@@ -587,6 +589,18 @@ sealed class AppRouter {
             conversationId: args.conversationId,
           ),
         );
+      case RouteNames.locationChatEdit:
+        final args = settings.arguments;
+        if (args is! LocationChatEditPageArgs) {
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => const PageNotFoundPage(),
+          );
+        }
+        return MaterialPageRoute<LocationChatEditResult>(
+          settings: settings,
+          builder: (_) => LocationChatEditPage(args: args),
+        );
       case RouteNames.locationChat:
         final args = _LocationChatRouteArgs.from(settings.arguments);
         return _LocationChatPageRoute(
@@ -683,7 +697,12 @@ sealed class AppRouter {
       case RouteNames.gemWallet:
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => const GemWalletPage(),
+          builder: (_) => PurchaseSessionBuilder(
+            builder: (_, showBuyGems) => GemWalletPage(
+              showBuyGems: showBuyGems,
+              showSubscriptionInitially: settings.arguments == 'subscription',
+            ),
+          ),
         );
       case RouteNames.gemRecords:
         return MaterialPageRoute<void>(

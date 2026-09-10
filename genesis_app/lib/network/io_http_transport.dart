@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:firebase_performance/firebase_performance.dart';
 
@@ -46,7 +45,14 @@ class IoHttpTransport implements HttpTransport {
   final HttpRequestPerformanceMetricReady _performanceMetricReady;
 
   @override
-  Future<TransportResponse> send(TransportRequest request) async {
+  Future<TransportResponse> send(TransportRequest request) =>
+      runWithNetworkDeadline(
+        timeout: Duration(milliseconds: request.timeoutMs),
+        cancellationToken: request.cancellationToken,
+        action: (token) => _send(request.withCancellationToken(token)),
+      );
+
+  Future<TransportResponse> _send(TransportRequest request) async {
     request.cancellationToken?.throwIfCancelled();
     final metric = await startPerformanceMetric(
       request,
@@ -54,12 +60,17 @@ class IoHttpTransport implements HttpTransport {
       urlFilter: _performanceMetricUrlFilter,
       ready: _performanceMetricReady,
     );
+    final stopMetric = performanceMetricStopper(metric);
+    final removeMetricCancelListener = request.cancellationToken
+        ?.addCancelListener(stopMetric);
     HttpClientRequest? httpRequest;
     void Function()? removeCancelListener;
     try {
-      httpRequest = await _client
-          .openUrl(request.method, request.uri)
-          .timeout(Duration(milliseconds: request.timeoutMs));
+      request.cancellationToken?.throwIfCancelled();
+      // Keep observing openUrl after cancellation so a late connection is
+      // aborted before any headers or body are sent.
+      httpRequest = await _client.openUrl(request.method, request.uri);
+      httpRequest.done.ignore();
       removeCancelListener = request.cancellationToken?.addCancelListener(() {
         httpRequest?.abort(const NetworkRequestCancelledException());
       });
@@ -78,9 +89,7 @@ class IoHttpTransport implements HttpTransport {
         );
       }
 
-      final httpResponse = await openedRequest.close().timeout(
-        Duration(milliseconds: request.timeoutMs),
-      );
+      final httpResponse = await openedRequest.close();
       request.cancellationToken?.throwIfCancelled();
 
       final headers = <String, String>{};
@@ -88,9 +97,9 @@ class IoHttpTransport implements HttpTransport {
         headers[name] = values.join(',');
       });
 
-      final bodyBytes = await _readResponseBytes(
+      final bodyBytes = await readTransportResponseBytes(
         httpResponse,
-        timeout: Duration(milliseconds: request.timeoutMs),
+        totalBytes: nonNegativeContentLength(httpResponse.contentLength) ?? -1,
         onReceiveProgress: request.onReceiveProgress,
         cancellationToken: request.cancellationToken,
       );
@@ -112,26 +121,10 @@ class IoHttpTransport implements HttpTransport {
       return response;
     } finally {
       removeCancelListener?.call();
-      unawaited(stopPerformanceMetric(metric));
+      removeMetricCancelListener?.call();
+      stopMetric();
     }
   }
-}
-
-Future<Uint8List> _readResponseBytes(
-  HttpClientResponse response, {
-  required Duration timeout,
-  required NetworkProgressCallback? onReceiveProgress,
-  required NetworkCancellationToken? cancellationToken,
-}) async {
-  final out = BytesBuilder(copy: false);
-  final totalBytes = nonNegativeContentLength(response.contentLength) ?? -1;
-  await for (final chunk in response.timeout(timeout)) {
-    cancellationToken?.throwIfCancelled();
-    out.add(chunk);
-    onReceiveProgress?.call(out.length, totalBytes);
-  }
-  cancellationToken?.throwIfCancelled();
-  return out.takeBytes();
 }
 
 class _FirebaseHttpRequestPerformanceMetric
@@ -185,8 +178,11 @@ HttpRequestPerformanceMetric createFirebasePerformanceMetric(
   );
 }
 
-HttpClient createProxyAwareHttpClient(String? proxy) {
-  final client = HttpClient();
+HttpClient createProxyAwareHttpClient(
+  String? proxy, {
+  SecurityContext? securityContext,
+}) {
+  final client = HttpClient(context: securityContext);
   final proxyAddress = normalizeHttpProxyAddress(proxy);
   if (proxyAddress != null) {
     client.findProxy = (_) => 'PROXY $proxyAddress; DIRECT';
@@ -270,7 +266,9 @@ void recordPerformanceMetricProtocol(
 ) {
   if (metric == null) return;
   final normalized = normalizeHttpProtocolVersion(protocol);
-  if (normalized != 'h3' && normalized != 'h2') return;
+  if (normalized != 'h3' && normalized != 'h2' && normalized != 'http/1.1') {
+    return;
+  }
   try {
     metric.putAttribute('network_protocol', normalized!);
   } catch (_) {}
@@ -333,6 +331,15 @@ Future<void> stopPerformanceMetric(HttpRequestPerformanceMetric? metric) async {
       'http_metric_stop_timeout',
     );
   } catch (_) {}
+}
+
+void Function() performanceMetricStopper(HttpRequestPerformanceMetric? metric) {
+  var stopped = false;
+  return () {
+    if (stopped) return;
+    stopped = true;
+    unawaited(stopPerformanceMetric(metric));
+  };
 }
 
 String? headerValue(Map<String, String> headers, String name) {

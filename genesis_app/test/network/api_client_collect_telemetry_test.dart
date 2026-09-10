@@ -52,6 +52,97 @@ void main() {
     return store.eventsForTesting;
   }
 
+  for (final stage in ['headers', 'interceptor']) {
+    test(
+      '$stage deadline records one timeout terminal even after late completion',
+      () async {
+        final release = Completer<void>();
+        final lateFinished = Completer<void>();
+        var sends = 0;
+        final client = ApiClient(
+          baseUrl: 'https://example.test/',
+          timeoutMs: 40,
+          transport: _FakeTransport(
+            handler: (_) {
+              sends++;
+              return const TransportResponse(
+                statusCode: 200,
+                headers: {},
+                body: '{}',
+              );
+            },
+          ),
+          requestHeaderProvider: stage == 'headers'
+              ? () async {
+                  await release.future;
+                  lateFinished.complete();
+                  return {};
+                }
+              : null,
+          requestInterceptor: stage == 'interceptor'
+              ? (request, send) async {
+                  await release.future;
+                  try {
+                    return await send(request);
+                  } finally {
+                    lateFinished.complete();
+                  }
+                }
+              : null,
+        );
+        await expectLater(
+          client.post('/api/v1/example'),
+          throwsA(isA<ApiException>()),
+        );
+        release.complete();
+        await lateFinished.future;
+        final recorded = await events();
+        expect(recorded.map((e) => e.action), [
+          'api_req_start',
+          'api_req_fail_tech',
+        ]);
+        expect(recorded.last.object3, 'tech_client_1004');
+        expect(sends, 0);
+      },
+    );
+  }
+
+  test(
+    'outer deadline keeps transport duration separate from Gateway preparation',
+    () async {
+      final transportEntered = Completer<void>();
+      final client = ApiClient(
+        baseUrl: 'https://example.test/',
+        timeoutMs: 1000,
+        requestInterceptor: (request, send) async {
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+          return send(request);
+        },
+        transport: _FakeTransport(
+          handler: (_) {
+            transportEntered.complete();
+            return Completer<TransportResponse>().future;
+          },
+        ),
+      );
+      final checked = expectLater(
+        client.post('/api/v1/example'),
+        throwsA(isA<ApiException>()),
+      );
+      await transportEntered.future;
+      await checked;
+      final recorded = await events();
+      expect(recorded.map((e) => e.action), [
+        'api_req_start',
+        'api_req_fail_tech',
+      ]);
+      expect(recorded.last.object3, 'tech_client_1004');
+      // The request waited about 1s overall, but the actual send used only the
+      // remaining half of that budget. Preparation must not inflate object4.
+      expect(int.parse(recorded.last.object4), inInclusiveRange(200, 800));
+    },
+  );
+
   test('successful business request emits start and success', () async {
     final client = ApiClient(
       baseUrl: 'https://example.test/api/',

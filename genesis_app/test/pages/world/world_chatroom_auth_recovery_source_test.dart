@@ -31,6 +31,7 @@ void main() {
     expect(worldPage, contains('onFailure: _handleWorldChatroomFailure'));
     expect(recovery, contains('await service.dispose()'));
     expect(recovery, contains('final loggedIn = await ensureGenesisLogin'));
+    expect(recovery, contains('continueAfterLogin: true'));
     expect(recovery, contains('await replacement.connect('));
     expect(recovery, contains('await replacement.join('));
     expect(recovery, isNot(contains('Future<void>.delayed(')));

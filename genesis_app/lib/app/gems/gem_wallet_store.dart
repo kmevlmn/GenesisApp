@@ -10,6 +10,7 @@ class GemWalletState {
   const GemWalletState({
     this.ownerUid,
     this.balanceCent,
+    this.membership,
     this.isRefreshing = false,
     this.updatedAt,
     this.lastError,
@@ -17,6 +18,7 @@ class GemWalletState {
 
   final String? ownerUid;
   final int? balanceCent;
+  final GemWalletMembership? membership;
   final bool isRefreshing;
   final DateTime? updatedAt;
   final Object? lastError;
@@ -70,9 +72,13 @@ class GemWalletStore {
     final retainedUpdatedAt = current.ownerUid == uid
         ? current.updatedAt
         : null;
+    final retainedMembership = current.ownerUid == uid
+        ? current.membership
+        : null;
     _state.value = GemWalletState(
       ownerUid: uid,
       balanceCent: retainedBalanceCent,
+      membership: retainedMembership,
       isRefreshing: true,
       updatedAt: retainedUpdatedAt,
     );
@@ -90,6 +96,7 @@ class GemWalletStore {
       _state.value = GemWalletState(
         ownerUid: uid,
         balanceCent: wallet.balanceCent,
+        membership: wallet.membership,
         updatedAt: DateTime.now(),
       );
     } catch (error) {
@@ -105,6 +112,7 @@ class GemWalletStore {
       _state.value = GemWalletState(
         ownerUid: uid,
         balanceCent: retainedBalanceCent,
+        membership: retainedMembership,
         updatedAt: retainedUpdatedAt,
         lastError: error,
       );
@@ -112,6 +120,18 @@ class GemWalletStore {
   }
 
   Future<void> refreshAfterEntitlementGranted() => refresh();
+
+  /// VIP mutations need a request made after the server confirms the change.
+  /// Leave the existing Gems refresh/coalescing behavior unchanged.
+  Future<void> refreshAfterMembershipChanged() async {
+    final earlierRequest = _refreshFuture;
+    if (earlierRequest != null) await earlierRequest;
+    if (_disposed) return;
+    await refresh();
+    if (_disposed) return;
+    final error = _state.value.lastError;
+    if (error != null) throw error;
+  }
 
   void reset() {
     if (_disposed) return;

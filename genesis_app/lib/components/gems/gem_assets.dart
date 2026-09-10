@@ -1,4 +1,5 @@
 const String gemIconAsset = 'assets/custom-icons/svg/icon_gem.svg';
+const String gemOutlineIconAsset = 'assets/custom-icons/svg/gem_outline.svg';
 const String gemStackIconAsset = 'assets/custom-icons/svg/icon_gems_stack.svg';
 const double gemLargeIconSize = 31;
 const double gemSmallIconSize = 16;

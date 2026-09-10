@@ -102,6 +102,43 @@ void main() {
     expect(find.byType(GlowingOverscrollIndicator), findsNothing);
   });
 
+  testWidgets(
+    'reply generation scrolls over 500ms and respects a user interruption',
+    (tester) async {
+      final coordinator = LocationChatScrollCoordinator();
+      addTearDown(coordinator.dispose);
+      await tester.pumpWidget(viewport(coordinator));
+      await tester.pumpAndSettle();
+      coordinator.controller.jumpTo(0);
+      coordinator.requestBottom(
+        reason: LocationChatBottomReason.replyGeneration,
+        behavior: LocationChatBottomBehavior.animate,
+        duration: const Duration(milliseconds: 500),
+      );
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      final position = coordinator.controller.position;
+      expect(position.pixels, greaterThan(0));
+      expect(position.pixels, lessThan(position.maxScrollExtent - 24));
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(position.pixels, closeTo(position.maxScrollExtent, 0.1));
+
+      coordinator.controller.jumpTo(0);
+      coordinator.requestBottom(
+        reason: LocationChatBottomReason.replyGeneration,
+        behavior: LocationChatBottomBehavior.animate,
+        duration: const Duration(milliseconds: 500),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 120));
+      await tester.pumpAndSettle();
+      expect(coordinator.isDetached, isTrue);
+      expect(position.pixels, lessThan(position.maxScrollExtent - 24));
+    },
+  );
+
   testWidgets('async long content accepts the first user drag', (tester) async {
     final coordinator = LocationChatScrollCoordinator();
     final messageCount = ValueNotifier<int>(0);
