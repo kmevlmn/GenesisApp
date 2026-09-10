@@ -518,12 +518,12 @@ sealed class AppRouter {
         final initialIndex = settings.arguments is int
             ? settings.arguments! as int
             : 0;
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => AppShellPage(initialIndex: initialIndex),
         );
       case RouteNames.origin:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const AppShellPage(initialIndex: 1),
         );
@@ -592,12 +592,12 @@ sealed class AppRouter {
       case RouteNames.locationChatEdit:
         final args = settings.arguments;
         if (args is! LocationChatEditPageArgs) {
-          return MaterialPageRoute<void>(
+          return GenesisDarkPageRoute<void>(
             settings: settings,
             builder: (_) => const PageNotFoundPage(),
           );
         }
-        return MaterialPageRoute<LocationChatEditResult>(
+        return GenesisDarkPageRoute<LocationChatEditResult>(
           settings: settings,
           builder: (_) => LocationChatEditPage(args: args),
         );
@@ -636,17 +636,17 @@ sealed class AppRouter {
           builder: (_) => EditOriginPage(originId: args.originId),
         );
       case RouteNames.messages:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const AppShellPage(initialIndex: 3),
         );
       case RouteNames.me:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const AppShellPage(initialIndex: 4),
         );
       case RouteNames.notifications:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const MessageCategoryListPage(
             title: 'Notifications',
@@ -655,7 +655,7 @@ sealed class AppRouter {
           ),
         );
       case RouteNames.newFollowers:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const MessageCategoryListPage(
             title: 'New followers',
@@ -664,7 +664,7 @@ sealed class AppRouter {
           ),
         );
       case RouteNames.comments:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const MessageCategoryListPage(
             title: 'Comments',
@@ -674,13 +674,13 @@ sealed class AppRouter {
         );
       case RouteNames.userInfo:
         final args = _UserInfoRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => UserInfoPage(uid: args.uid),
         );
       case RouteNames.follows:
         final args = _FollowsRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => FollowsPage(
             uid: args.uid,
@@ -695,7 +695,7 @@ sealed class AppRouter {
           builder: (_) => LegalDocumentPage(document: args.document),
         );
       case RouteNames.gemWallet:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => PurchaseSessionBuilder(
             builder: (_, showBuyGems) => GemWalletPage(
@@ -705,7 +705,7 @@ sealed class AppRouter {
           ),
         );
       case RouteNames.gemRecords:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const GemRecordsPage(),
         );
@@ -721,7 +721,7 @@ sealed class AppRouter {
           builder: (_) => const PageNotFoundPage(),
         );
       case RouteNames.shell:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const AppShellPage(initialIndex: 0),
         );

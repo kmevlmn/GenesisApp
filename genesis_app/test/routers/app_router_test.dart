@@ -1,10 +1,37 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/navigation/genesis_dark_page_route.dart';
 import 'package:genesis_flutter_android/pages/world/world_page_result.dart';
 import 'package:genesis_flutter_android/routers/app_router.dart';
 
 void main() {
+  test(
+    'migrated content routes and invalid edit fallback use dark transitions',
+    () {
+      for (final name in [
+        RouteNames.home,
+        RouteNames.origin,
+        RouteNames.messages,
+        RouteNames.me,
+        RouteNames.notifications,
+        RouteNames.newFollowers,
+        RouteNames.comments,
+        RouteNames.userInfo,
+        RouteNames.follows,
+        RouteNames.gemWallet,
+        RouteNames.gemRecords,
+        RouteNames.locationChatEdit,
+      ]) {
+        expect(
+          AppRouter.onGenerateRoute(RouteSettings(name: name)),
+          isA<GenesisDarkPageRoute<void>>(),
+          reason: name,
+        );
+      }
+    },
+  );
+
   test('world route keeps its typed result', () {
     final route = AppRouter.onGenerateRoute(
       const RouteSettings(

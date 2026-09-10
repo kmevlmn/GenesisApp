@@ -5,7 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../common/genesis_action_box.dart';
 import 'gem_assets.dart';
-import 'gem_colors.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import 'gem_purchase_bottom_sheet.dart';
 import '../../utils/gem_amount.dart';
 
@@ -37,7 +37,7 @@ Future<bool> showDailyCheckInDialog(
         GenesisActionBoxAction<_DailyCheckInAction>(
           label: 'Get 100',
           value: _DailyCheckInAction.subscribe,
-          color: kGemAccentColor,
+          color: GenesisColors.redSecondary,
           trailing: SvgPicture.asset(
             gemIconAsset,
             key: const ValueKey('daily-check-in-subscription-gem'),
@@ -55,10 +55,10 @@ Future<bool> showDailyCheckInDialog(
         value: _DailyCheckInAction.checkIn,
         fontWeight: showSubscriptionOffer ? FontWeight.w400 : FontWeight.w600,
         color: claimed
-            ? kGemTaskClaimedForegroundColor
+            ? GenesisColors.darkTextTertiary
             : showSubscriptionOffer
-            ? const Color(0xFF111111)
-            : kGemAccentColor,
+            ? GenesisColors.darkTextPrimary
+            : GenesisColors.redSecondary,
         enabled: !claimed,
       ),
     ],
@@ -133,7 +133,7 @@ class _GemTaskReward extends StatelessWidget {
           '+$rewardText',
           key: const ValueKey<String>('gem-task-reward-value'),
           style: const TextStyle(
-            color: Color(0xFF111111),
+            color: GenesisColors.darkTextSecondary,
             fontSize: 15,
             height: 1.2,
             fontWeight: FontWeight.w600,

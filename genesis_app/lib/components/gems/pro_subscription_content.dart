@@ -17,7 +17,7 @@ import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_typography.dart';
 import '../../network/models/membership_product.dart';
 import '../../network/models/membership_benefit.dart';
-import 'gem_colors.dart';
+import 'gem_purchase_state.dart';
 import 'membership_purchase_presentation.dart';
 import '../common/genesis_center_toast.dart';
 import 'pro_colors.dart';
@@ -202,16 +202,7 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
     final selectedProduct = _offerFor(_plan)?.product;
     if (_loading) {
       // Match Buy Gems' initial loading indicator in the same tab content area.
-      return const Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            color: kGemAccentColor,
-          ),
-        ),
-      );
+      return const GemPurchaseLoading();
     }
     return Column(
       children: [
@@ -221,9 +212,9 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
             key: const ValueKey('pro-benefits-card'),
             margin: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: GenesisColors.darkCardBackground,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFEBEBEB)),
+              border: Border.all(color: GenesisColors.darkCardBorder),
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(
@@ -234,17 +225,20 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       GenesisSoftItalicText(
-                        selectedProduct?.title ?? '',
+                        'Premium',
                         key: const ValueKey('pro-tier-title'),
                         style: const TextStyle(
                           fontSize: 28,
                           height: 34 / 28,
                           fontWeight: FontWeight.w700,
-                          color: GenesisColors.textPrimary,
+                          color: GenesisColors.darkTextPrimary,
                         ),
                       ),
                       const SizedBox(height: 10),
-                      const Divider(height: 1, color: Color(0xFFEBEBEB)),
+                      const Divider(
+                        height: 1,
+                        color: GenesisColors.darkFaintFill,
+                      ),
                     ],
                   ),
                 ),
@@ -343,7 +337,7 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
                           arguments: {'document': document.key},
                         ),
                         style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF888888),
+                          foregroundColor: GenesisColors.darkTextSecondary,
                           textStyle: GenesisTypography.resolve(
                             context,
                             const TextStyle(fontSize: 11),
@@ -398,7 +392,9 @@ class _ProBenefit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locked = status == MembershipBenefitDisplay.locked;
-    final color = locked ? const Color(0xFF999999) : GenesisColors.textPrimary;
+    final color = locked
+        ? GenesisColors.darkTextTertiary
+        : GenesisColors.darkTextSecondary;
     final (statusIcon, statusColor, statusLabel) = switch (status) {
       MembershipBenefitDisplay.enhanced => (
         null,
@@ -407,12 +403,12 @@ class _ProBenefit extends StatelessWidget {
       ),
       MembershipBenefitDisplay.included => (
         Icons.check_rounded,
-        GenesisColors.textPrimary,
+        GenesisColors.darkTextPrimary,
         'Same as free',
       ),
       MembershipBenefitDisplay.locked => (
         Icons.lock_outline_rounded,
-        const Color(0xFF999999),
+        GenesisColors.darkTextTertiary,
         'Higher tier required',
       ),
     };
@@ -425,7 +421,7 @@ class _ProBenefit extends StatelessWidget {
             height: 28,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: GenesisColors.surfacePanel,
+              color: GenesisColors.darkFaintFill,
               borderRadius: BorderRadius.circular(8),
             ),
             child: asset != null
@@ -504,11 +500,15 @@ class _ProPlanCard extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Material(
-            color: selected ? proPurchaseTint : Colors.white,
+            color: selected
+                ? proPurchaseTint
+                : GenesisColors.darkCardBackground,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
               side: BorderSide(
-                color: selected ? proPurchaseAccent : const Color(0xFFEBEBEB),
+                color: selected
+                    ? proPurchaseAccent
+                    : GenesisColors.darkCardBorder,
                 width: 1,
               ),
             ),
@@ -531,7 +531,7 @@ class _ProPlanCard extends StatelessWidget {
                           fontSize: 14,
                           height: 20 / 14,
                           fontWeight: FontWeight.w400,
-                          color: GenesisColors.textPrimary,
+                          color: GenesisColors.darkTextPrimary,
                         ),
                       ),
                       FittedBox(
@@ -545,14 +545,14 @@ class _ProPlanCard extends StatelessWidget {
                                   fontSize: 24,
                                   height: 28 / 24,
                                   fontWeight: FontWeight.w400,
-                                  color: GenesisColors.textPrimary,
+                                  color: GenesisColors.darkTextPrimary,
                                 ),
                               ),
                               TextSpan(
                                 text: '/mo',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: const Color(0xFF888888),
+                                  color: GenesisColors.darkTextTertiary,
                                 ),
                               ),
                             ],

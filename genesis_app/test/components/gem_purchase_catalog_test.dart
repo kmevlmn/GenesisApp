@@ -1,10 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/components/genesis_primary_button.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/components/gems/gem_purchase_catalog.dart';
 import 'package:genesis_flutter_android/network/models/gem_product.dart';
 import 'package:genesis_flutter_android/platform/billing/billing_models.dart';
 
 void main() {
+  testWidgets('price and card each buy once, and loading blocks both', (
+    tester,
+  ) async {
+    var purchases = 0;
+    Future<void> showCard({required bool buying}) => tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 105,
+            height: kGemProductCardHeight,
+            child: GemProductCard(
+              product: _product(),
+              isBuying: buying,
+              isPurchaseInProgress: buying,
+              onPurchase: () => purchases++,
+            ),
+          ),
+        ),
+      ),
+    );
+    final price = find.byKey(const ValueKey('gem-product-price-gem_pack_500'));
+    final card = find.byKey(const ValueKey('gem-product-gem_pack_500'));
+    await showCard(buying: false);
+    await tester.tap(price);
+    expect(purchases, 1);
+    await tester.tap(card);
+    expect(purchases, 2);
+    await showCard(buying: true);
+    await tester.tap(price);
+    await tester.tap(card);
+    expect(purchases, 2);
+    final button = tester.widget<FilledButton>(
+      find.descendant(of: price, matching: find.byType(FilledButton)),
+    );
+    expect(button.onPressed, isNull);
+    expect(
+      button.style?.backgroundColor?.resolve({WidgetState.disabled}),
+      GenesisColors.redPrimary,
+    );
+    expect(
+      tester
+          .widget<CircularProgressIndicator>(
+            find.byType(CircularProgressIndicator),
+          )
+          .color,
+      GenesisColors.darkTextPrimary,
+    );
+  });
+
   testWidgets('new user product card uses backend activity label and color', (
     tester,
   ) async {
@@ -56,13 +107,13 @@ void main() {
     expect(amountStyle?.fontSize, 14);
     expect(amountStyle?.height, 20 / 14);
     expect(amountStyle?.fontWeight, FontWeight.w600);
-    expect(amountStyle?.color, const Color(0xFF111111));
+    expect(amountStyle?.color, GenesisColors.darkTextPrimary);
 
     final originalAmount = find.text('500');
     final originalAmountStyle = tester.widget<Text>(originalAmount).style;
     expect(originalAmountStyle?.fontSize, 12);
     expect(originalAmountStyle?.fontWeight, FontWeight.w400);
-    expect(originalAmountStyle?.color, const Color(0xFF888888));
+    expect(originalAmountStyle?.color, GenesisColors.darkTextTertiary);
     expect(originalAmountStyle?.decoration, TextDecoration.lineThrough);
 
     final currentAmountRect = tester.getRect(find.text('+550'));
@@ -75,20 +126,20 @@ void main() {
       closeTo(originalAmountRect.top - currentAmountRect.bottom + 4, 0.1),
     );
 
-    final priceStyle = tester.widget<Text>(find.text('HKD1.49')).style;
-    expect(priceStyle?.fontSize, 12);
-    expect(priceStyle?.height, 14 / 12);
-    expect(priceStyle?.fontWeight, FontWeight.w600);
-    expect(priceStyle?.color, const Color(0xFFFF2442));
-    final priceDecoration =
-        tester
-                .widget<Container>(
-                  find.byKey(const ValueKey('gem-product-price-gem_pack_500')),
-                )
-                .decoration!
-            as BoxDecoration;
-    expect(priceDecoration.color, Colors.white);
-    expect(priceDecoration.border, isNotNull);
+    final price = find.byKey(const ValueKey('gem-product-price-gem_pack_500'));
+    expect(tester.widget(price), isA<GenesisPrimaryButton>());
+    final priceStyle = tester
+        .widget<FilledButton>(
+          find.descendant(of: price, matching: find.byType(FilledButton)),
+        )
+        .style!;
+    expect(priceStyle.textStyle?.resolve({})?.fontSize, 14);
+    expect(priceStyle.textStyle?.resolve({})?.fontWeight, FontWeight.w600);
+    expect(
+      priceStyle.foregroundColor?.resolve({}),
+      GenesisColors.darkTextPrimary,
+    );
+    expect(priceStyle.backgroundColor?.resolve({}), GenesisColors.redPrimary);
     final productIconSize = tester.getSize(
       find.byKey(const ValueKey<String>('gem-product-icon-gem_pack_500')),
     );
@@ -111,13 +162,13 @@ void main() {
     expect(labelStyle?.fontSize, 14);
     expect(labelStyle?.height, 18 / 14);
     expect(labelStyle?.fontWeight, FontWeight.w600);
-    expect(labelStyle?.color, const Color(0xFF666666));
+    expect(labelStyle?.color, GenesisColors.darkTextSecondary);
 
     final balanceStyle = tester.widget<Text>(find.text('430.0')).style;
     expect(balanceStyle?.fontSize, 30);
     expect(balanceStyle?.height, 40 / 30);
     expect(balanceStyle?.fontWeight, FontWeight.w600);
-    expect(balanceStyle?.color, const Color(0xFF333333));
+    expect(balanceStyle?.color, GenesisColors.darkTextPrimary);
     final balanceIconSize = tester.getSize(
       find.byKey(const ValueKey('gem-balance-icon')),
     );
@@ -204,18 +255,24 @@ void main() {
     expect(find.byType(ColorFiltered), findsNothing);
     expect(find.text('Sold Out'), findsOneWidget);
     expect(find.text(r'$1.49'), findsNothing);
-    final soldOutButton = tester.widget<Container>(
-      find.byKey(const ValueKey('gem-product-price-gem_pack_500')),
+    final soldOutButton = tester.widget<FilledButton>(
+      find.descendant(
+        of: find.byKey(const ValueKey('gem-product-price-gem_pack_500')),
+        matching: find.byType(FilledButton),
+      ),
     );
+    expect(soldOutButton.onPressed, isNull);
     expect(
-      (soldOutButton.decoration as BoxDecoration).color,
+      soldOutButton.style?.backgroundColor?.resolve({WidgetState.disabled}),
       Colors.transparent,
     );
-    final soldOutDecoration = soldOutButton.decoration! as BoxDecoration;
-    expect(soldOutDecoration.border, isNotNull);
     expect(
-      tester.widget<Text>(find.text('Sold Out')).style?.color,
-      const Color(0xFFD47B89),
+      soldOutButton.style?.foregroundColor?.resolve({WidgetState.disabled}),
+      GenesisColors.darkTextTertiary,
+    );
+    expect(
+      soldOutButton.style?.side?.resolve({WidgetState.disabled})?.color,
+      GenesisColors.darkFaintFill,
     );
   });
 

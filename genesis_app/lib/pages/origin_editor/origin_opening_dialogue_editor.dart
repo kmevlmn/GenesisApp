@@ -326,9 +326,7 @@ class _OpeningNarratorEditor extends StatelessWidget {
             padding: style.systemMessagePadding,
             decoration: BoxDecoration(
               color: chatNarratorMessageBackgroundColor(style),
-              border: Border.all(
-                color: GenesisColors.darkFaintFill.withValues(alpha: 0.06),
-              ),
+              border: chatNarratorEditorBorder,
               borderRadius: BorderRadius.circular(
                 style.systemMessageBorderRadius,
               ),

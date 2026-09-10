@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/components/genesis_dark_close_button.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/app/gems/gem_wallet_store.dart';
 import 'package:genesis_flutter_android/app/telemetry/genesis_telemetry.dart';
 import 'package:genesis_flutter_android/components/common/genesis_bottom_sheet_panel.dart';
@@ -35,13 +37,21 @@ void main() {
     expect(find.text(lowGemBalancePrompt), findsNothing);
     expect(find.byType(GenesisBottomSheetPanel), findsOneWidget);
     expect(find.byType(GemPurchaseCatalogSection), findsOneWidget);
-    final closeIcon = tester.widget<Icon>(
+    expect(find.byType(GenesisDarkCloseButton), findsOneWidget);
+    final closeButton = tester.widget<IconButton>(
       find.descendant(
-        of: find.byKey(const ValueKey<String>('gem-purchase-sheet-close')),
-        matching: find.byIcon(Icons.close),
+        of: find.byType(GenesisDarkCloseButton),
+        matching: find.byType(IconButton),
       ),
     );
-    expect(closeIcon.color, const Color(0xFF111111));
+    expect(
+      closeButton.style?.foregroundColor?.resolve({}),
+      GenesisColors.darkTextPrimary,
+    );
+    expect(
+      closeButton.style?.backgroundColor?.resolve({}),
+      GenesisColors.darkFaintFill,
+    );
     expect(find.text('430.0'), findsOneWidget);
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('gem-balance-icon'))).dx,

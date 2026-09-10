@@ -28,7 +28,7 @@ class _TaskActionButton extends StatelessWidget {
     final enabled =
         !isLoading && (status == 'in_progress' || status == 'claimable');
     final foregroundColor = switch (status) {
-      'claimable' => kGemAccentColor,
+      'claimable' => GenesisColors.redSecondary,
       'in_progress' => kGemTaskProgressForegroundColor,
       'claimed' => kGemTaskClaimedForegroundColor,
       _ => kGemTaskActionColor,
@@ -72,56 +72,6 @@ class _TaskActionButton extends StatelessWidget {
   }
 }
 
-class _GemWalletLoading extends StatelessWidget {
-  const _GemWalletLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: SizedBox(
-        width: 24,
-        height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.5,
-          color: kGemAccentColor,
-        ),
-      ),
-    );
-  }
-}
-
-class _GemWalletError extends StatelessWidget {
-  const _GemWalletError({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Unable to load gems.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 20 / 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF333333),
-              ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _GemSectionStatePanel extends StatelessWidget {
   const _GemSectionStatePanel({
     required this.isLoading,
@@ -137,67 +87,8 @@ class _GemSectionStatePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 96,
-      child: Center(
-        child: isLoading || !hasError
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: kGemAccentColor,
-                ),
-              )
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    errorMessage,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      height: 16 / 12,
-                      color: Color(0xFF999999),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 28,
-                    child: FilledButton(
-                      onPressed: onRetry,
-                      child: const Text('Retry'),
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-class _GemEmptyPanel extends StatelessWidget {
-  const _GemEmptyPanel({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 96,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F8F8),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        message,
-        style: const TextStyle(
-          fontSize: 13,
-          height: 18 / 13,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF999999),
-        ),
-      ),
-    );
+    return isLoading || !hasError
+        ? const SizedBox(height: 96, child: GemPurchaseLoading(size: 20))
+        : GemPurchaseState(message: errorMessage, height: 96, onRetry: onRetry);
   }
 }

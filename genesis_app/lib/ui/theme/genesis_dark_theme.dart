@@ -23,6 +23,9 @@ class GenesisDarkTheme extends StatelessWidget {
       bodyStrongStyle: baseUi.bodyStrongStyle.copyWith(
         color: GenesisColors.darkTextPrimary,
       ),
+      tabSelectedColor: GenesisColors.darkTextPrimary,
+      tabUnselectedColor: GenesisColors.darkTextSecondary,
+      tabIndicatorColor: GenesisColors.redPrimary,
       searchBackgroundColor: GenesisColors.darkFaintFill,
       searchIconColor: GenesisColors.darkTextSecondary,
       searchHintStyle: baseUi.searchHintStyle.copyWith(

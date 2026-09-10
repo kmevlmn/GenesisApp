@@ -1,5 +1,10 @@
 part of 'chat_ui_library.dart';
 
+/// Subtle outline shared by Opening and inline narrator editing.
+final Border chatNarratorEditorBorder = Border.all(
+  color: GenesisColors.darkFaintFill.withValues(alpha: 0.06),
+);
+
 Color chatNarratorMessageBackgroundColor(ChatUiStyleConfig style) {
   if (!style.useScenePlateBubbleGeometry ||
       style.useConfiguredScenePlateSystemStyle) {
@@ -66,6 +71,7 @@ class ChatNarratorMessageBubble extends StatelessWidget {
       textAlign: TextAlign.left,
       leadingIconAsset: paragraphIconAsset,
       backgroundColor: chatNarratorMessageBackgroundColor(style),
+      border: editor == null ? null : chatNarratorEditorBorder,
       textStyle: narratorTextStyle,
       leadingIconColor: chatNarratorMessageIconColor(style),
       softItalic: usesScenePlate,

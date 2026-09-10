@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
+import 'package:genesis_flutter_android/components/gems/gem_purchase_state.dart';
 import 'package:genesis_flutter_android/app/bootstrap/app_services_scope.dart';
 import 'package:genesis_flutter_android/app/bootstrap/service_registry.dart';
 import 'package:genesis_flutter_android/app/config/app_config.dart';
@@ -170,6 +172,13 @@ void main() {
     );
     await tester.pump();
     expect(builds, 0);
+    final loading = find.byType(GemPurchaseLoading);
+    expect(Theme.of(tester.element(loading)).brightness, Brightness.dark);
+    final background = tester.widget<ColoredBox>(
+      find.ancestor(of: loading, matching: find.byType(ColoredBox)).first,
+    );
+    expect(background.color, GenesisColors.darkBackground);
+
     expect(find.text('Buy Gems'), findsNothing);
     session.uid.complete(null);
     await tester.pumpAndSettle();

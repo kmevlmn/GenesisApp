@@ -1015,10 +1015,7 @@ class _MyWorldFeedState extends State<_MyWorldFeed>
                     child: Center(
                       child: SizedBox.square(
                         dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: GenesisColors.darkTextSecondary,
-                        ),
+                        child: GenesisLoadingIndicator(strokeWidth: 2),
                       ),
                     ),
                   );

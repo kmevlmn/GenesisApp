@@ -10,6 +10,7 @@ import 'package:genesis_flutter_android/app/gems/gem_wallet_store.dart';
 import 'package:genesis_flutter_android/app/telemetry/genesis_telemetry.dart';
 import 'package:genesis_flutter_android/components/common/genesis_action_box.dart';
 import 'package:genesis_flutter_android/components/gems/gem_purchase_catalog.dart';
+import 'package:genesis_flutter_android/components/gems/wallet_purchase_tabs.dart';
 import 'package:genesis_flutter_android/components/gems/pro_colors.dart';
 import 'package:genesis_flutter_android/network/models/gem_product.dart';
 import 'package:genesis_flutter_android/network/models/gem_records.dart';
@@ -21,7 +22,6 @@ import 'package:genesis_flutter_android/pages/gems/gem_wallet_page.dart';
 import 'package:genesis_flutter_android/platform/billing/billing_models.dart';
 import 'package:genesis_flutter_android/platform/billing/billing_service.dart';
 import 'package:genesis_flutter_android/routers/app_router.dart';
-import 'package:genesis_flutter_android/ui/system/genesis_system_ui.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_typography.dart';
 import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
@@ -83,6 +83,16 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
+          expect(
+            Theme.of(
+              tester.element(find.byType(WalletPurchaseTabs)),
+            ).brightness,
+            Brightness.dark,
+          );
+          expect(
+            tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+            GenesisColors.darkBackground,
+          );
           expect(memberships, subscriptionFirst ? 1 : 0);
           expect(products, subscriptionFirst ? 0 : 1);
           expect(tasks, products);
@@ -245,12 +255,12 @@ void main() {
         (
           'Create custom characters',
           Icons.check_rounded,
-          GenesisColors.textPrimary,
+          GenesisColors.darkTextPrimary,
         ),
         (
           'Download without watermark',
           Icons.lock_outline_rounded,
-          const Color(0xFF999999),
+          GenesisColors.darkTextTertiary,
         ),
       ]) {
         final finder = find.byKey(ValueKey('pro-benefit-status-$label'));
@@ -354,7 +364,7 @@ void main() {
       expect(offset, greaterThan(0));
       await tester.tap(find.byKey(const ValueKey('wallet-subscription-tab')));
       await tester.pumpAndSettle();
-      expect(find.text('Pro'), findsOneWidget);
+      expect(find.text('Premium'), findsOneWidget);
       expect(find.text(r'Yearly: $99.99'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('pro-plan-monthly')));
       await tester.pumpAndSettle();
@@ -377,9 +387,9 @@ void main() {
           .widget<Text>(find.text('Buy Gems'))
           .style!
           .color;
-      expect(subscriptionDuringSwipe, isNot(GenesisColors.textPrimary));
-      expect(subscriptionDuringSwipe, isNot(GenesisColors.tabUnselected));
-      expect(gemsDuringSwipe, isNot(GenesisColors.tabUnselected));
+      expect(subscriptionDuringSwipe, isNot(GenesisColors.darkTextPrimary));
+      expect(subscriptionDuringSwipe, isNot(GenesisColors.darkTextSecondary));
+      expect(gemsDuringSwipe, isNot(GenesisColors.darkTextSecondary));
       expect(
         tester
             .widget<SvgPicture>(
@@ -393,11 +403,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.widget<Text>(find.text('Buy Gems')).style?.color,
-        GenesisColors.textPrimary,
+        GenesisColors.darkTextPrimary,
       );
       expect(
         tester.widget<Text>(find.text('Subscription')).style?.color,
-        GenesisColors.tabUnselected,
+        GenesisColors.darkTextSecondary,
       );
       expect(position.pixels, offset);
       expect(productLoads, 1);
@@ -405,14 +415,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.widget<Text>(find.text('Subscription')).style?.color,
-        GenesisColors.textPrimary,
+        GenesisColors.darkTextPrimary,
       );
       expect(find.text(r'Monthly: $9.99'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('wallet-buy-gems-tab')));
       await tester.pumpAndSettle();
       expect(
         tester.widget<Text>(find.text('Buy Gems')).style?.color,
-        GenesisColors.textPrimary,
+        GenesisColors.darkTextPrimary,
       );
       expect(position.pixels, offset);
       expect(tester.takeException(), isNull);
@@ -600,7 +610,7 @@ void main() {
     expect(taskButtonDecoration.border, isNull);
     expect(
       tester.widget<Text>(find.text('Go')).style?.color,
-      GenesisColors.brand,
+      GenesisColors.redSecondary,
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('gem-balance-icon'))).dx,
@@ -629,7 +639,7 @@ void main() {
     final pageTitleStyle = tester.widget<Text>(find.text('Buy Gems')).style;
     expect(pageTitleStyle?.fontSize, 16);
     expect(pageTitleStyle?.fontWeight, FontWeight.w600);
-    expect(pageTitleStyle?.color, GenesisColors.textPrimary);
+    expect(pageTitleStyle?.color, GenesisColors.darkTextPrimary);
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('gem-balance-panel'))).dy -
           tester.getRect(find.byType(AppBar)).bottom,
@@ -645,7 +655,7 @@ void main() {
     expect(groupTitleStyle?.fontSize, 16);
     expect(groupTitleStyle?.height, 20 / 16);
     expect(groupTitleStyle?.fontWeight, FontWeight.w600);
-    expect(groupTitleStyle?.color, const Color(0xFF111111));
+    expect(groupTitleStyle?.color, GenesisColors.darkTextPrimary);
 
     final taskTitleStyle = tester
         .widget<Text>(find.text('Create your first worldo'))
@@ -653,7 +663,7 @@ void main() {
     expect(taskTitleStyle?.fontSize, 14);
     expect(taskTitleStyle?.height, 16 / 14);
     expect(taskTitleStyle?.fontWeight, FontWeight.w600);
-    expect(taskTitleStyle?.color, const Color(0xFF111111));
+    expect(taskTitleStyle?.color, GenesisColors.darkTextPrimary);
 
     final descriptionStyle = tester
         .widget<Text>(find.text(_wrappingTaskDescription))
@@ -661,7 +671,7 @@ void main() {
     expect(descriptionStyle?.fontSize, 12);
     expect(descriptionStyle?.height, 14 / 12);
     expect(descriptionStyle?.fontWeight, FontWeight.w400);
-    expect(descriptionStyle?.color, const Color(0xFF888888));
+    expect(descriptionStyle?.color, GenesisColors.darkTextTertiary);
     final description = tester.widget<Text>(
       find.text(_wrappingTaskDescription),
     );
@@ -706,7 +716,7 @@ void main() {
     final taskRewardStyle = tester.widget<Text>(find.text('+50')).style;
     expect(taskRewardStyle?.fontSize, 14);
     expect(taskRewardStyle?.fontWeight, FontWeight.w600);
-    expect(taskRewardStyle?.color, const Color(0xFF111111));
+    expect(taskRewardStyle?.color, GenesisColors.darkTextPrimary);
     final taskRewardIconSize = tester.getSize(
       find.byKey(
         const ValueKey<String>('gem-task-reward-icon-create_first_worldo'),
@@ -753,17 +763,17 @@ void main() {
     expect(joinUsStyle?.fontSize, 16);
     expect(joinUsStyle?.height, 20 / 16);
     expect(joinUsStyle?.fontWeight, FontWeight.w600);
-    expect(joinUsStyle?.color, const Color(0xFF111111));
+    expect(joinUsStyle?.color, GenesisColors.darkTextPrimary);
 
     final discordStyle = tester.widget<Text>(find.text('Discord')).style;
     expect(discordStyle?.fontSize, 14);
     expect(discordStyle?.height, 16 / 14);
     expect(discordStyle?.fontWeight, FontWeight.w600);
-    expect(discordStyle?.color, const Color(0xFF111111));
+    expect(discordStyle?.color, GenesisColors.darkTextPrimary);
     final joinUsRewardStyle = tester.widget<Text>(find.text('+20')).style;
     expect(joinUsRewardStyle?.fontSize, 14);
     expect(joinUsRewardStyle?.fontWeight, FontWeight.w600);
-    expect(joinUsRewardStyle?.color, const Color(0xFF111111));
+    expect(joinUsRewardStyle?.color, GenesisColors.darkTextPrimary);
     final followRewardIconSize = tester.getSize(
       find.byKey(const ValueKey<String>('gem-task-reward-icon-discord_follow')),
     );
@@ -863,7 +873,9 @@ void main() {
     final recordsTitle = tester.widget<Text>(find.text('Gem Records'));
     expect(
       recordsTitle.style,
-      GenesisTypography.pageTitle.copyWith(color: Colors.black),
+      GenesisTypography.pageTitle.copyWith(
+        color: GenesisColors.darkTextPrimary,
+      ),
     );
     expect(
       tester.getTopLeft(find.byType(TabBar)).dy -
@@ -879,11 +891,11 @@ void main() {
     expect(tabs.labelStyle?.fontSize, 14);
     expect(tabs.labelStyle?.height, 20 / 14);
     expect(tabs.labelStyle?.fontWeight, FontWeight.w600);
-    expect(tabs.labelColor, const Color(0xFF333333));
+    expect(tabs.labelColor, GenesisColors.darkTextPrimary);
     expect(tabs.unselectedLabelStyle?.fontSize, 14);
     expect(tabs.unselectedLabelStyle?.height, 20 / 14);
     expect(tabs.unselectedLabelStyle?.fontWeight, FontWeight.w400);
-    expect(tabs.unselectedLabelColor, const Color(0xFF999999));
+    expect(tabs.unselectedLabelColor, GenesisColors.darkTextSecondary);
 
     final recordTitleStyle = tester
         .widget<Text>(find.text('Daily check-in'))
@@ -891,7 +903,7 @@ void main() {
     expect(recordTitleStyle?.fontSize, 14);
     expect(recordTitleStyle?.height, 17 / 14);
     expect(recordTitleStyle?.fontWeight, FontWeight.w600);
-    expect(recordTitleStyle?.color, const Color(0xFF111111));
+    expect(recordTitleStyle?.color, GenesisColors.darkTextPrimary);
 
     final recordTimeStyle = tester
         .widget<Text>(find.text(formatGemRecordTimestamp(1783586400)))
@@ -899,13 +911,13 @@ void main() {
     expect(recordTimeStyle?.fontSize, 12);
     expect(recordTimeStyle?.height, 14 / 12);
     expect(recordTimeStyle?.fontWeight, FontWeight.w400);
-    expect(recordTimeStyle?.color, const Color(0xFF999999));
+    expect(recordTimeStyle?.color, GenesisColors.darkTextTertiary);
 
     final amountStyle = tester.widget<Text>(find.text('+50.0')).style;
     expect(amountStyle?.fontSize, 14);
     expect(amountStyle?.height, 20 / 14);
     expect(amountStyle?.fontWeight, FontWeight.w600);
-    expect(amountStyle?.color, const Color(0xFFFF2442));
+    expect(amountStyle?.color, GenesisColors.redSecondary);
 
     await tester.drag(find.byType(TabBarView), const Offset(-420, 0));
     await tester.pumpAndSettle();
@@ -1108,7 +1120,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.widget<AppBar>(find.byType(AppBar)).systemOverlayStyle,
-      kGenesisDefaultSystemUiOverlayStyle,
+      SystemUiOverlayStyle.light,
     );
     systemUiOverlayStyleCalls.clear();
 
@@ -1116,7 +1128,11 @@ void main() {
       find.byKey(const ValueKey<String>('gem-product-gem_pack_500')),
     );
 
-    expect(SystemChrome.latestStyle?.statusBarColor, Colors.transparent);
+    expect(
+      SystemChrome.latestStyle?.statusBarColor,
+      anyOf(isNull, Colors.transparent),
+    );
+    expect(SystemChrome.latestStyle?.statusBarIconBrightness, Brightness.light);
     expect(
       systemUiOverlayStyleCalls.where(
         (call) =>
@@ -1127,11 +1143,19 @@ void main() {
     );
 
     await tester.pump();
-    expect(SystemChrome.latestStyle?.statusBarColor, Colors.transparent);
+    expect(
+      SystemChrome.latestStyle?.statusBarColor,
+      anyOf(isNull, Colors.transparent),
+    );
+    expect(SystemChrome.latestStyle?.statusBarIconBrightness, Brightness.light);
 
     await tester.pump(const Duration(milliseconds: 16));
 
-    expect(SystemChrome.latestStyle?.statusBarColor, Colors.transparent);
+    expect(
+      SystemChrome.latestStyle?.statusBarColor,
+      anyOf(isNull, Colors.transparent),
+    );
+    expect(SystemChrome.latestStyle?.statusBarIconBrightness, Brightness.light);
     expect(
       systemUiOverlayStyleCalls.where(
         (call) =>
@@ -1195,7 +1219,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump();
     await tester.idle();
-    expect(SystemChrome.latestStyle?.statusBarColor, Colors.transparent);
+    expect(
+      SystemChrome.latestStyle?.statusBarColor,
+      anyOf(isNull, Colors.transparent),
+    );
+    expect(SystemChrome.latestStyle?.statusBarIconBrightness, Brightness.light);
   });
 
   testWidgets('store recovery starts only after products load succeeds', (
@@ -1655,6 +1683,12 @@ void main() {
         find.byKey(ValueKey<String>('gem-task-action-${entry.key}')),
       );
       await tester.pump();
+      if (entry.key == 'daily_checkin') {
+        await tester.pumpAndSettle();
+        expect(find.text('Daily Check-in'), findsOneWidget);
+        await tester.tap(find.text('Check in').last);
+        await tester.pumpAndSettle();
+      }
       expect(find.text(entry.value), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
     }
@@ -1755,7 +1789,19 @@ void main() {
       const ValueKey<String>('gem-task-action-daily_checkin'),
     );
     await tester.tap(button);
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('Daily Check-in'), findsOneWidget);
+    expect(reportCalls, 0);
+    expect(claimCalls, 0);
+    // Dismissing the dialog must not perform the check-in or claim.
+    Navigator.of(tester.element(find.text('Daily Check-in'))).pop();
+    await tester.pumpAndSettle();
+    expect(reportCalls, 0);
+    expect(claimCalls, 0);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Check in').last);
+    await tester.pumpAndSettle();
     await tester.tap(button);
     await tester.pump();
     expect(reportCalls, 1);
@@ -1820,7 +1866,10 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey<String>('gem-task-action-daily_checkin')),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(claimCalls, 0);
+    await tester.tap(find.text('Check in').last);
+    await tester.pumpAndSettle();
 
     expect(claimCalls, 1);
     expect(find.text('Claim'), findsNothing);
@@ -1882,6 +1931,12 @@ void main() {
         find.byKey(ValueKey<String>('gem-task-action-${entry.key}')),
       );
       await tester.pump();
+      if (entry.key == 'daily_checkin') {
+        await tester.pumpAndSettle();
+        expect(find.text('Daily Check-in'), findsOneWidget);
+        await tester.tap(find.text('Check in').last);
+        await tester.pumpAndSettle();
+      }
       expect(find.text(entry.value), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
     }
@@ -1920,6 +1975,11 @@ void main() {
     );
     await tester.pump();
 
+    await tester.pumpAndSettle();
+    expect(find.text('Daily Check-in'), findsOneWidget);
+    expect(find.text('Claim failed.'), findsNothing);
+    await tester.tap(find.text('Claim').last);
+    await tester.pumpAndSettle();
     expect(find.text('Claim failed.'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
   });
@@ -2067,7 +2127,7 @@ void main() {
     expect(claimButtonDecoration.border, isNull);
     expect(
       tester.widget<Text>(find.text('Claim')).style?.color,
-      const Color(0xFFFF2442),
+      GenesisColors.redSecondary,
     );
 
     final row = find.byKey(
@@ -2128,7 +2188,7 @@ void main() {
     expect(claimedButtonDecoration.border, isNull);
     expect(
       tester.widget<Text>(find.text('Claimed')).style?.color,
-      const Color(0xFF999999),
+      GenesisColors.darkTextTertiary,
     );
 
     await tester.tap(

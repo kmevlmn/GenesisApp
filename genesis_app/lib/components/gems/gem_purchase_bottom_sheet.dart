@@ -14,7 +14,9 @@ import '../common/genesis_center_toast.dart';
 import '../common/genesis_bottom_sheet_panel.dart';
 import '../common/genesis_modal_routes.dart';
 import 'gem_billing_purchase_dialog.dart';
-import 'gem_colors.dart';
+import 'gem_purchase_state.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import 'gem_purchase_catalog.dart';
 import 'purchase_options_sheet.dart';
 import 'purchase_session_builder.dart';
@@ -85,6 +87,7 @@ Future<void> showSubscriptionPurchaseBottomSheet(BuildContext context) async {
       heightFactor: 0.8,
       alignment: Alignment.bottomCenter,
       child: PurchaseSessionBuilder(
+        backgroundColor: GenesisColors.darkRaisedBackground,
         builder: (_, showBuyGems) => PurchaseOptionsSheet(
           showBuyGems: showBuyGems,
           initialTab: PurchaseSheetTab.subscription,
@@ -349,109 +352,42 @@ class _GemPurchaseBottomSheetState extends State<GemPurchaseBottomSheet> {
     if (widget.embedded) {
       return content;
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GenesisBottomSheetPanel(
-          title: _title,
-          height: constraints.maxHeight,
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-          trailing: GenesisBottomSheetCloseButton(
-            buttonKey: const ValueKey<String>('gem-purchase-sheet-close'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          child: content,
-        );
-      },
+    return GenesisDarkTheme(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return GenesisBottomSheetPanel(
+            title: _title,
+            height: constraints.maxHeight,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            trailing: GenesisBottomSheetCloseButton(
+              buttonKey: const ValueKey<String>('gem-purchase-sheet-close'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            child: content,
+          );
+        },
+      ),
     );
   }
 
   Widget _buildProducts() {
     final products = _products;
     if (_productsLoading && products == null) {
-      return const _GemProductGridSkeleton();
+      return const GemProductGridSkeleton();
     }
     if (_productsError != null && products == null) {
-      return _GemPurchaseSheetState(
+      return GemPurchaseState(
         message: 'Unable to load gem packs.',
-        actionLabel: 'Retry',
-        onAction: () => unawaited(_loadProducts()),
+        onRetry: () => unawaited(_loadProducts()),
       );
     }
     if (products == null || products.isEmpty) {
-      return const _GemPurchaseSheetState(message: 'No gem packs available.');
+      return const GemPurchaseState(message: 'No gem packs available.');
     }
     return GemProductGrid(
       products: products,
       billingStateListenable: widget.billingService.state,
       onPurchase: (product) => unawaited(_purchase(product)),
-    );
-  }
-}
-
-class _GemProductGridSkeleton extends StatelessWidget {
-  const _GemProductGridSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 6,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 12,
-        mainAxisExtent: kGemProductCardHeight,
-      ),
-      itemBuilder: (_, _) => Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7F7F7),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFEBEBEB)),
-        ),
-      ),
-    );
-  }
-}
-
-class _GemPurchaseSheetState extends StatelessWidget {
-  const _GemPurchaseSheetState({
-    required this.message,
-    this.actionLabel,
-    this.onAction,
-  });
-
-  final String message;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 160,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF999999),
-              fontSize: 13,
-              height: 18 / 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: onAction,
-              style: TextButton.styleFrom(foregroundColor: kGemAccentColor),
-              child: Text(actionLabel!),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }
