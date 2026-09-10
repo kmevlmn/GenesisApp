@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/app/bootstrap/app_services_scope.dart';
@@ -17,6 +20,9 @@ import 'package:genesis_flutter_android/pages/world/world_page_result.dart';
 import 'package:genesis_flutter_android/platform/session/memory_user_session_store.dart';
 import 'package:genesis_flutter_android/routers/app_router.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_avatar.dart';
+import 'package:genesis_flutter_android/ui/components/genesis_search_field.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
+import 'package:genesis_flutter_android/ui/theme/genesis_theme.dart';
 import 'package:genesis_flutter_android/ui/components/genesis_list_image.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_avatar_radii.dart';
 import 'package:genesis_flutter_android/ui/tokens/genesis_origin_card_geometry.dart';
@@ -29,11 +35,104 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
   });
 
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets('search push and pop keep dark pixels on $platform', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final boundaryKey = GlobalKey();
+      // Build the fixture without native billing; the route platform below
+      // still exercises the real Android/iOS transition implementations.
+      final previousPlatform = debugDefaultTargetPlatformOverride;
+      late final AppServices services;
+      try {
+        debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+        services = await _servicesWithTransport(_SearchPageTransport());
+      } finally {
+        debugDefaultTargetPlatformOverride = previousPlatform;
+      }
+      await tester.pumpWidget(
+        AppServicesScope(
+          services: services,
+          child: MaterialApp(
+            theme: GenesisTheme.light().copyWith(platform: platform),
+            onGenerateRoute: AppRouter.onGenerateRoute,
+            builder: (context, child) =>
+                RepaintBoundary(key: boundaryKey, child: child!),
+            home: Scaffold(
+              backgroundColor: GenesisColors.darkBackground,
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(RouteNames.search),
+                  child: const Text('Open search'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Future<void> checkFrames() async {
+        for (final milliseconds in [0, 16, 32, 64, 100, 120, 200]) {
+          await tester.pump(Duration(milliseconds: milliseconds));
+          final channels = await tester.runAsync(() async {
+            final boundary =
+                boundaryKey.currentContext!.findRenderObject()!
+                    as RenderRepaintBoundary;
+            final image = await boundary.toImage(pixelRatio: 1);
+            try {
+              final bytes = (await image.toByteData(
+                format: ui.ImageByteFormat.rawRgba,
+              ))!;
+              return [
+                for (final x in [24, 195, 366])
+                  for (var channel = 0; channel < 3; channel++)
+                    bytes.getUint8((400 * image.width + x) * 4 + channel),
+              ];
+            } finally {
+              image.dispose();
+            }
+          });
+          expect(
+            channels,
+            everyElement(lessThan(64)),
+            reason:
+                'Empty page regions must stay dark throughout the transition.',
+          );
+        }
+      }
+
+      await tester.tap(find.text('Open search'));
+      await checkFrames();
+      expect(find.byType(SearchPage), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await checkFrames();
+      await tester.pumpAndSettle();
+      expect(find.byType(SearchPage), findsNothing);
+    });
+  }
+
   testWidgets('does not request search before three letters or chinese chars', (
     tester,
   ) async {
     final transport = _SearchPageTransport();
     await _pumpSearchPage(tester, transport);
+
+    // The editable search entrance must match Home from its first frame.
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.backgroundColor, GenesisColors.darkBackground);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.style?.color, GenesisColors.darkTextPrimary);
+    expect(field.cursorColor, GenesisColors.darkTextPrimary);
+    expect(field.decoration?.hintText, genesisSearchHintText);
+    expect(
+      field.decoration?.hintStyle?.color,
+      GenesisColors.darkInputPlaceholder,
+    );
 
     await tester.enterText(find.byType(TextField), 'a');
     await tester.pump(const Duration(milliseconds: 700));
@@ -54,6 +153,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
 
+    expect(
+      tester.widget<Icon>(find.byIcon(Icons.close)).color,
+      GenesisColors.darkTextTertiary,
+    );
     expect(transport.searchRequests, hasLength(1));
     expect(
       transport.searchRequests.single.uri.queryParameters['keyword'],
@@ -73,8 +176,9 @@ void main() {
     await _pumpSearchPage(tester, transport);
     await tester.pumpAndSettle();
 
+    expect(find.text('Search history'), findsOneWidget);
     final historyText = tester.widget<Text>(find.text('history query'));
-    expect(historyText.style?.color, const Color(0xFF666666));
+    expect(historyText.style?.color, GenesisColors.darkTextSecondary);
     final capsule = tester.widget<DecoratedBox>(
       find
           .ancestor(
@@ -84,7 +188,7 @@ void main() {
           .first,
     );
     final decoration = capsule.decoration as BoxDecoration;
-    expect(decoration.color, const Color(0xFFF1F3F6));
+    expect(decoration.color, GenesisColors.darkFaintFill);
     expect(decoration.borderRadius, BorderRadius.circular(8));
   });
 
@@ -231,6 +335,7 @@ void main() {
       find.byType(CircularProgressIndicator),
     );
     expect(progress.strokeWidth, 2);
+    expect(progress.color, GenesisColors.darkTextSecondary);
     expect(
       tester.getSize(find.byType(CircularProgressIndicator)),
       const Size.square(20),
@@ -434,7 +539,7 @@ void main() {
     );
     expect(brief.textSpan?.toPlainText(), 'Origin brief 1');
     expect(brief.maxLines, 2);
-    expect(brief.style?.color, const Color(0xFF666666));
+    expect(brief.style?.color, GenesisColors.darkTextSecondary);
   });
 
   testWidgets('renders world fields from the v2 search contract', (
@@ -483,9 +588,9 @@ void main() {
       find.byKey(const ValueKey<String>('origin-summary-tags')).first,
     );
     final tagsDecoration = tagsBox.decoration as BoxDecoration;
-    expect(tagsDecoration.color, const Color(0xFFF1F3F6));
+    expect(tagsDecoration.color, GenesisColors.darkFaintFill);
     expect(tagsDecoration.borderRadius, BorderRadius.circular(4));
-    expect(originTags.style?.color, const Color(0xFF666666));
+    expect(originTags.style?.color, GenesisColors.darkTextSecondary);
     final tagsPadding = tester.widget<Padding>(
       find.descendant(
         of: find.byKey(const ValueKey<String>('origin-summary-tags')).first,
@@ -558,7 +663,7 @@ void main() {
         matching: find.text('Character 1, Supporting 1'),
       ),
     );
-    expect(charactersText.style?.color, const Color(0xFF666666));
+    expect(charactersText.style?.color, GenesisColors.darkTextSecondary);
     expect(
       tester.getTopLeft(charactersFinder.first).dy,
       lessThan(tester.getTopLeft(briefFinder.first).dy),
@@ -788,6 +893,10 @@ void main() {
     final originImage = tester.widget<GenesisListImage>(
       find.descendant(of: originTile, matching: find.byType(GenesisListImage)),
     );
+    expect(
+      (originImage.placeholder as ColoredBox).color,
+      GenesisColors.darkFaintFill,
+    );
     expect(originImage.width, 60);
     expect(originImage.height, 60 / genesisOriginCoverAspectRatio);
 
@@ -818,14 +927,14 @@ void main() {
       ),
     );
     expect(originSubtitle.style?.height, 1.2);
-    expect(originSubtitle.style?.color, const Color(0xFF888888));
+    expect(originSubtitle.style?.color, GenesisColors.darkTextTertiary);
     final originStatTexts = tester.widgetList<Text>(
       find.descendant(of: originTile, matching: find.text('1')),
     );
     expect(originStatTexts, isNotEmpty);
     expect(
       originStatTexts.every(
-        (text) => text.style?.color == const Color(0xFF666666),
+        (text) => text.style?.color == GenesisColors.darkTextSecondary,
       ),
       isTrue,
     );
@@ -841,7 +950,10 @@ void main() {
       originStatIcons.every(
         (icon) =>
             icon.colorFilter ==
-            const ColorFilter.mode(Color(0xFF666666), BlendMode.srcIn),
+            const ColorFilter.mode(
+              GenesisColors.darkTextSecondary,
+              BlendMode.srcIn,
+            ),
       ),
       isTrue,
     );
@@ -857,6 +969,10 @@ void main() {
         .first;
     final worldImage = tester.widget<GenesisListImage>(
       find.descendant(of: worldTile, matching: find.byType(GenesisListImage)),
+    );
+    expect(
+      (worldImage.placeholder as ColoredBox).color,
+      GenesisColors.darkFaintFill,
     );
     expect(worldImage.width, 60);
     expect(worldImage.height, 90);
@@ -880,7 +996,7 @@ void main() {
     );
     expect(worldMetadata.style?.fontSize, 12);
     expect(worldMetadata.style?.height, 1.2);
-    expect(worldMetadata.style?.color, const Color(0xFF888888));
+    expect(worldMetadata.style?.color, GenesisColors.darkTextTertiary);
     final worldStats = tester.widget<Text>(
       find.descendant(
         of: worldTile,
@@ -889,7 +1005,7 @@ void main() {
     );
     expect(worldStats.style?.fontSize, 12);
     expect(worldStats.style?.height, 1.2);
-    expect(worldStats.style?.color, const Color(0xFF666666));
+    expect(worldStats.style?.color, GenesisColors.darkTextSecondary);
 
     await tester.tap(find.text('User'));
     await tester.pumpAndSettle();
@@ -917,7 +1033,7 @@ void main() {
     final userUid = tester.widget<Text>(
       find.descendant(of: userTile, matching: find.text('UID: user_1')),
     );
-    expect(userUid.style?.color, const Color(0xFF888888));
+    expect(userUid.style?.color, GenesisColors.darkTextTertiary);
 
     final userSizedBoxes = tester
         .widgetList<SizedBox>(
@@ -1478,7 +1594,7 @@ List<String> _highlightedTextParts(Text text) {
 
   void collect(InlineSpan span) {
     if (span is! TextSpan) return;
-    if (span.style?.color == const Color(0xFFFF2442) && span.text != null) {
+    if (span.style?.color == GenesisColors.redSecondary && span.text != null) {
       expect(span.style?.backgroundColor, isNull);
       result.add(span.text!);
     }

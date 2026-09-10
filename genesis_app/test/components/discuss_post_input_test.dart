@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+
+import '../support/font_expectations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/components/common/genesis_upload_progress_overlay.dart';
@@ -96,6 +98,7 @@ void main() {
 
     await tester.tap(find.text('Write a post').first);
     await tester.pumpAndSettle();
+    expectInterText(tester, find.text('Send'));
 
     expect(
       find.byKey(const ValueKey('discuss-image-picker-button')),
@@ -148,7 +151,7 @@ void main() {
       tester
           .widget<Icon>(find.byIcon(Icons.add_photo_alternate_outlined))
           .color,
-      GenesisColors.createAdd,
+      GenesisColors.brand,
     );
 
     await tester.tapAt(const Offset(20, 20));

@@ -1,7 +1,8 @@
 part of 'location_chat_page.dart';
 
 const String _locationChatMentionPlaceholder = '\uFFFC';
-const Color _locationChatMentionPrimaryForeground = Color(0xF2FFFFFF);
+const Color _locationChatMentionPrimaryForeground =
+    GenesisColors.darkTextPrimary;
 
 ChatMentionCatalog mergeLocationChatMentionCatalogs(
   ChatMentionCatalog primary,
@@ -764,7 +765,7 @@ class _LocationChatMentionSheetState extends State<LocationChatMentionSheet>
     final height = MediaQuery.sizeOf(context).height * 0.8;
     return Material(
       key: const ValueKey<String>('location-chat-mention-sheet'),
-      color: const Color(0xFF1F1D24),
+      color: GenesisColors.darkRaisedBackground,
       borderRadius: GenesisBottomSheetPanel.borderRadius,
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
@@ -834,7 +835,7 @@ class _LocationChatMentionSheetState extends State<LocationChatMentionSheet>
                 labelPadding: const EdgeInsets.symmetric(horizontal: 8),
                 labelFontSize: 14,
                 labelColor: _locationChatMentionPrimaryForeground,
-                unselectedLabelColor: const Color(0xB8FFFFFF),
+                unselectedLabelColor: GenesisColors.darkTextSecondary,
                 expanded: true,
               ),
               const SizedBox(height: 8),
@@ -906,7 +907,10 @@ class _LocationChatMentionList extends StatelessWidget {
       return Center(
         child: Text(
           emptyLabel,
-          style: const TextStyle(color: Color(0xB8FFFFFF), fontSize: 14),
+          style: const TextStyle(
+            color: GenesisColors.darkTextSecondary,
+            fontSize: 14,
+          ),
         ),
       );
     }
@@ -1023,7 +1027,7 @@ class _LocationChatLocationMentionRow extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Color(0x73FFFFFF),
+              color: GenesisColors.darkTextTertiary,
               fontSize: 12,
               height: 1,
               fontWeight: FontWeight.w600,
@@ -1070,7 +1074,7 @@ class _LocationChatMentionHereLabel extends StatelessWidget {
     return const Text(
       'Here',
       style: TextStyle(
-        color: Color(0x73FFFFFF),
+        color: GenesisColors.darkTextTertiary,
         fontSize: 12,
         height: 1.2,
         fontWeight: FontWeight.w600,

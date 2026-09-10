@@ -72,7 +72,7 @@ class _ProfileCollectionListState extends State<ProfileCollectionList> {
         key: widget.loadingKey,
         width: 24,
         height: 24,
-        child: const CircularProgressIndicator(strokeWidth: 2.4),
+        child: const GenesisLoadingIndicator(),
       );
       return _buildPlaceholder(context, loading);
     }
@@ -80,9 +80,11 @@ class _ProfileCollectionListState extends State<ProfileCollectionList> {
     if (widget.items.isEmpty) {
       final empty = Text(
         widget.emptyText,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
-          color: Color(0xFF8A8A8A),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? GenesisColors.darkTextSecondary
+              : const Color(0xFF8A8A8A),
           fontWeight: FontWeight.w400,
         ),
         textAlign: TextAlign.center,
@@ -206,9 +208,8 @@ class _ProfileCollectionListState extends State<ProfileCollectionList> {
   Widget _wrapRefreshIndicator(Widget child) {
     final refresh = widget.onRefresh;
     if (refresh == null) return child;
-    return RefreshIndicator(
+    return GenesisRefreshIndicator(
       key: widget.refreshKey,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       onRefresh: refresh,
       child: child,
     );

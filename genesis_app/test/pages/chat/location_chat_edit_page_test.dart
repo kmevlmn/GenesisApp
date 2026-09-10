@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/components/common/genesis_center_toast.dart';
 import 'package:genesis_flutter_android/network/api_exception.dart';
 import 'package:genesis_flutter_android/components/chat/shared/chat_ui.dart';
@@ -265,25 +266,18 @@ void main() {
                   )
                   .decoration!
               as BoxDecoration;
+      expect(deleteDecoration.color, GenesisColors.darkFaintSurface);
+      expect(deleteDecoration.borderRadius, BorderRadius.circular(6));
       expect(
-        deleteDecoration.color,
-        kLocationChatStyle.composerSendButtonDisabledColor,
+        deleteDecoration.border,
+        Border.all(color: GenesisColors.darkFaintFill),
       );
       expect(
-        deleteDecoration.borderRadius,
-        BorderRadius.circular(
-          kLocationChatStyle.composerSendButtonBorderRadius,
-        ),
-      );
-      final deleteSurface = tester.widget<ChatStableBackdropSurface>(
         find.ancestor(
           of: find.byKey(const ValueKey('location-chat-edit-delete-reply')),
           matching: find.byType(ChatStableBackdropSurface),
         ),
-      );
-      expect(
-        deleteSurface.sigma,
-        kLocationChatStyle.composerSendButtonBackdropBlurSigma,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('location-chat-background-overlay')),

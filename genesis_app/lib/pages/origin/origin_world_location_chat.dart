@@ -31,7 +31,7 @@ class _OriginLocationChatEmptyState extends StatelessWidget {
                   softWrap: false,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Color(0xF2FFFFFF),
+                    color: GenesisColors.darkTextPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     height: 1.4,
@@ -47,7 +47,7 @@ class _OriginLocationChatEmptyState extends StatelessWidget {
                   softWrap: false,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Color(0xB8FFFFFF),
+                    color: GenesisColors.darkTextSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                     height: 1.4,
@@ -277,7 +277,11 @@ extension _OriginWorldPageLocationChat on _OriginWorldPageState {
           .where((character) => _characterStableId(character) == selectedRoleId)
           .firstOrNull;
       if (character == null) {
-        showGenesisToast(context, 'This role is no longer available');
+        showGenesisToast(
+          context,
+          'This role is no longer available',
+          brightness: Brightness.dark,
+        );
         _setLocationChatRoleId(
           _OriginWorldPageState._profileLocationChatRoleId,
         );
@@ -809,21 +813,6 @@ _OriginInitialDialoguePreview? _originFirstInitialDialoguePreview(
         : locationId,
     messages: messages,
   );
-}
-
-Map<String, Map<String, dynamic>> _originLocationsById(
-  List<OriginLocation> locations,
-) {
-  final out = <String, Map<String, dynamic>>{};
-  for (final location in locations) {
-    final locationId = location.locationId.trim();
-    if (locationId.isEmpty) continue;
-    out[locationId] = <String, dynamic>{
-      'location_name': location.name,
-      'name': location.name,
-    };
-  }
-  return out;
 }
 
 List<WorldChatroomMessage> _originLocationOpeningPreviewMessages(

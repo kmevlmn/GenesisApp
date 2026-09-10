@@ -224,6 +224,8 @@ class _GemWalletPageState extends State<GemWalletPage>
         backgroundColor: Colors.white,
         appBar: GenesisBackAppBar(
           pageName: 'Buy Gems',
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
           titleWidget: WalletPurchaseTabs(controller: _purchaseTabs),
           titleSideInset: 56,
           systemOverlayStyle: kGenesisDefaultSystemUiOverlayStyle,

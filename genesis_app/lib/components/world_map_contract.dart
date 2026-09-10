@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../ui/tokens/genesis_typography.dart';
+
 import 'world_point.dart';
 
 typedef WorldPointTapCallback = FutureOr<void> Function(WorldPoint point);
@@ -18,6 +20,8 @@ const BorderRadius worldMapMessageBubbleBorderRadius = BorderRadius.all(
   Radius.circular(8),
 );
 const TextStyle worldMapMessageBubbleTextStyle = TextStyle(
+  fontFamily: GenesisTypography.fontFamily,
+  fontFamilyFallback: GenesisTypography.fontFamilyFallback,
   color: Color(0xFFF4F3F6),
   fontSize: 12,
   height: 1.2,

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import '../../../ui/tokens/genesis_blur.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -135,7 +137,7 @@ final ChatUiStyleConfig kPrivateChatStyle = ChatUiStyleConfig.standard.copyWith(
   headerBackdropBlurSigma: 0,
   composerBackgroundColor: const Color(0xF2F6F6F6),
   clearComposerBackgroundGradient: true,
-  composerBackdropBlurSigma: 20,
+  composerBackdropBlurSigma: GenesisBlur.strong,
   composerSendButtonColor: const Color(0xFF338960),
   composerSendButtonDisabledColor: const Color(0xFFBFD8CD),
   senderNameTextStyle: ChatUiStyleConfig.standard.senderNameTextStyle.copyWith(
@@ -147,9 +149,9 @@ final ChatUiStyleConfig kPrivateChatStyle = ChatUiStyleConfig.standard.copyWith(
 const double _locationChatAvatarOneThird = 40 / 3;
 const double _npcChatAvatarSize = 40;
 const Color _npcChatAvatarBackgroundColor = Color(0xFF4A5F7A);
-const Color _locationChatBackgroundColor = Color(0xFF151517);
+const Color _locationChatBackgroundColor = GenesisColors.darkBackground;
 const Color _locationChatSurfaceColor = Colors.transparent;
-const double _locationChatSurfaceBlurSigma = 4;
+const double _locationChatSurfaceBlurSigma = GenesisBlur.light;
 const double _chatHeaderTrailingWidth = 96;
 
 ChatUiStyleConfig get kLocationChatStyle => ChatUiStyleConfig.standard.copyWith(
@@ -172,14 +174,15 @@ ChatUiStyleConfig get kLocationChatStyle => ChatUiStyleConfig.standard.copyWith(
   composerSendButtonBorderRadius: 8,
   composerSendButtonColor: const Color(0xFFFF2442),
   composerSendButtonDisabledColor: const Color(0x21FFFFFF),
-  composerSendButtonBackdropBlurSigma: 14,
+  composerSendButtonBackdropBlurSigma: GenesisBlur.strong,
   composerSendButtonIconSize: 17,
   composerActionGap: 9,
   inputBackgroundColor: const Color(0x1FFFFFFF),
-  inputBackdropBlurSigma: 4,
+  inputBackdropBlurSigma: GenesisBlur.light,
   inputBorderRadius: 8,
+  inputHintStyle: const TextStyle(color: GenesisColors.darkInputPlaceholder),
   inputTextStyle: ChatUiStyleConfig.standard.inputTextStyle.copyWith(
-    color: Colors.white,
+    color: GenesisColors.darkTextPrimary,
     fontSize: 14,
     height: 1.4,
   ),
@@ -215,26 +218,6 @@ ChatUiStyleConfig get kLocationChatStyle => ChatUiStyleConfig.standard.copyWith(
   ),
 );
 
-ChatUiStyleConfig get kOpeningDialogueStyle => kLocationChatStyle.copyWith(
-  headerTitleTextStyle: kLocationChatStyle.headerTitleTextStyle.copyWith(
-    color: const Color(0xFF111111),
-  ),
-  headerTitleIconColor: const Color(0xFF111111),
-  senderNameTextStyle: kLocationChatStyle.senderNameTextStyle.copyWith(
-    color: const Color(0xFF111111),
-  ),
-  selfBubbleColor: const Color(0xFFC41F2E),
-  otherBubbleColor: Colors.white,
-  bubbleTextStyle: kLocationChatStyle.bubbleTextStyle.copyWith(
-    color: Colors.black,
-  ),
-  bubbleBackdropBlurSigma: 0,
-  useConfiguredScenePlateSystemStyle: true,
-  systemMessageBackgroundColor: const Color(0xE6111111),
-  systemMessageTextStyle: const TextStyle(
-    color: Color(0xBAFFFFFF),
-    fontSize: 13,
-    height: 1.3,
-    fontWeight: FontWeight.w400,
-  ),
-);
+// Opening uses the chat palette on a flat surface, so no backdrop blur is needed.
+ChatUiStyleConfig get kOpeningDialogueStyle =>
+    kLocationChatStyle.copyWith(bubbleBackdropBlurSigma: 0);

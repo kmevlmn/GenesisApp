@@ -27,6 +27,7 @@ import '../network/chatroom/chatroom_connection_controller.dart';
 import '../network/chatroom/world_chatroom_service.dart';
 import '../network/models/world.dart';
 import '../components/discuss/origin_discuss_list.dart';
+import '../ui/navigation/genesis_dark_page_route.dart';
 import '../components/chat/shared/chat_ui.dart';
 import '../components/gems/purchase_session_builder.dart';
 
@@ -550,13 +551,13 @@ sealed class AppRouter {
         );
       case RouteNames.discuss:
         final args = _DiscussRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => DiscussPage(oid: args.oid, originId: args.originId),
         );
       case RouteNames.postDetail:
         final args = _PostDetailRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => PostDetailPage(item: args.item),
         );
@@ -619,18 +620,18 @@ sealed class AppRouter {
           ),
         );
       case RouteNames.search:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const SearchPage(),
         );
       case RouteNames.create:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const CreateOriginPage(),
         );
       case RouteNames.edit:
         final args = _EditRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => EditOriginPage(originId: args.originId),
         );
@@ -689,7 +690,7 @@ sealed class AppRouter {
         );
       case RouteNames.legal:
         final args = _LegalRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => LegalDocumentPage(document: args.document),
         );
@@ -710,12 +711,12 @@ sealed class AppRouter {
         );
       case RouteNames.memoryModel:
         final args = _MemoryModelRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<String>(
+        return GenesisDarkPageRoute<String>(
           settings: settings,
           builder: (_) => MemoryModelPage(worldId: args.worldId),
         );
       case RouteNames.pageNotFound:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const PageNotFoundPage(),
         );
@@ -725,7 +726,7 @@ sealed class AppRouter {
           builder: (_) => const AppShellPage(initialIndex: 0),
         );
       default:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const PageNotFoundPage(),
         );

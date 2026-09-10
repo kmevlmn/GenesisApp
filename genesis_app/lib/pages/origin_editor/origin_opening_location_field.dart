@@ -28,9 +28,9 @@ class _OpeningLocationField extends StatelessWidget {
           onTap: loading ? null : onTap,
           child: Container(
             height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
-              color: createFormFieldFill,
+              color: GenesisColors.darkFaintFill,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -46,17 +46,17 @@ class _OpeningLocationField extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: locationName.isEmpty
-                          ? createFormHint
-                          : createFormText,
+                          ? GenesisColors.darkInputPlaceholder
+                          : GenesisColors.darkTextPrimary,
                       fontSize: 14,
-                      height: 1.2,
+                      height: 1.4,
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 const Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  color: createFormMuted,
+                  color: GenesisColors.darkTextTertiary,
                   size: 24,
                 ),
               ],
@@ -77,9 +77,23 @@ class _OpeningInitialCharacters extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       key: const ValueKey<String>('opening-initial-characters'),
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SvgPicture.asset(characterStatIconAsset, width: 12, height: 12),
+        SizedBox(
+          width: 12,
+          height: MediaQuery.textScalerOf(context).scale(12) * 1.4,
+          child: Center(
+            child: SvgPicture.asset(
+              characterStatIconAsset,
+              width: 12,
+              height: 12,
+              colorFilter: const ColorFilter.mode(
+                GenesisColors.darkTextSecondary,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+        ),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
@@ -87,9 +101,9 @@ class _OpeningInitialCharacters extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: createFormText,
+              color: GenesisColors.darkTextPrimary,
               fontSize: 12,
-              height: 1.1,
+              height: 1.4,
               fontWeight: FontWeight.w600,
             ),
           ),

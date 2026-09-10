@@ -58,7 +58,7 @@ extension _WorldPageTickFlow on _WorldPageState {
       if (!mounted) return;
       if (action != WorldHeaderActionKind.progress &&
           message.trim().isNotEmpty) {
-        showGenesisToast(context, message);
+        showGenesisToast(context, message, brightness: Brightness.dark);
       }
       if (action == WorldHeaderActionKind.progress) {
         _startWorldTickTracking(openEventsAfterDone: true);
@@ -87,7 +87,11 @@ extension _WorldPageTickFlow on _WorldPageState {
           return;
         }
       }
-      showGenesisToast(context, '${worldHeaderActionLabel(action)} failed');
+      showGenesisToast(
+        context,
+        '${worldHeaderActionLabel(action)} failed',
+        brightness: Brightness.dark,
+      );
     } finally {
       if (mounted && action != WorldHeaderActionKind.progress) {
         _setWorldPageState(() => _worldActionRunning = false);
@@ -294,11 +298,7 @@ extension _WorldPageTickFlow on _WorldPageState {
       context: context,
       title: 'Request to join this World?',
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Request',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Request', value: true),
       ],
     );
     return result ?? false;
@@ -332,12 +332,12 @@ extension _WorldPageTickFlow on _WorldPageState {
       );
       if (!mounted) return;
       if (message.trim().isNotEmpty) {
-        showGenesisToast(context, message);
+        showGenesisToast(context, message, brightness: Brightness.dark);
       }
       await _fetchWorld();
     } catch (_) {
       if (!mounted) return;
-      showGenesisToast(context, 'Launch failed');
+      showGenesisToast(context, 'Launch failed', brightness: Brightness.dark);
     } finally {
       if (mounted) _setWorldPageState(() => _worldActionRunning = false);
     }
@@ -350,7 +350,11 @@ extension _WorldPageTickFlow on _WorldPageState {
     final userInfo = await services.sessionStore.readUserInfo();
     if (userInfo == null || userInfo.isEmpty) {
       if (mounted) {
-        showGenesisToast(context, 'No saved profile found');
+        showGenesisToast(
+          context,
+          'No saved profile found',
+          brightness: Brightness.dark,
+        );
       }
       return null;
     }

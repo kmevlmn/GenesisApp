@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
 import '../../app/debug_floating_button_unlock.dart';
 import '../../platform/auth/auth_session.dart';
 import '../login_provider_button.dart';
@@ -14,11 +14,13 @@ class SignedOutMeView extends StatefulWidget {
     required this.loggingInProvider,
     required this.onLogin,
     this.reselectionListenable,
+    this.isActiveListenable,
   });
 
   final IdentityProvider? loggingInProvider;
   final ValueChanged<IdentityProvider> onLogin;
   final ValueListenable<int>? reselectionListenable;
+  final ValueListenable<bool>? isActiveListenable;
 
   @override
   State<SignedOutMeView> createState() => _SignedOutMeViewState();
@@ -34,23 +36,36 @@ class _SignedOutMeViewState extends State<SignedOutMeView> {
   void initState() {
     super.initState();
     widget.reselectionListenable?.addListener(_handleMainNavReselected);
+    widget.isActiveListenable?.addListener(_handleTabActivityChanged);
   }
 
   @override
   void didUpdateWidget(covariant SignedOutMeView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.reselectionListenable == widget.reselectionListenable) {
-      return;
+    if (oldWidget.reselectionListenable != widget.reselectionListenable) {
+      oldWidget.reselectionListenable?.removeListener(_handleMainNavReselected);
+      widget.reselectionListenable?.addListener(_handleMainNavReselected);
     }
-    oldWidget.reselectionListenable?.removeListener(_handleMainNavReselected);
-    widget.reselectionListenable?.addListener(_handleMainNavReselected);
+    if (oldWidget.isActiveListenable != widget.isActiveListenable) {
+      oldWidget.isActiveListenable?.removeListener(_handleTabActivityChanged);
+      widget.isActiveListenable?.addListener(_handleTabActivityChanged);
+    }
   }
 
   @override
   void dispose() {
     widget.reselectionListenable?.removeListener(_handleMainNavReselected);
+    widget.isActiveListenable?.removeListener(_handleTabActivityChanged);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleTabActivityChanged() {
+    if (widget.isActiveListenable?.value != false ||
+        !_scrollController.hasClients) {
+      return;
+    }
+    _scrollController.jumpTo(_scrollController.position.minScrollExtent);
   }
 
   void _handleMainNavReselected() {
@@ -78,6 +93,7 @@ class _SignedOutMeViewState extends State<SignedOutMeView> {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return SafeArea(
       bottom: false,
       child: LayoutBuilder(
@@ -100,33 +116,42 @@ class _SignedOutMeViewState extends State<SignedOutMeView> {
                             ),
                             behavior: HitTestBehavior.opaque,
                             onTap: _handleTopTap,
-                            child: SvgPicture.asset(
-                              'assets/svg/worldo-logo.svg',
+                            child: ClipRRect(
                               key: const Key('signed_out_worldo_logo'),
-                              width: 200,
-                              fit: BoxFit.contain,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.asset(
+                                'assets/images/app_icon.png',
+                                width: 96,
+                                height: 96,
+                                fit: BoxFit.contain,
+                                semanticLabel: 'Worldo',
+                              ),
                             ),
                           ),
                           const SizedBox(height: 30),
-                          const Text(
+                          Text(
                             'LIVE YOUR WORLD',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 9,
-                              color: Color(0xFF7A7A7A),
+                              color: dark
+                                  ? GenesisColors.darkTextPrimary
+                                  : const Color(0xFF7A7A7A),
                             ),
                           ),
                           const SizedBox(height: 18),
-                          const Text(
+                          Text(
                             'Play world, create worldo, invite friends,\n'
                             'and continue them anywhere.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.35,
-                              color: Color(0xFF666666),
+                              color: dark
+                                  ? GenesisColors.darkTextSecondary
+                                  : const Color(0xFF666666),
                             ),
                           ),
                         ],
@@ -134,12 +159,14 @@ class _SignedOutMeViewState extends State<SignedOutMeView> {
                     ),
                     Column(
                       children: [
-                        const Text(
+                        Text(
                           'Sign up and get 250 Gems!',
-                          key: ValueKey<String>('signed-out-gems-promo'),
+                          key: const ValueKey<String>('signed-out-gems-promo'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Color(0xFFFF2442),
+                            color: dark
+                                ? GenesisColors.redSecondary
+                                : GenesisColors.redPrimary,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),

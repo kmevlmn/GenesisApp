@@ -9,6 +9,8 @@ import 'package:genesis_flutter_android/pages/origin_editor/origin_pending_submi
 import 'package:genesis_flutter_android/routers/app_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../support/font_expectations.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -117,6 +119,10 @@ void main() {
     expect(
       _richTextWithPlainText('Worldo #o_timeout_1 created!'),
       findsOneWidget,
+    );
+    expectInterText(
+      tester,
+      _richTextWithPlainText('Worldo #o_timeout_1 created!'),
     );
 
     await tester.tap(find.text('View'));
@@ -314,6 +320,10 @@ void main() {
       expect(
         _richTextWithPlainText('Worldo #Done Worldo $successVerb!'),
         findsOneWidget,
+      );
+      expectInterText(
+        tester,
+        _richTextWithPlainText('Worldo #Done Worldo $successVerb!'),
       );
 
       await tester.tap(find.text('View'));

@@ -16,11 +16,13 @@ class AiContentDisclaimer extends StatelessWidget {
     this.text = kAiContentDisclaimerText,
     this.padding = const EdgeInsets.fromLTRB(20, 0, 20, 16),
     this.textAlign = TextAlign.center,
+    this.textColor,
   });
 
   final String text;
   final EdgeInsetsGeometry padding;
   final TextAlign textAlign;
+  final Color? textColor;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +31,9 @@ class AiContentDisclaimer extends StatelessWidget {
       child: Text(
         text,
         textAlign: textAlign,
-        style: kAiContentDisclaimerTextStyle,
+        style: textColor == null
+            ? kAiContentDisclaimerTextStyle
+            : kAiContentDisclaimerTextStyle.copyWith(color: textColor),
       ),
     );
   }

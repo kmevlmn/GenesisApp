@@ -9,6 +9,8 @@ import 'package:genesis_flutter_android/pages/world/world_page_result.dart';
 import 'package:genesis_flutter_android/routers/app_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../support/font_expectations.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -161,6 +163,10 @@ void main() {
     expect(
       _richTextWithPlainText('Worldo #w_timeout_1 launched!'),
       findsOneWidget,
+    );
+    expectInterText(
+      tester,
+      _richTextWithPlainText('Worldo #w_timeout_1 launched!'),
     );
 
     await tester.tap(find.text('Enter'));

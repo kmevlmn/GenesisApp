@@ -7,6 +7,10 @@ import 'package:genesis_flutter_android/app/config/app_config.dart';
 import 'package:genesis_flutter_android/components/common/genesis_action_box.dart';
 import 'package:genesis_flutter_android/components/common/genesis_report_actions.dart';
 
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
+
+import '../support/font_expectations.dart';
+
 void main() {
   testWidgets('report button menu appears to the left with icon', (
     tester,
@@ -21,6 +25,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Report'), findsOneWidget);
+    expectInterText(tester, find.text('Report'));
     expect(find.byType(SvgPicture), findsOneWidget);
     final reportText = tester.widget<Text>(find.text('Report'));
     expect(reportText.style?.fontSize, 12);
@@ -141,6 +146,7 @@ void main() {
     final copyText = tester.widget<Text>(find.text('Copy'));
     final reportText = tester.widget<Text>(find.text('Report'));
     expect(copyText.style?.fontSize, 12);
+    expectInterText(tester, find.text('Copy'));
     expect(reportText.style?.fontSize, 12);
     expect(copyText.style?.color, Colors.white);
     expect(reportText.style?.color, Colors.white);
@@ -236,6 +242,15 @@ void main() {
     final input = tester.widget<TextField>(
       find.byKey(const ValueKey<String>('genesis-report-content-input')),
     );
+    expect(input.style?.color, GenesisColors.darkTextPrimary);
+    expect(input.cursorColor, GenesisColors.darkTextPrimary);
+    expect(input.decoration?.filled, isTrue);
+    expect(input.decoration?.fillColor, GenesisColors.darkFaintFill);
+    expect(input.decoration?.focusedBorder?.borderSide, BorderSide.none);
+    expect(
+      input.decoration?.hintStyle?.color,
+      GenesisColors.darkInputPlaceholder,
+    );
     expect(input.minLines, 3);
     expect(input.maxLines, 3);
     expect(input.autofocus, isTrue);
@@ -257,7 +272,9 @@ void main() {
     final inputRect = tester.getRect(
       find.byKey(const ValueKey<String>('genesis-report-content-input')),
     );
-    expect(titleRect.top - titleRowRect.top, closeTo(16, 1));
+    // The fixed-height title row centers this group (14px in the existing
+    // layout); its separate title-to-input spacing remains 16px.
+    expect(titleRect.top - titleRowRect.top, closeTo(14, 1));
     expect(inputRect.top - titleRect.bottom, closeTo(16, 1));
   });
 }

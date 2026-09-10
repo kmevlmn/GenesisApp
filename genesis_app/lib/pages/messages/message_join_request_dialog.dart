@@ -107,15 +107,20 @@ class _JoinRequestDialogInfoRow extends StatelessWidget {
               child: Text.rich(
                 TextSpan(
                   children: [
-                    TextSpan(text: title, style: _originBlueTextStyle),
+                    TextSpan(text: title, style: _notificationNameStyle),
                     if (subtitle.trim().isNotEmpty)
-                      TextSpan(text: ' $subtitle'),
+                      TextSpan(
+                        text: ' $subtitle',
+                        style: const TextStyle(
+                          color: GenesisColors.darkTextTertiary,
+                        ),
+                      ),
                   ],
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF111111),
+                  color: GenesisColors.darkTextSecondary,
                   fontSize: 12,
                   height: 1.2,
                   fontWeight: FontWeight.w400,
@@ -127,7 +132,7 @@ class _JoinRequestDialogInfoRow extends StatelessWidget {
               const Text(
                 '>',
                 style: TextStyle(
-                  color: Color(0xFF8A8D93),
+                  color: GenesisColors.darkTextTertiary,
                   fontSize: 12,
                   height: 1,
                   fontWeight: FontWeight.w400,

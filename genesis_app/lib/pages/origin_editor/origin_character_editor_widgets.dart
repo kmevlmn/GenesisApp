@@ -30,7 +30,7 @@ class _CharacterCard extends StatelessWidget {
             form: form,
             onChanged: onChanged,
             showFieldNotes: true,
-            labelFontWeight: FontWeight.w400,
+            labelFontWeight: FontWeight.w600,
             nextFocusNode: nextFocusNode,
             nameSupportLeading: _BestRoleSelector(
               form: form,
@@ -67,12 +67,13 @@ class _BestRoleSelector extends StatelessWidget {
                 selected: form.isRecommended,
                 semanticLabel: 'Creator suggests this role for the user',
                 style: OriginRoleSelectionMarkStyle.star,
+                starUnselectedColor: GenesisColors.darkTextTertiary,
               ),
               const SizedBox(width: 6),
               const Text(
                 'Suggest',
                 style: TextStyle(
-                  color: Color(0xFF111111),
+                  color: GenesisColors.darkTextSecondary,
                   fontSize: 12,
                   height: 1.2,
                   fontWeight: FontWeight.w400,

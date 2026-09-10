@@ -12,23 +12,7 @@ class WorldTickPendingEventPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          constraints: const BoxConstraints(minHeight: 30),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF4F5F8),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            'Tick $tickNumber',
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF111111),
-            ),
-          ),
-        ),
+        ChatTickHeader(label: 'Tick $tickNumber', style: kLocationChatStyle),
         const SizedBox(height: 12),
         Container(
           key: const ValueKey<String>('world-event-pending-tombstone'),
@@ -36,7 +20,7 @@ class WorldTickPendingEventPage extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 168),
           padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF4F5F8),
+            color: GenesisColors.darkRaisedBackground,
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Column(
@@ -77,8 +61,8 @@ class WorldTickPendingSkeletonLine extends StatelessWidget {
       widthFactor: widthFactor,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFFE1E4EA),
-          borderRadius: BorderRadius.circular(999),
+          color: GenesisColors.darkFaintFill,
+          borderRadius: BorderRadius.circular(4),
         ),
         child: SizedBox(height: height),
       ),
@@ -268,7 +252,7 @@ class WorldTickEventCardPageState extends State<WorldTickEventCardPage> {
               icon,
               key: key,
               size: iconSize,
-              color: const Color(0xFF111111),
+              color: GenesisColors.darkTextPrimary,
             ),
           ),
         ),
@@ -409,23 +393,23 @@ class WorldTickCardScrollPhysics extends BouncingScrollPhysics {
 
 const TextStyle _worldEventContentLabelStyle = TextStyle(
   fontSize: 13,
-  height: 1.6,
+  height: 1.3,
   fontWeight: FontWeight.w600,
-  color: Color(0xFF111111),
+  color: GenesisColors.darkTextPrimary,
 );
 
 const TextStyle _worldEventContentTextStyle = TextStyle(
   fontSize: 13,
-  height: 1.6,
+  height: 1.3,
   fontWeight: FontWeight.w400,
-  color: Color(0xFF111111),
+  color: GenesisColors.darkTextSecondary,
 );
 
 const TextStyle _worldEventContentTimestampStyle = TextStyle(
   fontSize: 13,
   height: 1.4,
   fontWeight: FontWeight.w400,
-  color: Color(0xFF666666),
+  color: GenesisColors.darkTextSecondary,
 );
 
 String? worldTickParagraphTimestamp(Map<String, dynamic> tick) {
@@ -452,7 +436,10 @@ class WorldEventsLoadingMoreIndicator extends StatelessWidget {
         child: SizedBox(
           width: 18,
           height: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: GenesisColors.darkTextSecondary,
+          ),
         ),
       ),
     );

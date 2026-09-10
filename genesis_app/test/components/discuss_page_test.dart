@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:genesis_flutter_android/components/discuss/discuss_dark_style.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/app/bootstrap/app_services_scope.dart';
@@ -64,6 +66,27 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    // Loading stays static even while the network response remains pending.
+    await tester.pumpAndSettle();
+    expect(tester.binding.transientCallbackCount, 0);
+    final bones = tester.widgetList<DecoratedBox>(
+      find.descendant(
+        of: find.byKey(const ValueKey<String>('discuss-page-loading-skeleton')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is DecoratedBox &&
+              widget.decoration is BoxDecoration &&
+              (widget.decoration as BoxDecoration).borderRadius != null,
+        ),
+      ),
+    );
+    expect(bones, isNotEmpty);
+    for (final bone in bones) {
+      final decoration = bone.decoration as BoxDecoration;
+      expect(decoration.color, const Color(0x1FFFFFFF));
+      expect(decoration.gradient, isNull);
+    }
 
     originGate.complete();
     await tester.pumpAndSettle();
@@ -140,23 +163,37 @@ void main() {
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffold.bottomNavigationBar, isNull);
 
-    final bar = tester.widget<ColoredBox>(
-      find.byKey(const ValueKey<String>('discuss-page-post-input-bar')),
+    final bar = tester.widget<Material>(
+      find
+          .ancestor(
+            of: find.byKey(
+              const ValueKey<String>('discuss-page-post-input-bar'),
+            ),
+            matching: find.byType(Material),
+          )
+          .first,
     );
-    expect(bar.color, const Color(0xFFF9F9F9));
+    expect(bar.color, DiscussDarkColors.background);
+    expect(scaffold.backgroundColor, DiscussDarkColors.background);
+    expect(
+      tester.widget<AppBar>(find.byType(AppBar)).backgroundColor,
+      DiscussDarkColors.background,
+    );
+    expect(
+      tester.widget<Text>(find.text('Discuss item 1')).style?.color,
+      DiscussDarkColors.primary,
+    );
 
     final barRect = tester.getRect(
       find.byKey(const ValueKey<String>('discuss-page-post-input-bar')),
     );
-    final inputRect = tester.getRect(
-      find.widgetWithText(TextField, 'Write a post'),
-    );
+    final inputRect = tester.getRect(find.text('Write a post'));
     expect(barRect.bottom, 760);
     expect(inputRect.bottom, greaterThan(660));
     expect(inputRect.bottom, lessThanOrEqualTo(760 - 34));
   });
 
-  testWidgets('reply action opens post detail before showing composer', (
+  testWidgets('reply preview opens post detail before showing composer', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -174,20 +211,25 @@ void main() {
     expect(find.byType(DiscussStoryBadge), findsNothing);
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('origin-discuss-reply-dis_1')),
+      find.byKey(const ValueKey<String>('discuss-page-reply-preview-dis_1')),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Post Detail'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey<String>('post-detail-post-input-bar')),
+      find.byKey(const ValueKey<String>('post-detail-comment-input-bar')),
       findsOneWidget,
     );
-    final bottomInput = tester.widget<TextField>(
-      find.widgetWithText(TextField, 'Write a reply'),
+    expect(find.text('Write a reply'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+      DiscussDarkColors.background,
     );
-    expect(bottomInput.minLines, 1);
-    expect(bottomInput.maxLines, 3);
+    expect(
+      tester.widget<Text>(find.text('Reply target')).style?.color,
+      DiscussDarkColors.primary,
+    );
   });
 
   testWidgets('comment action row shows report menu', (tester) async {
@@ -236,15 +278,15 @@ void main() {
     expect(find.text('Post Detail'), findsOneWidget);
     expect(find.text('All Replies 1'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey<String>('post-detail-reply-reply_1')),
+      find.byKey(const ValueKey<String>('post-detail-reply-like-reply_1')),
       findsOneWidget,
     );
     expect(find.text('Reply User: Reply target'), findsNothing);
     expect(find.text('Reply target'), findsOneWidget);
     expect(find.byType(DiscussStoryBadge), findsNothing);
-    expect(find.widgetWithText(TextField, 'Write a reply'), findsOneWidget);
+    expect(find.text('Write a reply'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(TextField, 'Write a reply'));
+    await tester.tap(find.text('Write a reply'));
     await tester.pumpAndSettle();
 
     final composerInputFinder = find.byWidgetPredicate(

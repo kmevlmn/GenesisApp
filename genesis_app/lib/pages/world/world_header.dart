@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+
 import '../../network/models/world.dart';
 import '../../ui/components/genesis_character_avatar.dart';
 import '../../ui/components/genesis_map_top_glass_bar.dart';
@@ -113,9 +115,18 @@ class WorldMapIdentityPill extends StatelessWidget {
                     ],
                   ),
                 ),
-              if (title.isNotEmpty && timeText.isNotEmpty)
-                const SizedBox(height: 3),
-              if (timeText.isNotEmpty) _WorldMapTimeLabel(text: timeText),
+              if (title.isNotEmpty) const SizedBox(height: 3),
+              // Reserve the time row before detail loads so the title never
+              // shifts from a single-line center to the final two-line layout.
+              Visibility(
+                visible: timeText.isNotEmpty,
+                maintainSize: true,
+                maintainAnimation: true,
+                maintainState: true,
+                child: _WorldMapTimeLabel(
+                  text: timeText.isEmpty ? 'Tick 0 · 00:00' : timeText,
+                ),
+              ),
             ],
           ),
         ),
@@ -419,9 +430,10 @@ class WorldInfoHeader extends StatelessWidget {
                         height: usesCompactProgressButton ? 34 : 35,
                         width: usesCompactProgressButton ? 92 : 140,
                         backgroundColor: const Color(0xFFFF2442),
-                        disabledBackgroundColor: const Color(
-                          0xFFFF2442,
-                        ).withValues(alpha: 0.62),
+                        disabledBackgroundColor:
+                            GenesisColors.darkButtonDisabledBackground,
+                        disabledForegroundColor:
+                            GenesisColors.darkButtonDisabledForeground,
                         foregroundColor: Colors.white,
                         fontSize: usesCompactProgressButton ? 14 : 16,
                         padding: EdgeInsets.zero,
@@ -476,7 +488,7 @@ class _WorldLaunchedCharacterSummary extends StatelessWidget {
             'world-current-character-avatar-placeholder',
           ),
           decoration: BoxDecoration(
-            color: const Color(0xFFE9EDF2),
+            color: GenesisColors.darkFaintFill,
             borderRadius: BorderRadius.circular(12),
           ),
           child: GenesisCharacterAvatar(
@@ -500,7 +512,7 @@ class _WorldLaunchedCharacterSummary extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF111111),
+                  color: GenesisColors.darkTextPrimary,
                   fontSize: 14,
                   height: 1.2,
                   fontWeight: FontWeight.w600,
@@ -513,7 +525,7 @@ class _WorldLaunchedCharacterSummary extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF666666),
+                  color: GenesisColors.darkTextSecondary,
                   fontSize: 12,
                   height: 1.2,
                   fontWeight: FontWeight.w400,
@@ -547,7 +559,7 @@ class _WorldUnlaunchedSummary extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: const TextStyle(
-        color: Color(0xFF111111),
+        color: GenesisColors.darkTextSecondary,
         fontSize: 13,
         height: 1.2,
         fontWeight: FontWeight.w400,

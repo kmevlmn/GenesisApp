@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from GenesisColors.darkBackground. Run tool/generate_launch_assets.dart. -->
+<resources>
+    <color name="genesis_dark_background">#151517</color>
+</resources>

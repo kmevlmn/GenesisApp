@@ -861,11 +861,14 @@ void main() {
 
     expect(find.text('Gem Records'), findsOneWidget);
     final recordsTitle = tester.widget<Text>(find.text('Gem Records'));
-    expect(recordsTitle.style, GenesisTypography.pageTitle);
+    expect(
+      recordsTitle.style,
+      GenesisTypography.pageTitle.copyWith(color: Colors.black),
+    );
     expect(
       tester.getTopLeft(find.byType(TabBar)).dy -
           tester.getRect(find.text('Gem Records')).bottom,
-      closeTo(12.5, 0.1),
+      closeTo(11, 0.1),
     );
     expect(find.text('Daily check-in'), findsOneWidget);
     expect(find.text('Starter reward'), findsNothing);
@@ -2376,7 +2379,7 @@ void _expectGrantedSuccessDialog(
     findsOneWidget,
   );
   expect((spans[1] as TextSpan).text, grantedText);
-  expect((spans[1] as TextSpan).style?.color, const Color(0xFFFF2442));
+  expect((spans[1] as TextSpan).style?.color, GenesisColors.redSecondary);
   expect((spans[2] as TextSpan).text, ' Gems have been granted.');
   final okText = tester.widget<Text>(find.text('OK'));
   expect(okText.style?.fontSize, 15);

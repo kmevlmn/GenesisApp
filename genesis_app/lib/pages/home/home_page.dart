@@ -21,7 +21,9 @@ import '../../platform/session/user_session_store.dart';
 import '../../routers/app_router.dart';
 import '../../ui/components/genesis_deleted_list_item_transition.dart';
 import '../../ui/components/genesis_safe_area.dart';
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 import 'home_feed_cache_store.dart';
 import '../world/world_deletion_events.dart';
 import '../world/world_page_result.dart';
@@ -125,21 +127,26 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return _HomeScaffold(
-      activationListenable: widget.activationListenable,
-      reselectionListenable: widget.reselectionListenable,
-      isActiveListenable: widget.isActiveListenable,
-      isFirstPageViewReported: widget.isFirstPageViewReported,
-      onFirstPageViewReady: widget.onFirstPageViewReady,
-      onOpenWorldo: widget.onOpenWorldo,
-      networkRequestsAllowed: _homeNetworkRequestsAllowed,
-      keepInitialNetworkFailureLoading: false,
-      initialRequestMetricWindow: widget.initialRequestMetricWindow,
-      localRestoreTimeout: widget.localRestoreTimeout,
-      myWorldsCacheLoader: widget.myWorldsCacheLoader,
-      initialMyWorldsData: widget.initialMyWorldsData,
-      initialMyWorldsRenderOperation: null,
-      initialMyWorldsRequestAttempt: 0,
+    return GenesisDarkTheme(
+      child: ColoredBox(
+        color: GenesisColors.darkBackground,
+        child: _HomeScaffold(
+          activationListenable: widget.activationListenable,
+          reselectionListenable: widget.reselectionListenable,
+          isActiveListenable: widget.isActiveListenable,
+          isFirstPageViewReported: widget.isFirstPageViewReported,
+          onFirstPageViewReady: widget.onFirstPageViewReady,
+          onOpenWorldo: widget.onOpenWorldo,
+          networkRequestsAllowed: _homeNetworkRequestsAllowed,
+          keepInitialNetworkFailureLoading: false,
+          initialRequestMetricWindow: widget.initialRequestMetricWindow,
+          localRestoreTimeout: widget.localRestoreTimeout,
+          myWorldsCacheLoader: widget.myWorldsCacheLoader,
+          initialMyWorldsData: widget.initialMyWorldsData,
+          initialMyWorldsRenderOperation: null,
+          initialMyWorldsRequestAttempt: 0,
+        ),
+      ),
     );
   }
 }

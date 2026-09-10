@@ -15,77 +15,6 @@ class CreateKeyboardDismissArea extends StatelessWidget {
   }
 }
 
-class CreateFormDeleteButton extends StatelessWidget {
-  const CreateFormDeleteButton({
-    super.key,
-    required this.onPressed,
-    this.buttonKey,
-    this.decorationKey,
-    this.size = 24,
-    this.iconSize = 14,
-    this.backgroundColor = const Color(0xE6F4F4F6),
-    this.iconColor = const Color(0xFF666666),
-    this.borderSide = const BorderSide(color: Color(0xFFD8D8DE)),
-    this.borderRadius,
-    this.enabled = true,
-    this.onDisabledPressed,
-  });
-
-  final VoidCallback onPressed;
-  final Key? buttonKey;
-  final Key? decorationKey;
-  final double size;
-  final double iconSize;
-  final Color backgroundColor;
-  final Color iconColor;
-  final BorderSide borderSide;
-  final BorderRadius? borderRadius;
-  final bool enabled;
-  final VoidCallback? onDisabledPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: enabled ? null : onDisabledPressed,
-      child: Opacity(
-        opacity: enabled ? 1 : 0.45,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Container(
-                key: decorationKey,
-                decoration: BoxDecoration(
-                  color: backgroundColor,
-                  border: Border.fromBorderSide(borderSide),
-                  borderRadius: borderRadius ?? BorderRadius.circular(size / 4),
-                ),
-              ),
-              IconButton(
-                key: buttonKey,
-                onPressed: enabled ? onPressed : null,
-                padding: EdgeInsets.all((size - iconSize) / 2),
-                constraints: BoxConstraints.tightFor(width: size, height: size),
-                icon: SvgPicture.asset(
-                  createFormDeleteIconAsset,
-                  width: iconSize,
-                  height: iconSize,
-                  colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-                ),
-                splashRadius: size / 2,
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class CreateFormCard extends StatelessWidget {
   const CreateFormCard({
     super.key,
@@ -116,10 +45,21 @@ class CreateFormCard extends StatelessWidget {
           ? const EdgeInsets.fromLTRB(18, 6, 18, 22)
           : const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: CreateFormTheme.colorOf(
+          context,
+          Colors.white,
+          GenesisColors.darkBackground,
+        ),
         borderRadius: BorderRadius.circular(8),
         border: showBorder
-            ? Border.all(color: createFormBorder, width: 1.2)
+            ? Border.all(
+                color: CreateFormTheme.colorOf(
+                  context,
+                  createFormBorder,
+                  GenesisColors.darkFaintFill,
+                ),
+                width: 1.2,
+              )
             : null,
       ),
       child: Column(
@@ -135,8 +75,12 @@ class CreateFormCard extends StatelessWidget {
                       if (titleSuffix?.trim().isNotEmpty == true)
                         TextSpan(
                           text: ' ${titleSuffix!.trim()}',
-                          style: const TextStyle(
-                            color: Color(0xFFA8A8AD),
+                          style: TextStyle(
+                            color: CreateFormTheme.colorOf(
+                              context,
+                              const Color(0xFFA8A8AD),
+                              GenesisColors.darkTextTertiary,
+                            ),
                             fontSize: 12,
                             fontWeight: FontWeight.w400,
                           ),
@@ -144,14 +88,18 @@ class CreateFormCard extends StatelessWidget {
                     ],
                   ),
                   style: TextStyle(
-                    color: createFormText,
+                    color: CreateFormTheme.colorOf(
+                      context,
+                      createFormText,
+                      GenesisColors.darkTextPrimary,
+                    ),
                     fontSize: titleFontSize,
                     fontWeight: FontWeight.w600,
                     height: 1.1,
                   ),
                 ),
               ),
-              CreateFormDeleteButton(
+              GenesisDeleteButton(
                 onPressed: onDelete,
                 enabled: deleteEnabled,
                 onDisabledPressed: onDeleteDisabled,

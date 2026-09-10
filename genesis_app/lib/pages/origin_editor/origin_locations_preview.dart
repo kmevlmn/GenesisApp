@@ -164,16 +164,18 @@ extension _OriginLocationsPreview on _OriginLocationsEditorPageState {
       footer: editable ? _buildTreeRootFooter() : null,
     );
     if (!editable) return list;
-    return Theme(
-      key: const ValueKey<String>('locations-edit-no-tap-effects'),
-      data: Theme.of(context).copyWith(
-        splashFactory: NoSplash.splashFactory,
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        hoverColor: Colors.transparent,
-        focusColor: Colors.transparent,
+    return Builder(
+      builder: (context) => Theme(
+        key: const ValueKey<String>('locations-edit-no-tap-effects'),
+        data: Theme.of(context).copyWith(
+          splashFactory: NoSplash.splashFactory,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          focusColor: Colors.transparent,
+        ),
+        child: list,
       ),
-      child: list,
     );
   }
 

@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../../ui/tokens/genesis_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../world_map_contract.dart';
@@ -651,7 +653,7 @@ class _MapZoomGripPainter extends CustomPainter {
       Paint()..color = Colors.transparent,
     );
     final paint = Paint()
-      ..color = const Color(0xB8FFFFFF)
+      ..color = GenesisColors.darkTextSecondary
       ..strokeWidth = 1
       ..strokeCap = StrokeCap.round;
     final center = size.center(Offset.zero);

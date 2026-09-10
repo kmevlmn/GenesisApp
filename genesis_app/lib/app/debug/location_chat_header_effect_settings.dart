@@ -1,3 +1,5 @@
+import '../../ui/tokens/genesis_blur.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,8 +14,8 @@ class LocationChatHeaderEffectSettings {
   static const double maxTransparencyStrength = 1;
   static const double defaultTransparencyStrength = 0;
   static const double minBlurSigma = 0;
-  static const double maxBlurSigma = 20;
-  static const double defaultBlurSigma = 4;
+  static const double maxBlurSigma = GenesisBlur.strong;
+  static const double defaultBlurSigma = GenesisBlur.light;
 
   static const defaults = LocationChatHeaderEffectSettings(
     transparencyStrength: defaultTransparencyStrength,
@@ -90,17 +92,13 @@ class LocationChatHeaderEffectSettingsController
                   LocationChatHeaderEffectSettings.maxTransparencyStrength,
                 )
                 .toDouble(),
-        blurSigma:
-            _storedDouble(
-                  prefs,
-                  blurSigmaStorageKey,
-                  LocationChatHeaderEffectSettings.defaultBlurSigma,
-                )
-                .clamp(
-                  LocationChatHeaderEffectSettings.minBlurSigma,
-                  LocationChatHeaderEffectSettings.maxBlurSigma,
-                )
-                .toDouble(),
+        blurSigma: GenesisBlur.normalize(
+          _storedDouble(
+            prefs,
+            blurSigmaStorageKey,
+            LocationChatHeaderEffectSettings.defaultBlurSigma,
+          ),
+        ),
       );
       if (revision == _revision) {
         value = loaded;
@@ -128,14 +126,7 @@ class LocationChatHeaderEffectSettingsController
   void previewBlurSigma(double blurSigma) {
     _revision += 1;
     _loaded = true;
-    value = value.copyWith(
-      blurSigma: blurSigma
-          .clamp(
-            LocationChatHeaderEffectSettings.minBlurSigma,
-            LocationChatHeaderEffectSettings.maxBlurSigma,
-          )
-          .toDouble(),
-    );
+    value = value.copyWith(blurSigma: GenesisBlur.normalize(blurSigma));
   }
 
   Future<void> save() async {

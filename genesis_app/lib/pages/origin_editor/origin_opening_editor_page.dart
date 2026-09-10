@@ -51,7 +51,7 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
         .toList(growable: false);
     _OpeningLocationOption? selectedOption;
     final savedLocationId = draft.opening.locationId.trim();
-    if (draft.openingSaved && savedLocationId.isNotEmpty) {
+    if (savedLocationId.isNotEmpty) {
       for (final option in options) {
         if (option.id == savedLocationId) {
           selectedOption = option;
@@ -115,9 +115,11 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _OpeningLocationPickerSheet(
-        options: _options,
-        initialSelection: _selectedOption,
+      builder: (context) => GenesisDarkTheme(
+        child: _OpeningLocationPickerSheet(
+          options: _options,
+          initialSelection: _selectedOption,
+        ),
       ),
     );
     if (!mounted || selected == null) return;
@@ -146,7 +148,11 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
     CharacterDraft? character,
   }) {
     if (_dialogueItems.length >= _maxDialogueItems) {
-      showGenesisToast(context, 'You can add up to 10 dialogue items.');
+      showGenesisToast(
+        context,
+        'You can add up to 10 dialogue items.',
+        brightness: Brightness.dark,
+      );
       return;
     }
     setState(() {
@@ -210,7 +216,11 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
         })
         .catchError((Object _) {
           if (mounted) {
-            showGenesisToast(context, 'Unable to save suggested role.');
+            showGenesisToast(
+              context,
+              'Unable to save suggested role.',
+              brightness: Brightness.dark,
+            );
           }
         });
   }
@@ -256,7 +266,11 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      showGenesisToast(context, 'Unable to save Opening.');
+      showGenesisToast(
+        context,
+        'Unable to save Opening.',
+        brightness: Brightness.dark,
+      );
     }
   }
 
@@ -268,11 +282,27 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: CreateFormTheme(child: _buildPage(context)),
+      ),
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
     final selected = _selectedOption;
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: Colors.white,
-      appBar: const GenesisBackAppBar(pageName: 'Opening'),
+      backgroundColor: GenesisColors.darkBackground,
+      appBar: const GenesisBackAppBar(
+        pageName: 'Opening',
+        backgroundColor: GenesisColors.darkBackground,
+        foregroundColor: GenesisColors.darkTextPrimary,
+        systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+      ),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -305,7 +335,7 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
                                     'opening-location-title',
                                   ),
                                   style: TextStyle(
-                                    color: createFormText,
+                                    color: GenesisColors.darkTextPrimary,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                     height: 1.2,
@@ -335,7 +365,7 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
                                           'opening-dialogue-title',
                                         ),
                                         style: TextStyle(
-                                          color: createFormText,
+                                          color: GenesisColors.darkTextPrimary,
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
                                           height: 1.2,
@@ -349,7 +379,7 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
                                         'opening-dialogue-count',
                                       ),
                                       style: const TextStyle(
-                                        color: createFormMuted,
+                                        color: GenesisColors.darkTextTertiary,
                                         fontSize: 13,
                                         fontWeight: FontWeight.w400,
                                         height: 1.2,
@@ -396,10 +426,15 @@ class _OriginOpeningEditorPageState extends State<OriginOpeningEditorPage> {
                     minimum: const EdgeInsets.fromLTRB(28, 8, 28, 14),
                     child: GenesisPrimaryButton(
                       label: _isSaving ? 'Saving...' : 'Save',
+                      backgroundColor: GenesisColors.redPrimary,
+                      foregroundColor: GenesisColors.darkTextPrimary,
                       width: _primaryActionButtonWidth(context),
                       onPressed: _canSave && !_isSaving ? _save : null,
-                      onDisabledPressed: () =>
-                          showGenesisToast(context, _saveDisabledReason),
+                      onDisabledPressed: () => showGenesisToast(
+                        context,
+                        _saveDisabledReason,
+                        brightness: Brightness.dark,
+                      ),
                     ),
                   ),
                 ],

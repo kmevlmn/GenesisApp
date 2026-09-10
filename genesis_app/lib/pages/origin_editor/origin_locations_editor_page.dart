@@ -177,24 +177,7 @@ class _OriginLocationsEditorPageState extends State<OriginLocationsEditorPage> {
     final locations = _snapshotLocations()
         .where(_locationDraftHasContent)
         .toList(growable: false);
-    final openingLocationId = draft.opening.locationId.trim();
-    final shouldClearOpening =
-        draft.openingSaved &&
-        openingLocationId.isNotEmpty &&
-        !locations.any(
-          (location) =>
-              (location.level == 0 || location.level == 3) &&
-              location.locationId.trim() == openingLocationId,
-        );
-
-    await widget.repository.saveFinalDraft(
-      draft.copyWith(
-        locations: locations,
-        locationsSaved: locations.isNotEmpty,
-        opening: shouldClearOpening ? const OpeningDraft() : draft.opening,
-        openingSaved: shouldClearOpening ? false : draft.openingSaved,
-      ),
-    );
+    await widget.repository.saveFinalDraft(draft.withSavedLocations(locations));
 
     if (!mounted) return;
     setState(() => _isSaving = false);
@@ -299,7 +282,7 @@ class _OriginLocationsEditorPageState extends State<OriginLocationsEditorPage> {
   }
 
   void _showError(String message) {
-    showGenesisToast(context, message);
+    showGenesisToast(context, message, brightness: Brightness.dark);
   }
 
   void _setLocationEditorState(VoidCallback callback) {
@@ -312,6 +295,8 @@ class _OriginLocationsEditorPageState extends State<OriginLocationsEditorPage> {
       minimum: const EdgeInsets.fromLTRB(28, 8, 28, 14),
       child: GenesisPrimaryButton(
         label: _isSaving ? 'Saving...' : 'Save',
+        backgroundColor: GenesisColors.redPrimary,
+        foregroundColor: GenesisColors.darkTextPrimary,
         width: _primaryActionButtonWidth(context),
         onPressed: _canUseSaveButton ? _saveLocations : null,
         onDisabledPressed: () => _showError(_saveDisabledReason),
@@ -336,14 +321,28 @@ class _OriginLocationsEditorPageState extends State<OriginLocationsEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: CreateFormTheme(child: _buildPage(context)),
+      ),
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
     return Listener(
       onPointerUp: (_) => _releaseInlineOutsideTapSuppression(),
       onPointerCancel: (_) => _releaseInlineOutsideTapSuppression(),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
-        backgroundColor: Colors.white,
+        backgroundColor: GenesisColors.darkBackground,
         appBar: GenesisBackAppBar(
           pageName: 'Locations',
+          backgroundColor: GenesisColors.darkBackground,
+          foregroundColor: GenesisColors.darkTextPrimary,
+          systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 12),

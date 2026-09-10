@@ -144,7 +144,7 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.center,
         style: const TextStyle(
-          color: Color(0xFF666666),
+          color: GenesisColors.darkTextSecondary,
           fontSize: 13,
           height: 1.3,
           fontWeight: FontWeight.w400,
@@ -152,11 +152,7 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
       ),
       titleHeight: 104,
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Delete',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Delete', value: true),
       ],
       cancelLabel: 'Cancel',
     );
@@ -177,7 +173,7 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
         'This is the Opening location. Deleting it will also clear the Opening.',
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: Color(0xFF666666),
+          color: GenesisColors.darkTextSecondary,
           fontSize: 13,
           height: 1.3,
           fontWeight: FontWeight.w400,
@@ -185,11 +181,7 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
       ),
       titleHeight: 120,
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Delete',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Delete', value: true),
       ],
       cancelLabel: 'Cancel',
     );
@@ -456,155 +448,171 @@ extension _OriginLocationsTreeFlow on _OriginLocationsEditorPageState {
           draftOwnedBySheet = true;
           return _LocationFormOwner(
             form: draftForm,
-            child: StatefulBuilder(
-              builder: (context, setSheetState) {
-                void refreshSheet() => setSheetState(() {});
+            child: GenesisDarkTheme(
+              child: CreateFormTheme(
+                child: StatefulBuilder(
+                  builder: (context, setSheetState) {
+                    void refreshSheet() => setSheetState(() {});
 
-                final deleteEnabled = target.parent.children.length > 1;
-                final selectedCharacterIds = draftForm.selectedCharacterIds
-                    .toSet();
-                final blockedCharacterIds = _boundCharacterIdsExceptForm(
-                  target.form,
-                );
-                final availableCharacters = _finalCharacters
-                    .where((character) {
-                      final characterId = character.charId.trim();
-                      return characterId.isNotEmpty &&
-                          character.name.trim().isNotEmpty &&
-                          !selectedCharacterIds.contains(characterId) &&
-                          !blockedCharacterIds.contains(characterId);
-                    })
-                    .toList(growable: false);
-                return GenesisBottomSheetPanel(
-                  key: const ValueKey<String>('locations-l3-editor-sheet'),
-                  title: isNew ? 'Add L3 Location' : 'Edit L3 Location',
-                  height: sheetHeight,
-                  maintainBottomViewPadding: true,
-                  trailing: GenesisBottomSheetCloseButton(
-                    buttonKey: const ValueKey<String>(
-                      'locations-l3-editor-close',
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          child: _LocationCard(
-                            key: ValueKey<String>(
-                              'locations-l3-sheet-${target.form.locationId}',
-                            ),
-                            index: target.l3Index + 1,
-                            showHeader: false,
-                            nameFieldLabel: 'Name *',
-                            nameFieldHintText: '',
-                            nameFieldNote:
-                                _OriginLocationsEditorPageState._l3NameNote,
-                            fieldLabelFontWeight: FontWeight.w400,
-                            form: draftForm,
-                            nextFocusNode: null,
-                            characters: _finalCharacters,
-                            onChanged: refreshSheet,
-                            onPickCharacters: () {
-                              // L3 sheets use the inline Available to select
-                              // list instead of opening a second sheet.
-                            },
-                            availableCharacters: availableCharacters,
-                            onAddCharacter: (characterId) {
-                              if (draftForm.selectedCharacterIds.contains(
-                                characterId,
-                              )) {
-                                return;
-                              }
-                              draftForm.selectedCharacterIds = [
-                                ...draftForm.selectedCharacterIds,
-                                characterId,
-                              ];
-                              setSheetState(() {});
-                            },
-                            onRemoveCharacter: (charId) {
-                              draftForm.selectedCharacterIds = draftForm
-                                  .selectedCharacterIds
-                                  .where((item) => item != charId)
-                                  .toList(growable: true);
-                              setSheetState(() {});
-                            },
-                            onDelete: () {},
-                          ),
+                    final deleteEnabled = target.parent.children.length > 1;
+                    final selectedCharacterIds = draftForm.selectedCharacterIds
+                        .toSet();
+                    final blockedCharacterIds = _boundCharacterIdsExceptForm(
+                      target.form,
+                    );
+                    final availableCharacters = _finalCharacters
+                        .where((character) {
+                          final characterId = character.charId.trim();
+                          return characterId.isNotEmpty &&
+                              character.name.trim().isNotEmpty &&
+                              !selectedCharacterIds.contains(characterId) &&
+                              !blockedCharacterIds.contains(characterId);
+                        })
+                        .toList(growable: false);
+                    return GenesisBottomSheetPanel(
+                      key: const ValueKey<String>('locations-l3-editor-sheet'),
+                      title: isNew ? 'Add L3 Location' : 'Edit L3 Location',
+                      height: sheetHeight,
+                      maintainBottomViewPadding: true,
+                      trailing: GenesisBottomSheetCloseButton(
+                        buttonKey: const ValueKey<String>(
+                          'locations-l3-editor-close',
                         ),
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
-                      const SizedBox(height: 18),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final preferredSaveWidth = _primaryActionButtonWidth(
-                            context,
-                          );
-                          final reservedActionWidth = isNew
-                              ? 0.0
-                              : GenesisPrimaryButton.defaultHeight + 12;
-                          final availableSaveWidth =
-                              constraints.maxWidth - reservedActionWidth;
-                          final saveWidth =
-                              preferredSaveWidth <= availableSaveWidth
-                              ? preferredSaveWidth
-                              : availableSaveWidth;
-                          return Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (!isNew) ...[
-                                  CreateFormDeleteButton(
-                                    buttonKey: const ValueKey<String>(
-                                      'locations-l3-editor-delete',
-                                    ),
-                                    size: GenesisPrimaryButton.defaultHeight,
-                                    iconSize: 20,
-                                    onPressed: () async {
-                                      final shouldDelete =
-                                          await _confirmOpeningLocationDeletion(
-                                            locationId: target.form.locationId,
-                                            name: draftForm.name.text,
-                                          );
-                                      if (!context.mounted || !shouldDelete) {
-                                        return;
-                                      }
-                                      Navigator.of(
-                                        context,
-                                      ).pop(_L3EditorSheetAction.delete);
-                                    },
-                                    enabled: deleteEnabled,
-                                    onDisabledPressed: () => _showError(
-                                      _l2NeedsL3Message(target.parent),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                ],
-                                GenesisPrimaryButton(
-                                  key: const ValueKey<String>(
-                                    'locations-l3-editor-save',
-                                  ),
-                                  label: 'Save',
-                                  width: saveWidth,
-                                  onPressed: draftForm.name.text.trim().isEmpty
-                                      ? null
-                                      : () => Navigator.of(
-                                          context,
-                                        ).pop(_L3EditorSheetAction.save),
-                                  onDisabledPressed: () => _showError(
-                                    'L3 location name is required.',
-                                  ),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: SingleChildScrollView(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              child: _LocationCard(
+                                key: ValueKey<String>(
+                                  'locations-l3-sheet-${target.form.locationId}',
                                 ),
-                              ],
+                                index: target.l3Index + 1,
+                                showHeader: false,
+                                nameFieldLabel: 'Name *',
+                                nameFieldHintText: '',
+                                nameFieldNote:
+                                    _OriginLocationsEditorPageState._l3NameNote,
+                                fieldLabelFontWeight: FontWeight.w600,
+                                form: draftForm,
+                                nextFocusNode: null,
+                                characters: _finalCharacters,
+                                onChanged: refreshSheet,
+                                onPickCharacters: () {
+                                  // L3 sheets use the inline Available to select
+                                  // list instead of opening a second sheet.
+                                },
+                                availableCharacters: availableCharacters,
+                                onAddCharacter: (characterId) {
+                                  if (draftForm.selectedCharacterIds.contains(
+                                    characterId,
+                                  )) {
+                                    return;
+                                  }
+                                  draftForm.selectedCharacterIds = [
+                                    ...draftForm.selectedCharacterIds,
+                                    characterId,
+                                  ];
+                                  setSheetState(() {});
+                                },
+                                onRemoveCharacter: (charId) async {
+                                  if (!await _confirmOpeningCharacterRemoval(
+                                        draftForm,
+                                        {charId},
+                                      ) ||
+                                      !context.mounted)
+                                    return;
+                                  draftForm.selectedCharacterIds = draftForm
+                                      .selectedCharacterIds
+                                      .where((item) => item != charId)
+                                      .toList(growable: true);
+                                  setSheetState(() {});
+                                },
+                                onDelete: () {},
+                              ),
                             ),
-                          );
-                        },
+                          ),
+                          const SizedBox(height: 18),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final preferredSaveWidth =
+                                  _primaryActionButtonWidth(context);
+                              final reservedActionWidth = isNew
+                                  ? 0.0
+                                  : GenesisPrimaryButton.defaultHeight + 12;
+                              final availableSaveWidth =
+                                  constraints.maxWidth - reservedActionWidth;
+                              final saveWidth =
+                                  preferredSaveWidth <= availableSaveWidth
+                                  ? preferredSaveWidth
+                                  : availableSaveWidth;
+                              return Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (!isNew) ...[
+                                      GenesisDeleteButton(
+                                        buttonKey: const ValueKey<String>(
+                                          'locations-l3-editor-delete',
+                                        ),
+                                        size:
+                                            GenesisPrimaryButton.defaultHeight,
+                                        iconSize: 20,
+                                        onPressed: () async {
+                                          final shouldDelete =
+                                              await _confirmOpeningLocationDeletion(
+                                                locationId:
+                                                    target.form.locationId,
+                                                name: draftForm.name.text,
+                                              );
+                                          if (!context.mounted ||
+                                              !shouldDelete) {
+                                            return;
+                                          }
+                                          Navigator.of(
+                                            context,
+                                          ).pop(_L3EditorSheetAction.delete);
+                                        },
+                                        enabled: deleteEnabled,
+                                        onDisabledPressed: () => _showError(
+                                          _l2NeedsL3Message(target.parent),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                    ],
+                                    GenesisPrimaryButton(
+                                      key: const ValueKey<String>(
+                                        'locations-l3-editor-save',
+                                      ),
+                                      label: 'Save',
+                                      backgroundColor: GenesisColors.redPrimary,
+                                      foregroundColor:
+                                          GenesisColors.darkTextPrimary,
+                                      width: saveWidth,
+                                      onPressed:
+                                          draftForm.name.text.trim().isEmpty
+                                          ? null
+                                          : () => Navigator.of(
+                                              context,
+                                            ).pop(_L3EditorSheetAction.save),
+                                      onDisabledPressed: () => _showError(
+                                        'L3 location name is required.',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
           );
         },

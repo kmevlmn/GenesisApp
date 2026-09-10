@@ -2,10 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'support/font_expectations.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:genesis_flutter_android/ui/components/genesis_delete_button.dart';
+import 'package:genesis_flutter_android/ui/components/genesis_profile_collection_list_item.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent, RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -3683,8 +3688,37 @@ void main() {
     },
   );
 
+  testWidgets('app text uses Inter across root overlay and main pages', (
+    WidgetTester tester,
+  ) async {
+    await _pumpGenesisApp(tester, initialAuthToken: 'backend-token');
+    await tester.pumpAndSettle();
+    expectInterText(tester, find.byType(GenesisApp));
+
+    final entry = OverlayEntry(
+      builder: (_) => const Positioned(
+        top: 100,
+        left: 20,
+        child: Text('Root overlay font probe'),
+      ),
+    );
+    genesisNavigatorKey.currentState!.overlay!.insert(entry);
+    await tester.pump();
+    expectInterText(tester, find.text('Root overlay font probe'));
+    entry.remove();
+    entry.dispose();
+
+    for (final tab in ['Inbox', 'Me', 'Worldo', 'Create']) {
+      await tester.tap(find.byKey(ValueKey('bottom-nav-$tab')));
+      await tester.pumpAndSettle();
+      expectInterText(tester, find.byType(GenesisApp));
+    }
+    AppStartupCoordinator.resetForTesting();
+  });
+
   testWidgets('Home is default tab', (WidgetTester tester) async {
     await _pumpGenesisApp(tester);
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Popular'), findsNothing);
@@ -3693,6 +3727,7 @@ void main() {
     expect(find.byKey(const ValueKey('bottom-nav-Create')), findsOneWidget);
     expect(find.text('Inbox'), findsOneWidget);
     expect(find.text('Me'), findsOneWidget);
+    AppStartupCoordinator.resetForTesting();
   });
 
   testWidgets('signed-out cold start opens Worldo and Home opens My Worlds', (
@@ -3704,13 +3739,63 @@ void main() {
 
     expect(find.byType(AppShellPage, skipOffstage: false), findsOneWidget);
     expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 1);
+    expect(
+      Theme.of(tester.element(find.byType(BottomTabs))).brightness,
+      Brightness.light,
+    );
     expect(find.text('Worldo'), findsOneWidget);
+    expect(
+      _pageStatusBarStyle(tester).statusBarIconBrightness,
+      Brightness.light,
+    );
+    expect(
+      _pageStatusBarStyle(tester).systemNavigationBarIconBrightness,
+      Brightness.dark,
+    );
     expect(find.text('For you'), findsOneWidget);
+    expect(tester.widget<Icon>(find.byIcon(CupertinoIcons.search)).size, 16);
 
     await tester.tap(find.text('Home'));
     await tester.pump();
 
     expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 0);
+    expect(
+      Theme.of(tester.element(find.byType(BottomTabs))).brightness,
+      Brightness.light,
+    );
+    expect(
+      _pageStatusBarStyle(tester).statusBarIconBrightness,
+      Brightness.light,
+    );
+    final navImages = tester.widgetList<SvgPicture>(
+      find.descendant(
+        of: find.byType(BottomTabs),
+        matching: find.byType(SvgPicture),
+      ),
+    );
+    expect(navImages, isNotEmpty);
+    expect(navImages.every((image) => image.colorFilter == null), isTrue);
+    final navDecoration =
+        tester
+                .widget<DecoratedBox>(
+                  find
+                      .descendant(
+                        of: find.byType(BottomTabs),
+                        matching: find.byType(DecoratedBox),
+                      )
+                      .first,
+                )
+                .decoration
+            as BoxDecoration;
+    expect(navDecoration.color, Colors.white);
+    expect(navDecoration.boxShadow, const [
+      BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, -2)),
+    ]);
+
+    expect(
+      _pageStatusBarStyle(tester).systemNavigationBarIconBrightness,
+      Brightness.dark,
+    );
     expect(find.text('Popular'), findsNothing);
 
     final emptyAction = find.byKey(
@@ -3725,7 +3810,13 @@ void main() {
     await tester.pump();
 
     expect(tester.widget<BottomTabs>(find.byType(BottomTabs)).currentIndex, 1);
+    expect(
+      Theme.of(tester.element(find.byType(BottomTabs))).brightness,
+      Brightness.light,
+    );
     expect(find.text('For you'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    AppStartupCoordinator.resetForTesting();
   });
 
   testWidgets('tap header search bar opens search page', (
@@ -3736,12 +3827,13 @@ void main() {
         .getTopLeft(find.byType(SearchBarPlaceholder).first)
         .dy;
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
 
     expect(find.text('Cancel'), findsOneWidget);
-    expect(find.text('Explore'), findsOneWidget);
+    expect(find.text('Worldo, Character, Tags'), findsOneWidget);
     final searchPageSearchTop = tester
         .getTopLeft(find.byType(SearchBarPlaceholder).first)
         .dy;
@@ -3759,6 +3851,20 @@ void main() {
     );
     await tester.pump();
 
+    final search = tester.widget<SearchBarPlaceholder>(
+      find.byType(SearchBarPlaceholder),
+    );
+    expect(search.backgroundColor, GenesisColors.darkFaintFill);
+    expect(search.borderColor, isNull);
+    expect(search.iconAsset, isNull);
+    expect(search.icon, CupertinoIcons.search);
+    final searchIcon = tester.widget<Icon>(find.byIcon(CupertinoIcons.search));
+    expect(searchIcon.size, 16);
+    expect(searchIcon.color, GenesisColors.darkTextSecondary);
+    expect(
+      tester.widget<Text>(find.text('Worldo, Character, Tags')).style?.color,
+      GenesisColors.darkInputPlaceholder,
+    );
     final searchRect = tester.getRect(find.byType(SearchBarPlaceholder));
     final headerRect = tester.getRect(find.byType(GenesisTopSafeArea));
     final gemEntryFinder = find.byKey(
@@ -4029,7 +4135,9 @@ void main() {
       ),
     );
 
-    final placeholder = tester.widget<Text>(find.text('Explore'));
+    final placeholder = tester.widget<Text>(
+      find.text('Worldo, Character, Tags'),
+    );
     expect(placeholder.maxLines, 1);
     expect(placeholder.overflow, TextOverflow.ellipsis);
     expect(placeholder.softWrap, isFalse);
@@ -4041,7 +4149,7 @@ void main() {
     await _pumpGenesisApp(tester);
     await tester.pump();
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'zz');
@@ -4091,7 +4199,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'reborn');
@@ -4160,7 +4268,7 @@ void main() {
     await tester.pumpWidget(GenesisApp(services: services));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'reborn');
     await tester.pump(const Duration(milliseconds: 600));
@@ -4184,7 +4292,7 @@ void main() {
   ) async {
     await _pumpGenesisApp(tester);
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), '老肖');
@@ -4200,7 +4308,7 @@ void main() {
   ) async {
     await _pumpGenesisApp(tester);
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), '老肖');
@@ -4222,7 +4330,7 @@ void main() {
   ) async {
     await _pumpGenesisApp(tester);
 
-    await tester.tap(find.text('Explore').first);
+    await tester.tap(find.text('Worldo, Character, Tags').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'st');
@@ -4479,12 +4587,12 @@ void main() {
       find.text('First direct message preview'),
     );
     expect(lastMessage.style?.fontWeight, FontWeight.w400);
-    expect(lastMessage.style?.color, const Color(0xFF666666));
+    expect(lastMessage.style?.color, GenesisColors.darkTextSecondary);
     final timestamp = tester.widget<Text>(
       find.text(formatGenesisTimestamp(transport.lastMessageAt)),
     );
     expect(timestamp.style?.fontWeight, FontWeight.w400);
-    expect(timestamp.style?.color, const Color(0xFF888888));
+    expect(timestamp.style?.color, GenesisColors.darkTextTertiary);
     final dmAvatar = find.byKey(const ValueKey('dm-avatar-dm_test_001'));
     final dmName = find.text('Penny Direct');
     expect(dmAvatar, findsOneWidget);
@@ -4721,7 +4829,7 @@ void main() {
 
     final text = tester.widget<Text>(emptyText);
     expect(text.style?.fontSize, 14);
-    expect(text.style?.color, const Color(0xFF8A8A8A));
+    expect(text.style?.color, GenesisColors.darkTextSecondary);
     expect(text.style?.fontWeight, FontWeight.w400);
   });
 
@@ -5323,6 +5431,15 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+      GenesisColors.darkBackground,
+    );
+    final header = tester.widget<Text>(find.text('Notifications'));
+    expect(header.style?.fontSize, 20);
+    expect(header.style?.fontWeight, FontWeight.w600);
+    expect(header.style?.color, GenesisColors.darkTextPrimary);
+    expect(tester.getTopLeft(find.text('Notifications')).dx, 49);
     expect(find.text('Join request'), findsOneWidget);
     expect(
       _richTextWithPlainText(
@@ -5402,7 +5519,7 @@ void main() {
     expect(title.style?.fontWeight, FontWeight.w600);
     expect(
       tester.widget<Text>(find.text('Awaiting your approval')).style?.color,
-      GenesisColors.brand,
+      GenesisColors.redSecondary,
     );
   });
 
@@ -6620,52 +6737,174 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('reselecting Me returns the profile page to top', (
-    WidgetTester tester,
-  ) async {
-    AppStartupCoordinator.resetForTesting();
-    addTearDown(AppStartupCoordinator.resetForTesting);
-    final transport = _RecordingV1ListTransport();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AppServicesScope(
-          services: await _testServices(
-            transport: transport,
-            useMock: false,
-            initialAuthToken: 'backend-token',
-            initialUserInfo: {
-              'uid': 'u_mock',
-              'name': 'Me Scroll User',
-              'avatar': '',
-              'following_cnt': 1,
-              'follower_cnt': 2,
-            },
+  testWidgets(
+    'Me bottom navigation resets scroll while collection returns preserve it',
+    (WidgetTester tester) async {
+      AppStartupCoordinator.resetForTesting();
+      addTearDown(AppStartupCoordinator.resetForTesting);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        GenesisMethodChannels.device,
+        (call) async => call.method == GenesisMethodChannels.getAppVersion
+            ? {
+                'versionName': '0.4.6',
+                'versionCode': 51,
+                'packageName': 'com.worldo.ai',
+              }
+            : null,
+      );
+      addTearDown(() {
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          GenesisMethodChannels.device,
+          null,
+        );
+      });
+      final transport = _RecordingV1ListTransport();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorObservers: [genesisPageRouteObserver],
+          onGenerateRoute: (settings) => MaterialPageRoute<WorldPageResult>(
+            settings: settings,
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Back to Me collection'),
+              ),
+            ),
           ),
-          child: const AppShellPage(initialIndex: 4),
+          home: AppServicesScope(
+            services: await _testServices(
+              transport: transport,
+              useMock: false,
+              initialAuthToken: 'backend-token',
+              initialUserInfo: {
+                'uid': 'u_mock',
+                'name': 'Me Scroll User',
+                'avatar': '',
+                'following_cnt': 1,
+                'follower_cnt': 2,
+              },
+            ),
+            child: const AppShellPage(initialIndex: 4),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final nestedScrollViewFinder = find.byType(NestedScrollView);
-    expect(nestedScrollViewFinder, findsOneWidget);
-    final nestedScrollState = tester.state<NestedScrollViewState>(
-      nestedScrollViewFinder,
-    );
-    await tester.drag(nestedScrollViewFinder, const Offset(0, -500));
-    await tester.pumpAndSettle();
-    expect(nestedScrollState.outerController.position.pixels, greaterThan(0));
+      final nestedScrollViewFinder = find.byType(NestedScrollView);
+      expect(nestedScrollViewFinder, findsOneWidget);
+      final nestedScrollState = tester.state<NestedScrollViewState>(
+        nestedScrollViewFinder,
+      );
+      await tester.drag(nestedScrollViewFinder, const Offset(0, -500));
+      await tester.pumpAndSettle();
+      expect(nestedScrollState.outerController.position.pixels, greaterThan(0));
 
-    await tester.tap(
-      find.descendant(of: find.byType(BottomTabs), matching: find.text('Me')),
-    );
-    await tester.pumpAndSettle();
+      final headerTitle = find.descendant(
+        of: find.byType(MePage),
+        matching: find.text('Me'),
+      );
+      expect(tester.getTopLeft(headerTitle).dx, 16);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: headerTitle, matching: find.byType(RichText)),
+      );
+      expect(paragraph.text.style!.fontSize, 20);
+      expect(paragraph.textScaler.scale(20), 20);
+      final transform = paragraph.getTransformTo(null);
+      expect(transform.entry(0, 0), 1);
+      expect(transform.entry(1, 1), 1);
 
-    expect(nestedScrollState.outerController.position.pixels, 0);
-    await tester.pump(const Duration(seconds: 1));
-    AppStartupCoordinator.resetForTesting();
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+      expect(
+        tester.widget<Text>(headerTitle).style?.color,
+        GenesisColors.darkTextPrimary,
+      );
+      final visibility = tester.widget<AnimatedOpacity>(
+        find
+            .ancestor(of: headerTitle, matching: find.byType(AnimatedOpacity))
+            .first,
+      );
+      expect(visibility.opacity, 1);
+      await tester.tap(
+        find.descendant(of: find.byType(BottomTabs), matching: find.text('Me')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(nestedScrollState.outerController.position.pixels, 0);
+
+      for (final collection in ['Worldo', 'Playing']) {
+        await tester.tap(
+          find.descendant(
+            of: find.byType(MePage),
+            matching: find.text(collection),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.drag(nestedScrollViewFinder, const Offset(0, -700));
+        await tester.pumpAndSettle();
+        final outerBefore = nestedScrollState.outerController.position.pixels;
+        final innerBefore = nestedScrollState.innerController.position.pixels;
+        expect(outerBefore, greaterThan(0));
+        expect(innerBefore, greaterThan(0));
+
+        await tester.tap(
+          find.byType(GenesisProfileCollectionListItem).hitTestable().first,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          ModalRoute.of(
+            tester.element(find.text('Back to Me collection')),
+          )?.settings.name,
+          collection == 'Worldo' ? RouteNames.originWorld : RouteNames.world,
+        );
+        await tester.tap(find.text('Back to Me collection'));
+        await tester.pumpAndSettle();
+        expect(nestedScrollState.outerController.position.pixels, outerBefore);
+        expect(nestedScrollState.innerController.position.pixels, innerBefore);
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(BottomTabs),
+            matching: find.text('Home'),
+          ),
+        );
+        // Departure must reset immediately, before returning or waiting for
+        // a scroll animation to finish.
+        expect(nestedScrollState.outerController.position.pixels, 0);
+        expect(nestedScrollState.innerController.position.pixels, 0);
+        expect(
+          nestedScrollState.outerController.position.isScrollingNotifier.value,
+          isFalse,
+        );
+        expect(
+          nestedScrollState.innerController.position.isScrollingNotifier.value,
+          isFalse,
+        );
+        await tester.pump();
+        await tester.tap(
+          find.descendant(
+            of: find.byType(BottomTabs),
+            matching: find.text('Me'),
+          ),
+        );
+        await tester.pump();
+        expect(nestedScrollState.outerController.position.pixels, 0);
+        expect(nestedScrollState.innerController.position.pixels, 0);
+        expect(
+          nestedScrollState.outerController.position.isScrollingNotifier.value,
+          isFalse,
+        );
+        expect(
+          nestedScrollState.innerController.position.isScrollingNotifier.value,
+          isFalse,
+        );
+        await tester.pumpAndSettle();
+        expect(nestedScrollState.outerController.position.pixels, 0);
+        expect(nestedScrollState.innerController.position.pixels, 0);
+      }
+      await tester.pump(const Duration(seconds: 1));
+      AppStartupCoordinator.resetForTesting();
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('Origin tab requests cursor feed then tag list', (
     WidgetTester tester,
@@ -6697,7 +6936,7 @@ void main() {
     expect(originRequests.single.uri.queryParameters['tag'], 'Destroyed');
   });
 
-  testWidgets('Origin header displays the compact full logo before search', (
+  testWidgets('Origin header search fills the row without a logo', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -6710,14 +6949,32 @@ void main() {
 
     final searchFinder = find.byType(SearchBarPlaceholder);
     final searchRect = tester.getRect(searchFinder);
+    final search = tester.widget<SearchBarPlaceholder>(searchFinder);
+    expect(search.backgroundColor, GenesisColors.darkFaintFill);
+    expect(search.borderColor, isNull);
+    expect(Theme.of(tester.element(searchFinder)).brightness, Brightness.dark);
+    expect(
+      tester.widget<Text>(find.text('Worldo, Character, Tags')).style?.color,
+      GenesisColors.darkInputPlaceholder,
+    );
+    final tabs = tester.widget<TabBar>(find.byType(TabBar));
+    expect(tabs.labelColor, GenesisColors.darkTextPrimary);
+    expect(tabs.unselectedLabelColor, GenesisColors.darkTextSecondary);
+    expect(
+      tester
+          .widget<GenesisTopSafeArea>(find.byType(GenesisTopSafeArea))
+          .backgroundColor,
+      GenesisColors.darkBackground,
+    );
+
     final logoFinder = find.byKey(const ValueKey<String>('origin-brand-logo'));
 
     expect(
       find.byKey(const ValueKey<String>('origin-gem-wallet-entry')),
       findsNothing,
     );
-    expect(tester.getSize(logoFinder), const Size(96, 26));
-    expect(searchRect.left, 122);
+    expect(logoFinder, findsNothing);
+    expect(searchRect.left, 16);
     expect(
       searchRect.right,
       tester.getSize(find.byType(OriginPage)).width - 16,
@@ -6779,7 +7036,7 @@ void main() {
       final feedScrollView = tester.widget<CustomScrollView>(feedFinder);
       expect(
         feedScrollView.scrollCacheExtent,
-        const ScrollCacheExtent.viewport(2),
+        const ScrollCacheExtent.viewport(1),
       );
       final virtualGrid = tester.widget<SliverGrid>(
         find.byKey(const ValueKey<String>('origin-feed-virtual-grid')),
@@ -8223,7 +8480,7 @@ void main() {
     final topBar = find.byKey(const ValueKey<String>('origin-top-overlay-bar'));
     final viewportWidth =
         tester.view.physicalSize.width / tester.view.devicePixelRatio;
-    expect(tester.getTopLeft(topBar).dx, moreOrLessEquals(12));
+    expect(tester.getTopLeft(topBar).dx, moreOrLessEquals(5));
     expect(tester.getTopRight(topBar).dx, moreOrLessEquals(viewportWidth - 12));
     expect(tester.getSize(topBar).height, genesisSearchFieldHeight);
     expect(
@@ -15305,7 +15562,53 @@ void main() {
     AppStartupCoordinator.resetForTesting();
   });
 
-  testWidgets('Origin detail launch preview uses detail tick and locations', (
+  testWidgets('Origin initial detail failure keeps a dark error surface', (
+    WidgetTester tester,
+  ) async {
+    final response = Completer<TransportResponse>();
+    final transport = _RecordingV1ListTransport(
+      originDetailCompleter: response,
+    );
+    await tester.pumpWidget(
+      AppServicesScope(
+        services: await _testServices(transport: transport, useMock: false),
+        child: const MaterialApp(
+          home: OriginWorldPage(oid: 'o_test_1', originId: 0),
+        ),
+      ),
+    );
+    await tester.pump();
+    response.complete(
+      transport._jsonResponse({
+        'err_no': 1,
+        'err_msg': 'Detail unavailable',
+        'data': null,
+      }),
+    );
+    await tester.pumpAndSettle();
+    final failure = find.text('Load failed');
+    expect(failure, findsOneWidget);
+    expect(
+      tester.widget<Text>(failure).style?.color,
+      GenesisColors.darkTextSecondary,
+    );
+    expect(
+      tester
+          .widget<Scaffold>(
+            find.ancestor(of: failure, matching: find.byType(Scaffold)).first,
+          )
+          .backgroundColor,
+      GenesisColors.darkBackground,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Retry'))
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('Origin detail omits launch preview even with tick data', (
     WidgetTester tester,
   ) async {
     final transport = _RecordingV1ListTransport();
@@ -15341,20 +15644,11 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    expect(find.text('Launch Preview'), findsOneWidget);
-    expect(find.text('Tick 1 · Day 1, 16:30'), findsOneWidget);
-    expect(find.text('Global'), findsOneWidget);
-    expect(find.text('Origin launch tick narrator.'), findsOneWidget);
-    expect(find.text('Detail Location'), findsWidgets);
-    expect(find.text('Detail location launch paragraph.'), findsOneWidget);
-    expect(tester.widget<Text>(find.text('Global')).style?.height, 1.4);
-    expect(
-      tester
-          .widget<Text>(find.text('Origin launch tick narrator.'))
-          .style
-          ?.height,
-      1.4,
-    );
+    expect(find.text('Launch Preview'), findsNothing);
+    expect(find.text('Tick 1 · Day 1, 16:30'), findsNothing);
+    expect(find.text('Global'), findsNothing);
+    expect(find.text('Origin launch tick narrator.'), findsNothing);
+    expect(find.text('Detail location launch paragraph.'), findsNothing);
   });
 
   testWidgets('Origin detail hides launch preview without tick1 data', (
@@ -15564,67 +15858,6 @@ void main() {
     expect(tester.widget<TextField>(fields.at(1)).controller?.text, 'I' * 100);
     expect(tester.widget<TextField>(fields.at(2)).controller?.text, 'B' * 500);
   });
-
-  testWidgets(
-    'Origin role sheet defaults to launched preset roles and launches selection',
-    (WidgetTester tester) async {
-      OriginRoleLaunchSelection? result;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Builder(
-              builder: (context) => FilledButton(
-                onPressed: () async {
-                  result = await showOriginRoleLaunchSheet(
-                    context: context,
-                    characters: const <OriginCharacter>[],
-                    launchedPresetRolesLoader: () async => const [
-                      OriginMyLaunchPresetCharacter(
-                        charId: 'char_launched_1',
-                        type: 'ai',
-                        name: 'Mira',
-                        identity: 'Navigator',
-                        brief: 'Knows every route.',
-                        goal: 'Reach the hidden harbor.',
-                        avatar: '',
-                        avatarResource: GenesisImageResource(),
-                        initialLocationId: 'loc_launched_1',
-                        lastLaunchedAt: 1785292800,
-                        worldId: 'w_launched_1',
-                        tickCount: 7,
-                        currentTime: 'Day 3',
-                      ),
-                    ],
-                  );
-                },
-                child: const Text('Open role sheet'),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      await tester.tap(find.text('Open role sheet'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Playing'), findsOneWidget);
-      expect(find.text('Mira'), findsOneWidget);
-      expect(find.text('w_launched_1'), findsOneWidget);
-      expect(find.text('Tick 7 · Day 3'), findsOneWidget);
-      expect(
-        find.widgetWithText(GenesisPrimaryButton, 'Enter'),
-        findsOneWidget,
-      );
-
-      await tester.tap(
-        find.byKey(const ValueKey('origin-role-launched-w_launched_1')),
-      );
-      await tester.tap(find.byKey(const ValueKey('origin-role-launch')));
-      await tester.pumpAndSettle();
-
-      expect(result?.existingWorldId, 'w_launched_1');
-    },
-  );
 
   testWidgets('World list item opens world detail with current wid', (
     WidgetTester tester,
@@ -16036,7 +16269,7 @@ void main() {
       pendingButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      const Color(0xFFFF2442).withValues(alpha: 0.62),
+      GenesisColors.darkButtonDisabledBackground,
     );
 
     await tester.tap(buttonFinder);
@@ -16689,7 +16922,9 @@ void main() {
   testWidgets('tap Me shows signed-out Me view when not logged in', (
     WidgetTester tester,
   ) async {
-    await _pumpGenesisApp(tester);
+    await tester.pumpWidget(
+      GenesisApp(services: await _testServices(initialUid: null)),
+    );
 
     await tester.tap(find.text('Me'));
     await tester.pumpAndSettle();
@@ -16705,6 +16940,17 @@ void main() {
     expect(find.text('Sign up and get 250 Gems!'), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Continue with Apple'), findsOneWidget);
+    expect(
+      Theme.of(tester.element(find.byType(SignedOutMeView))).brightness,
+      Brightness.dark,
+    );
+    expect(
+      Theme.of(tester.element(find.byType(BottomTabs))).brightness,
+      Brightness.light,
+    );
+    await tester.pump(const Duration(seconds: 1));
+    AppStartupCoordinator.resetForTesting();
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('tap EULA opens EULA legal document', (
@@ -18314,6 +18560,11 @@ void main() {
       MaterialApp(
         initialRoute: RouteNames.create,
         onGenerateRoute: AppRouter.onGenerateRoute,
+        onGenerateInitialRoutes: (_) => [
+          AppRouter.onGenerateRoute(
+            const RouteSettings(name: RouteNames.create),
+          ),
+        ],
       ),
     );
     await tester.pumpAndSettle();
@@ -18367,26 +18618,44 @@ void main() {
     await expectCreateButtonMatchesSaveSpacing('Story Events (Optional)');
   });
 
-  testWidgets('invalid create basics save uses the soft brand color', (
-    WidgetTester tester,
-  ) async {
-    await CreateOriginDraftStore.clear();
+  testWidgets(
+    'invalid create basics save uses muted brand fill with secondary text',
+    (WidgetTester tester) async {
+      await CreateOriginDraftStore.clear();
 
-    await tester.pumpWidget(const MaterialApp(home: CreateBasicsPage()));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(const MaterialApp(home: CreateBasicsPage()));
+      await tester.pumpAndSettle();
 
-    final saveButton = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Save'),
-    );
+      final saveButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Save'),
+      );
 
-    expect(saveButton.onPressed, isNull);
-    expect(
-      saveButton.style?.backgroundColor?.resolve(<WidgetState>{
-        WidgetState.disabled,
-      }),
-      GenesisColors.brandSoft,
-    );
-  });
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        GenesisColors.darkBackground,
+      );
+      final nameInput = tester.widget<TextField>(
+        find.widgetWithText(TextField, 'eg. Main Street'),
+      );
+      expect(nameInput.style?.color, GenesisColors.darkTextPrimary);
+      expect(nameInput.cursorColor, GenesisColors.darkTextPrimary);
+      expect(
+        nameInput.decoration?.hintStyle?.color,
+        GenesisColors.darkInputPlaceholder,
+      );
+      expect(
+        saveButton.style?.foregroundColor?.resolve({WidgetState.disabled}),
+        GenesisColors.darkButtonDisabledForeground,
+      );
+      expect(saveButton.onPressed, isNull);
+      expect(
+        saveButton.style?.backgroundColor?.resolve(<WidgetState>{
+          WidgetState.disabled,
+        }),
+        GenesisColors.redPrimary.withValues(alpha: 0.4),
+      );
+    },
+  );
 
   testWidgets('create text counters use user-perceived characters', (
     WidgetTester tester,
@@ -18514,7 +18783,7 @@ void main() {
       createButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.brandSoft,
+      GenesisColors.redPrimary.withValues(alpha: 0.4),
     );
   });
 
@@ -18551,7 +18820,7 @@ void main() {
       createButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.brandSoft,
+      GenesisColors.redPrimary.withValues(alpha: 0.4),
     );
   });
 
@@ -18920,7 +19189,7 @@ void main() {
             )
             .style
             ?.color,
-        const Color(0xFF666666),
+        GenesisColors.darkTextSecondary,
       );
       final emptyLocationOption = find.byKey(
         const ValueKey<String>('opening-location-option-location_opening_2'),
@@ -19084,7 +19353,10 @@ void main() {
       );
       final narratorColor =
           (narratorContainer.decoration as BoxDecoration).color!;
-      expect(narratorColor, kOpeningDialogueStyle.systemMessageBackgroundColor);
+      expect(
+        narratorColor,
+        chatNarratorMessageBackgroundColor(kLocationChatStyle),
+      );
       expect(
         find.byKey(const ValueKey<String>('opening-dialogue-0-delete')),
         findsOneWidget,
@@ -19233,6 +19505,22 @@ void main() {
         const ValueKey<String>('opening-dialogue-1-field'),
       );
       expect(tester.widget<TextField>(characterField).readOnly, isFalse);
+      final characterInput = tester.widget<TextField>(characterField);
+      expect(characterInput.style, kLocationChatStyle.bubbleTextStyle);
+      expect(characterInput.cursorColor, GenesisColors.darkTextPrimary);
+      expect(
+        characterInput.decoration?.hintStyle?.color,
+        GenesisColors.darkInputPlaceholder,
+      );
+      final characterBubble = tester.widget<Container>(
+        find.byKey(const ValueKey<String>('opening-dialogue-1-bubble')),
+      );
+      final characterDecoration = characterBubble.decoration as BoxDecoration;
+      expect(characterDecoration.color, kLocationChatStyle.otherBubbleColor);
+      expect(characterDecoration.border, isNull);
+      expect(characterBubble.padding, kLocationChatStyle.bubblePadding);
+      expect(find.byType(BackdropFilter), findsNothing);
+
       expect(
         find.byKey(const ValueKey<String>('opening-dialogue-1-delete')),
         findsOneWidget,
@@ -19268,7 +19556,7 @@ void main() {
       final characterNameRow = find.byKey(
         const ValueKey<String>('opening-dialogue-1-name-row'),
       );
-      expect(tester.getSize(characterNameRow).height, 16);
+      expect(tester.getSize(characterNameRow).height, 11);
       expect(
         tester
             .getTopLeft(
@@ -19508,10 +19796,12 @@ void main() {
           find.byKey(ValueKey<String>('$itemId-delete-container')),
         );
         final deleteDecoration = deleteContainer.decoration as BoxDecoration;
-        expect(deleteDecoration.color, const Color(0xE6F4F4F6));
-        final deleteBorder = deleteDecoration.border! as Border;
-        expect(deleteBorder.top.color, const Color(0xFFD8D8DE));
-        expect(deleteBorder.top.width, 1);
+        expect(deleteDecoration.color, GenesisColors.darkFaintSurface);
+        expect(
+          deleteDecoration.border,
+          Border.all(color: GenesisColors.darkFaintFill),
+        );
+        expect(deleteDecoration.borderRadius, BorderRadius.circular(6));
       }
 
       final characterDelete = find.byKey(
@@ -19675,7 +19965,7 @@ void main() {
               as BoxDecoration;
       expect(
         tester.widget<Text>(narratorUserLabel).style?.color,
-        const Color(0xFFF4F4F6),
+        GenesisColors.darkTextSecondary,
       );
       expect(tester.widget<Text>(narratorUserLabel).style?.fontSize, 13);
       expect(
@@ -19786,14 +20076,14 @@ void main() {
               as BoxDecoration;
       expect(
         tester.widget<Text>(characterUserLabel).style?.color,
-        const Color(0xFF666666),
+        GenesisColors.darkTextSecondary,
       );
       expect(tester.widget<Text>(characterUserLabel).style?.fontSize, 13);
       expect(
         tester.widget<Text>(characterUserLabel).style?.fontWeight,
         FontWeight.w400,
       );
-      expect(characterButtonDecoration.color, const Color(0xFFF4F4F6));
+      expect(characterButtonDecoration.color, GenesisColors.darkFaintFill);
       expect(characterButtonDecoration.border, isNull);
 
       final characterController = tester
@@ -20264,10 +20554,10 @@ void main() {
     expect((bestRoleSpans.first as TextSpan).text, 'Suggested:');
     expect(
       (bestRoleSpans.first as TextSpan).style?.color,
-      const Color(0xFF999999),
+      GenesisColors.darkTextTertiary,
     );
     expect((bestRoleSpans.last as TextSpan).text, ' Tff');
-    expect(bestRoleSummary.style?.color, const Color(0xFF444444));
+    expect(bestRoleSummary.style?.color, GenesisColors.darkTextSecondary);
     expect(find.text('L1 · Region : 1'), findsOneWidget);
     expect(find.text('L2 · Building : 1'), findsOneWidget);
     expect(find.text('L3 · Room : 1'), findsOneWidget);
@@ -20425,7 +20715,7 @@ void main() {
 
     expect(find.text('Character 1'), findsOneWidget);
     expect(find.text('Character 2'), findsNothing);
-    expect(find.byType(CreateFormDeleteButton), findsOneWidget);
+    expect(find.byType(GenesisDeleteButton), findsOneWidget);
     expect(
       tester.widget<CreateFormCard>(find.byType(CreateFormCard)).showBorder,
       isFalse,
@@ -20439,11 +20729,11 @@ void main() {
               matching: find.byType(CreateTextFieldBlock),
             ),
           )
-          .every((field) => field.labelFontWeight == FontWeight.w400),
+          .every((field) => field.labelFontWeight == FontWeight.w600),
       isTrue,
     );
     final addCharacterText = tester.widget<Text>(find.text('+ Add Character'));
-    expect(addCharacterText.style?.color, GenesisColors.createAdd);
+    expect(addCharacterText.style?.color, GenesisColors.redSecondary);
     expect(addCharacterText.style?.fontSize, 16);
     expect(addCharacterText.style?.fontWeight, FontWeight.w600);
     expect(
@@ -20452,7 +20742,7 @@ void main() {
     );
     expect(
       tester.getCenter(find.text('Character 1')).dy,
-      closeTo(tester.getCenter(find.byType(CreateFormDeleteButton)).dy, 0.01),
+      closeTo(tester.getCenter(find.byType(GenesisDeleteButton)).dy, 0.01),
     );
 
     await tester.scrollUntilVisible(
@@ -20493,7 +20783,7 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'Ari');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(CreateFormDeleteButton));
+    await tester.tap(find.byType(GenesisDeleteButton));
     await tester.pumpAndSettle();
 
     expect(find.text('Character 1'), findsOneWidget);
@@ -20612,7 +20902,7 @@ void main() {
     expect(
       tester
           .widgetList<CreateTextFieldBlock>(find.byType(CreateTextFieldBlock))
-          .every((field) => field.labelFontWeight == FontWeight.w400),
+          .every((field) => field.labelFontWeight == FontWeight.w600),
       isTrue,
     );
 
@@ -20731,8 +21021,8 @@ void main() {
     final l1Badge = tester.widget<Text>(
       find.descendant(of: statisticsNote, matching: find.text('L1')),
     );
-    expect(l1Badge.style?.fontSize, 9.5);
-    expect(l1Badge.style?.color, const Color(0xFF131215));
+    expect(l1Badge.style?.fontSize, 10);
+    expect(l1Badge.style?.color, GenesisColors.darkTextTertiary);
     expect(
       find.byKey(const ValueKey<String>('locations-inline-name-Loc_1')),
       findsOneWidget,
@@ -20799,13 +21089,29 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 2));
 
+    IconButton inlineSave(String id) => tester.widget<IconButton>(
+      find.descendant(
+        of: find.byKey(ValueKey<String>('locations-inline-save-$id')),
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(inlineSave('Loc_1').onPressed, isNull);
+
     final l1Editor = find.byKey(
       const ValueKey<String>('locations-inline-name-Loc_1'),
     );
     await tester.enterText(
       find.descendant(of: l1Editor, matching: find.byType(TextField)),
+      '   ',
+    );
+    await tester.pump();
+    expect(inlineSave('Loc_1').onPressed, isNull);
+    await tester.enterText(
+      find.descendant(of: l1Editor, matching: find.byType(TextField)),
       'Downtown',
     );
+    await tester.pump();
+    expect(inlineSave('Loc_1').onPressed, isNotNull);
     await tester.tap(
       find.byKey(const ValueKey<String>('locations-inline-save-Loc_1')),
     );
@@ -20824,6 +21130,7 @@ void main() {
       findsNothing,
     );
 
+    expect(inlineSave('Loc_1_1').onPressed, isNull);
     final l2Editor = find.byKey(
       const ValueKey<String>('locations-inline-name-Loc_1_1'),
     );
@@ -20842,6 +21149,8 @@ void main() {
       find.descendant(of: l2Editor, matching: find.byType(TextField)),
       'Main Street',
     );
+    await tester.pump();
+    expect(inlineSave('Loc_1_1').onPressed, isNotNull);
     await tester.tap(
       find.byKey(const ValueKey<String>('locations-inline-save-Loc_1_1')),
     );
@@ -20860,7 +21169,7 @@ void main() {
           .widget<Text>(find.descendant(of: addL3, matching: find.text('L3 *')))
           .style
           ?.color,
-      GenesisColors.createAdd,
+      GenesisColors.redSecondary,
     );
     expect(
       tester
@@ -20868,7 +21177,7 @@ void main() {
             find.descendant(of: addL3, matching: find.byIcon(Icons.add)),
           )
           .color,
-      GenesisColors.createAdd,
+      GenesisColors.redSecondary,
     );
     final addL3Border = tester
         .widgetList<CustomPaint>(
@@ -20877,7 +21186,7 @@ void main() {
         .map((widget) => widget.painter)
         .whereType<CreateDashedRRectPainter>()
         .single;
-    expect(addL3Border.color, createFormBorder);
+    expect(addL3Border.color, GenesisColors.darkFaintFill);
     expect(
       find.byKey(const ValueKey<String>('create-add-l2-Loc_1')),
       findsNothing,
@@ -21553,10 +21862,7 @@ void main() {
       const ValueKey<String>('locations-inline-name-Loc_2'),
     );
     await tester.tap(
-      find.descendant(
-        of: l1Editor,
-        matching: find.byType(CreateFormDeleteButton),
-      ),
+      find.descendant(of: l1Editor, matching: find.byType(GenesisDeleteButton)),
     );
     await tester.pump();
 
@@ -21571,10 +21877,7 @@ void main() {
       const ValueKey<String>('locations-inline-name-Loc_1_2'),
     );
     await tester.tap(
-      find.descendant(
-        of: l2Editor,
-        matching: find.byType(CreateFormDeleteButton),
-      ),
+      find.descendant(of: l2Editor, matching: find.byType(GenesisDeleteButton)),
     );
     await tester.pump();
 
@@ -21616,9 +21919,9 @@ void main() {
     );
     final cancelFlow = find.descendant(
       of: l2Editor,
-      matching: find.byType(CreateFormDeleteButton),
+      matching: find.byType(GenesisDeleteButton),
     );
-    expect(tester.widget<CreateFormDeleteButton>(cancelFlow).enabled, isTrue);
+    expect(tester.widget<GenesisDeleteButton>(cancelFlow).enabled, isTrue);
     await tester.tap(cancelFlow);
     await tester.pump();
 
@@ -21697,7 +22000,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: savedL2Editor,
-        matching: find.byType(CreateFormDeleteButton),
+        matching: find.byType(GenesisDeleteButton),
       ),
     );
     await tester.pumpAndSettle();
@@ -21782,7 +22085,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: harborEditor,
-          matching: find.byType(CreateFormDeleteButton),
+          matching: find.byType(GenesisDeleteButton),
         ),
       );
       await tester.pumpAndSettle();
@@ -22071,7 +22374,7 @@ void main() {
     expect(modeSwitch, findsOneWidget);
     expect(
       tester.widget<Text>(find.text('Preview')).style?.color,
-      const Color(0xFF4B6192),
+      GenesisColors.darkTextSecondary,
     );
     expect(
       tester.widget<Text>(find.text('Preview')).style?.fontWeight,
@@ -22205,7 +22508,7 @@ void main() {
     expect(saveIconWidget.height, 14);
     expect(
       saveIconWidget.colorFilter,
-      const ColorFilter.mode(createFormMuted, BlendMode.srcIn),
+      const ColorFilter.mode(GenesisColors.darkTextPrimary, BlendMode.srcIn),
     );
     final saveButtonDecoration =
         tester
@@ -22219,13 +22522,13 @@ void main() {
                 )
                 .decoration
             as BoxDecoration;
-    expect(saveButtonDecoration.color, const Color(0xE6F4F4F6));
+    expect(saveButtonDecoration.color, GenesisColors.darkFaintSurface);
     expect(
       (saveButtonDecoration.border as Border).top.color,
-      const Color(0xFF888888),
+      GenesisColors.darkFaintFill,
     );
     expect(saveButtonDecoration.borderRadius, BorderRadius.circular(6));
-    final inlineDeleteButton = find.byType(CreateFormDeleteButton);
+    final inlineDeleteButton = find.byType(GenesisDeleteButton);
     expect(
       tester.getSize(inlineSaveButton),
       tester.getSize(inlineDeleteButton),
@@ -22233,7 +22536,7 @@ void main() {
     final deleteIconWidget = tester.widget<SvgPicture>(
       find.descendant(
         of: inlineDeleteButton,
-        matching: _assetSvgFinder(createFormDeleteIconAsset),
+        matching: _assetSvgFinder(GenesisDeleteButton.iconAsset),
       ),
     );
     expect(deleteIconWidget.width, saveIconWidget.width);
@@ -22342,10 +22645,7 @@ void main() {
     expect(tester.getRect(l3Sheet), sheetRectWithoutKeyboard);
     expect(find.text('Edit L3 Location'), findsOneWidget);
     expect(
-      find.descendant(
-        of: l3Sheet,
-        matching: find.byType(CreateFormDeleteButton),
-      ),
+      find.descendant(of: l3Sheet, matching: find.byType(GenesisDeleteButton)),
       findsOneWidget,
     );
     final l3Delete = find.byKey(
@@ -22433,7 +22733,7 @@ void main() {
     expect(find.text('Central Station'), findsOneWidget);
     expect(
       tester.widget<Text>(find.text('Edit')).style?.color,
-      const Color(0xFF4B6192),
+      GenesisColors.darkTextSecondary,
     );
     expect(
       tester.widget<Text>(find.text('Edit')).style?.fontWeight,
@@ -22658,12 +22958,9 @@ void main() {
       locationText: '- L1 Location',
       locationId: 'Loc_1',
     );
-    final l1DeleteButton = find.byType(CreateFormDeleteButton);
+    final l1DeleteButton = find.byType(GenesisDeleteButton);
     expect(l1DeleteButton, findsOneWidget);
-    expect(
-      tester.widget<CreateFormDeleteButton>(l1DeleteButton).enabled,
-      isFalse,
-    );
+    expect(tester.widget<GenesisDeleteButton>(l1DeleteButton).enabled, isFalse);
 
     await tester.tap(l1DeleteButton);
     await tester.pump();
@@ -22687,10 +22984,10 @@ void main() {
     expect(l3DeleteButton, findsOneWidget);
     expect(
       tester
-          .widget<CreateFormDeleteButton>(
+          .widget<GenesisDeleteButton>(
             find.ancestor(
               of: l3DeleteButton,
-              matching: find.byType(CreateFormDeleteButton),
+              matching: find.byType(GenesisDeleteButton),
             ),
           )
           .enabled,
@@ -23263,14 +23560,14 @@ void main() {
 
     expect(find.text('Event 1'), findsOneWidget);
     expect(find.text('Event 2'), findsNothing);
-    expect(find.byType(CreateFormDeleteButton), findsOneWidget);
+    expect(find.byType(GenesisDeleteButton), findsOneWidget);
     expect(
       tester.widget<CreateFormCard>(find.byType(CreateFormCard)).showBorder,
       isFalse,
     );
     expect(find.byType(CreateInlineAddButton), findsOneWidget);
     final addEventText = tester.widget<Text>(find.text('+ Add Event'));
-    expect(addEventText.style?.color, GenesisColors.createAdd);
+    expect(addEventText.style?.color, GenesisColors.redSecondary);
     expect(addEventText.style?.fontSize, 16);
     expect(addEventText.style?.fontWeight, FontWeight.w600);
     expect(
@@ -23279,7 +23576,7 @@ void main() {
     );
     expect(
       tester.getCenter(find.text('Event 1')).dy,
-      closeTo(tester.getCenter(find.byType(CreateFormDeleteButton)).dy, 0.01),
+      closeTo(tester.getCenter(find.byType(GenesisDeleteButton)).dy, 0.01),
     );
 
     await tester.scrollUntilVisible(
@@ -23385,7 +23682,7 @@ void main() {
       createButton.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.brandSoft,
+      GenesisColors.redPrimary.withValues(alpha: 0.4),
     );
   });
 
@@ -23744,7 +24041,13 @@ void main() {
 
     expect(find.text('Select Location'), findsOneWidget);
     expect(find.text('Archive'), findsOneWidget);
-    expect(find.text('Mira'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(GenesisBottomSheetPanel),
+        matching: find.text('Mira'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('edit flow loads origin detail and posts update after changes', (
@@ -23813,7 +24116,7 @@ void main() {
       rootPublish.style?.backgroundColor?.resolve(<WidgetState>{
         WidgetState.disabled,
       }),
-      GenesisColors.brandSoft,
+      GenesisColors.redPrimary.withValues(alpha: 0.4),
     );
     expect(transport.requestsFor('/api/v2/origin/update'), isEmpty);
 
@@ -23988,12 +24291,12 @@ void main() {
     );
     expect(find.textContaining('Publishing your Worldo'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('create-worldo-wait-perspective-text')),
+      find.text('Preparing your Worldo updates.\nPlease wait for a moment.'),
       findsOneWidget,
     );
-    expect(find.text('Editable public view.'), findsOneWidget);
+    expect(find.text('Editable public view.'), findsNothing);
     expect(find.text('Editable hidden rules.'), findsNothing);
-    expect(find.text('Mira: Archivist. Patient'), findsOneWidget);
+    expect(find.text('Mira: Archivist. Patient'), findsNothing);
     expect(
       _richTextWithPlainText('Worldo #Origin o_edit_1 published!'),
       findsNothing,
@@ -26766,8 +27069,20 @@ void main() {
     expect(find.text('Following'), findsOneWidget);
     expect(find.text('17'), findsOneWidget);
     expect(find.text('Followers'), findsOneWidget);
-    expect(find.text('Worldo 30'), findsOneWidget);
-    expect(find.text('Playing 30'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('profile-tab-count-origin')),
+        matching: find.text('30'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('profile-tab-count-world')),
+        matching: find.text('30'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('#Worldo'), findsNothing);
     expect(tester.widget<Text>(find.text('Following')).style?.fontSize, 14);
     expect(tester.widget<Text>(find.text('Followers')).style?.fontSize, 14);
@@ -26793,7 +27108,7 @@ void main() {
       false,
     );
 
-    await tester.tap(find.text('Playing 30'));
+    await tester.tap(find.byKey(const ValueKey('profile-tab-world')));
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.chevron_right), findsNothing);
@@ -26856,6 +27171,25 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);
+    final skeleton = find.byKey(
+      const ValueKey<String>('user-info-loading-skeleton'),
+    );
+    final bones = tester.widgetList<DecoratedBox>(
+      find.descendant(of: skeleton, matching: find.byType(DecoratedBox)),
+    );
+    expect(bones, isNotEmpty);
+    for (final bone in bones) {
+      final decoration = bone.decoration as BoxDecoration;
+      expect(decoration.color, GenesisColors.darkFaintFill);
+      expect(decoration.gradient, isNull);
+    }
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+      GenesisColors.darkBackground,
+    );
+    expect(tester.widget<AppBar>(find.byType(AppBar)).centerTitle, isFalse);
 
     userInfoCompleter.complete(
       transport._jsonResponse({
@@ -28724,6 +29058,22 @@ void main() {
       of: find.byKey(const ValueKey<String>('world-bottom-tags-overlay')),
       matching: find.text('Detail'),
     );
+    final tagFills = tester
+        .widgetList<Container>(
+          find.descendant(
+            of: find.byKey(const ValueKey<String>('world-bottom-tags-overlay')),
+            matching: find.byType(Container),
+          ),
+        )
+        .where((widget) => widget.decoration is BoxDecoration)
+        .toList();
+    expect(tagFills, hasLength(4));
+    for (final tag in tagFills) {
+      expect(
+        (tag.decoration as BoxDecoration).color,
+        GenesisColors.darkFaintFill,
+      );
+    }
     await tester.tap(detailTag);
     await tester.pumpAndSettle();
     expect(currentTilemap().animationsPaused, isTrue);
@@ -28731,6 +29081,16 @@ void main() {
       const ValueKey<String>('world-single-section-bottom-sheet'),
     );
     final openedSheetContext = tester.element(openedSheet);
+    expect(
+      (tester.widget<DecoratedBox>(openedSheet).decoration as BoxDecoration)
+          .color,
+      GenesisColors.darkBackground,
+    );
+    expect(Theme.of(openedSheetContext).brightness, Brightness.dark);
+    final worldScaffold = tester.widget<WorldDetailsPageScaffold>(
+      find.byType(WorldDetailsPageScaffold).first,
+    );
+    expect(worldScaffold.panelBackgroundColor, GenesisColors.darkBackground);
     expect(
       tester.getTopLeft(openedSheet).dy,
       closeTo(
@@ -28772,7 +29132,9 @@ void main() {
       expect(tester.getSize(segment).width, index == 0 ? 26 : 4);
       expect(
         (tester.widget<Container>(segment).decoration as BoxDecoration).color,
-        index == 0 ? const Color(0xFF666666) : const Color(0xFFB7B7B7),
+        index == 0
+            ? GenesisColors.darkHandleActive
+            : GenesisColors.darkHandleInactive,
       );
     }
 
@@ -29152,7 +29514,7 @@ void main() {
       );
       final viewportWidth =
           tester.view.physicalSize.width / tester.view.devicePixelRatio;
-      expect(tester.getTopLeft(worldTopBar).dx, moreOrLessEquals(12));
+      expect(tester.getTopLeft(worldTopBar).dx, moreOrLessEquals(5));
       expect(
         tester.getTopRight(worldTopBar).dx,
         moreOrLessEquals(viewportWidth - 12),

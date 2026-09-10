@@ -39,7 +39,7 @@ Future<String?> startOriginLaunch({
 
     final wid = '${result['world_id'] ?? result['wid'] ?? ''}'.trim();
     if (wid.isEmpty) {
-      showGenesisToast(context, 'Launch failed');
+      showGenesisToast(context, 'Launch failed', brightness: Brightness.dark);
       return null;
     }
     GenesisTelemetry.collectLog(
@@ -52,7 +52,7 @@ Future<String?> startOriginLaunch({
     return wid;
   } catch (_) {
     if (context.mounted) {
-      showGenesisToast(context, 'Launch failed');
+      showGenesisToast(context, 'Launch failed', brightness: Brightness.dark);
     }
     return null;
   }

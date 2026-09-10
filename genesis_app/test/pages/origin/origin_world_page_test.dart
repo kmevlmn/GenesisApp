@@ -1,3 +1,4 @@
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -40,10 +41,7 @@ void main() {
 
   test('origin page and detail sheet share the base background', () {
     expect(originWorldDetailSheetBackgroundColor, const Color(0xFF151517));
-    expect(
-      originWorldDetailSheetRaisedBackgroundColor,
-      const Color(0xFF1F1D24),
-    );
+    expect(GenesisColors.darkRaisedBackground, const Color(0xFF181C1F));
     expect(
       originWorldMapShellSource,
       contains('backgroundColor: originWorldDetailSheetBackgroundColor'),
@@ -55,7 +53,7 @@ void main() {
     expect(originWorldDetailSheetSecondaryTextColor, const Color(0xB8FFFFFF));
     expect(originWorldDetailSheetTertiaryTextColor, const Color(0x73FFFFFF));
     expect(originWorldDetailSheetSoftWhiteColor, const Color(0xFFF4F3F6));
-    expect(originWorldDetailSheetAccentSoftColor, const Color(0xFFFF8A9A));
+    expect(GenesisColors.redSecondary, const Color(0xFFFF8A9A));
     expect(originWorldDetailSheetSubtleSurfaceColor, const Color(0x14FFFFFF));
     expect(originWorldDetailSheetSelectRoleArrowColor, const Color(0x8CFFFFFF));
   });
@@ -1213,7 +1211,7 @@ void main() {
     );
     expect(
       originSectionsSource,
-      isNot(contains('authorColor: originWorldDetailSheetAccentSoftColor')),
+      isNot(contains('authorColor: GenesisColors.redSecondary')),
     );
     expect(originSectionsSource, contains("'View all >'"));
     expect(originSectionsSource, contains('fontSize: 10'));

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 
 import 'package:genesis_flutter_android/app/bootstrap/app_services_scope.dart';
 import 'package:genesis_flutter_android/app/bootstrap/service_registry.dart';
@@ -62,6 +63,17 @@ void main() {
       expect(find.text('Character dialogue : 1'), findsOneWidget);
       expect(find.text('Narrator : 1'), findsOneWidget);
       expect(find.text('Image : 1'), findsOneWidget);
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        GenesisColors.darkBackground,
+      );
+      expect(
+        tester
+            .widget<Text>(find.textContaining('Current Version:'))
+            .style
+            ?.color,
+        GenesisColors.darkTextPrimary,
+      );
 
       await tester.tap(find.text('Basics'));
       await tester.pumpAndSettle();

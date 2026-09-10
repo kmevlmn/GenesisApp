@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/auth/login_guard.dart';
 import '../../components/common/genesis_generation_wait_overlay.dart';
-import '../../components/genesis_logo.dart';
 import '../../components/page_header.dart';
+import '../../ui/genesis_ui.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
 import '../../network/api_client.dart';
 import '../../network/api_exception.dart';
 import '../../network/json_utils.dart';
-import '../../utils/display_name_formatter.dart';
 import '../../utils/genesis_ugc_text.dart';
 import '../create/create_origin_draft_store.dart';
 import '../origin_editor/origin_draft_repository.dart';
@@ -42,7 +43,7 @@ class _EditOriginPageState extends State<EditOriginPage> {
   OriginDraftSubmitStatus _submitStatus = OriginDraftSubmitStatus.idle;
   int _reloadSignal = 0;
   late final VoidCallback _removePublishOutcomeListener;
-  List<String> _generationWaitLines = const <String>[];
+  List<GenesisGenerationWaitAvatar> _generationWaitAvatars = const [];
   bool _forEditIncludesSetting = false;
   bool _forEditIncludesEvents = false;
   Set<String> _forEditCharacterIds = const <String>{};
@@ -118,13 +119,9 @@ class _EditOriginPageState extends State<EditOriginPage> {
         _submitStatus = OriginDraftSubmitStatus.idle;
         _isLoading = false;
       });
-      final originatorName = await _readOriginatorName(context);
       if (!mounted) return;
       setState(() {
-        _generationWaitLines = originDraftGenerationWaitLines(
-          initialDraft,
-          originatorName: originatorName,
-        );
+        _generationWaitAvatars = originDraftGenerationWaitAvatars(initialDraft);
       });
       await _pendingCoordinator.ensurePublishingPolling(
         loadOriginInfo: (originId) => api.v1.origin.info(
@@ -151,17 +148,43 @@ class _EditOriginPageState extends State<EditOriginPage> {
 
   @override
   Widget build(BuildContext context) {
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: kGenesisLightSystemUiOverlayStyle,
+          child: _buildPage(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        appBar: GenesisBackAppBar(pageName: 'Edit Worldo'),
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: GenesisColors.darkBackground,
+        appBar: GenesisBackAppBar(
+          pageName: 'Edit Worldo',
+          backgroundColor: GenesisColors.darkBackground,
+          foregroundColor: GenesisColors.darkTextPrimary,
+          systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+        ),
+        body: Center(child: GenesisLoadingIndicator()),
       );
     }
 
     final repository = _repository;
     if (_error != null || repository == null) {
       return Scaffold(
-        appBar: const GenesisBackAppBar(pageName: 'Edit Worldo'),
+        backgroundColor: GenesisColors.darkBackground,
+        appBar: const GenesisBackAppBar(
+          pageName: 'Edit Worldo',
+          backgroundColor: GenesisColors.darkBackground,
+          foregroundColor: GenesisColors.darkTextPrimary,
+          systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -171,10 +194,17 @@ class _EditOriginPageState extends State<EditOriginPage> {
                 Text(
                   _error ?? 'Worldo detail is unavailable.',
                   textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: GenesisColors.darkTextSecondary,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: _loadOrigin,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: GenesisColors.darkFaintFill,
+                    foregroundColor: GenesisColors.darkTextPrimary,
+                  ),
                   child: const Text('Retry'),
                 ),
               ],
@@ -218,13 +248,9 @@ class _EditOriginPageState extends State<EditOriginPage> {
       children: [
         flow,
         Positioned.fill(
-          child: GenesisGenerationWaitOverlay(
-            title: 'Publishing your Worldo',
-            illustration: const Center(
-              child: GenesisLogo(height: 88, width: 152),
-            ),
-            perspectiveLines: _generationWaitLines,
-            centeredPerspectiveLineCount: 2,
+          child: OriginGenerationWaitOverlay(
+            publishing: true,
+            avatars: _generationWaitAvatars,
             onBackPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
@@ -247,19 +273,9 @@ class _EditOriginPageState extends State<EditOriginPage> {
     final api = AppServicesScope.read(context).api;
     setState(() {
       _submitStatus = OriginDraftSubmitStatus.checkingPending;
-      _generationWaitLines = originDraftGenerationWaitLines(draft);
+      _generationWaitAvatars = originDraftGenerationWaitAvatars(draft);
     });
     try {
-      final originatorName = await _readOriginatorName(context);
-      if (!context.mounted) {
-        return const OriginSubmitResult(message: '', showMessage: false);
-      }
-      setState(
-        () => _generationWaitLines = originDraftGenerationWaitLines(
-          draft,
-          originatorName: originatorName,
-        ),
-      );
       final payload = draft.toCreateOriginPayload();
       if (payload['init_location_group'] is! Map) {
         throw StateError('A complete Opening is required to publish');
@@ -344,21 +360,5 @@ class _EditOriginPageState extends State<EditOriginPage> {
       _submitStatus = OriginDraftSubmitStatus.idle;
       _reloadSignal++;
     });
-  }
-
-  Future<String> _readOriginatorName(BuildContext context) async {
-    final services = AppServicesScope.read(context);
-    final userInfo = await services.sessionStore.readUserInfo();
-    final uid = (await services.sessionStore.readUid())?.trim() ?? '';
-    final rawName = userInfo == null
-        ? ''
-        : asString(
-            userInfo['name'] ??
-                userInfo['user_name'] ??
-                userInfo['username'] ??
-                userInfo['display_name'] ??
-                userInfo['nickname'],
-          );
-    return formatUidForDisplay(rawName, fallback: uid.isEmpty ? 'You' : uid);
   }
 }

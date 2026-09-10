@@ -197,15 +197,23 @@ class _PreviewPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: const Color(0xFFEFEFF2),
+      color: CreateFormTheme.colorOf(
+        context,
+        const Color(0xFFEFEFF2),
+        GenesisColors.darkFaintSurface,
+      ),
       child: showSpinner
-          ? const Center(
+          ? Center(
               child: SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: createFormGreen,
+                  color: CreateFormTheme.colorOf(
+                    context,
+                    createFormGreen,
+                    GenesisColors.darkTextSecondary,
+                  ),
                 ),
               ),
             )
@@ -219,12 +227,20 @@ class _PreviewErrorIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Color(0xFFEFEFF2),
+    return ColoredBox(
+      color: CreateFormTheme.colorOf(
+        context,
+        const Color(0xFFEFEFF2),
+        GenesisColors.darkFaintSurface,
+      ),
       child: Center(
         child: Icon(
           Icons.broken_image_outlined,
-          color: createFormGreen,
+          color: CreateFormTheme.colorOf(
+            context,
+            createFormGreen,
+            GenesisColors.darkTextSecondary,
+          ),
           size: 34,
         ),
       ),

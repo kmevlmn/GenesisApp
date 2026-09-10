@@ -31,16 +31,6 @@ extension _LocationChatSendActions on _LocationChatPanelState {
     });
   }
 
-  void _editInspiration(String text) {
-    _textController.setSerializedText(text);
-    if (_composerFocusNode.hasFocus) {
-      // The system back button can hide the keyboard without dropping focus.
-      unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.show'));
-    } else {
-      _composerFocusNode.requestFocus();
-    }
-  }
-
   Future<void> _send({
     String? textOverride,
     ChatroomInspirationSource? inspirationSource,
@@ -52,6 +42,7 @@ extension _LocationChatSendActions on _LocationChatPanelState {
         _chatroomState.inputBlocked ||
         _sendAwaitingResponse ||
         _preparingReplyAction ||
+        _replyCardTransitionBusy ||
         _sending) {
       return;
     }
@@ -156,6 +147,7 @@ extension _LocationChatSendActions on _LocationChatPanelState {
   }
 
   Future<void> _retryFailedMessage(ChatMessageVm message) async {
+    if (_replyCardTransitionBusy) return;
     final service = _service;
     if (!message.isMe ||
         message.status != 'failed' ||
@@ -345,6 +337,7 @@ extension _LocationChatSendActions on _LocationChatPanelState {
           context,
           _locationChatDraftRestoreToastMessage(e),
           duration: const Duration(seconds: 4),
+          brightness: Brightness.dark,
         );
       }
       if (receiptReceived) {
@@ -352,6 +345,7 @@ extension _LocationChatSendActions on _LocationChatPanelState {
           context,
           'Message sent, but syncing the server message timed out.',
           duration: const Duration(seconds: 4),
+          brightness: Brightness.dark,
         );
       }
       _recordPanelDebug(

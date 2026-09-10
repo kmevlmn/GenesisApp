@@ -6652,16 +6652,49 @@ void _replyCompletionTests() {
         http.cardRequests.single.uri.queryParameters['conversation_round_id'],
         '10',
       );
+      final joining = service.join(locationId: 'loc-1');
+      await _waitFor(() => socket.sentTypes.contains('join'));
+      final join = socket.sent
+          .map((raw) => jsonDecode(raw) as Map)
+          .lastWhere((frame) => frame['type'] == 'join');
+      socket.serverV2Ack(clientMsgId: join['client_msg_id'] as String);
+      await joining;
+      await _waitFor(
+        () => service.state.historyHasMoreByLocation.containsKey('loc-1'),
+      );
+      await service.replyActions!.loadHistoryCards(
+        'loc-1',
+        roundIds: {10},
+        isCurrent: () => true,
+      );
+      expect(
+        http.cardRequests,
+        hasLength(1),
+        reason: 'Preload and join share the cached round',
+      );
       await service.refreshLatestMessages(locationId: 'loc-1');
-      expect(http.cardRequests, hasLength(2));
+      expect(http.cardRequests, hasLength(1));
       await service.loadOlderMessages(locationId: 'loc-1', beforeMessageId: 3);
-      expect(http.cardRequests, hasLength(3));
+      expect(http.cardRequests, hasLength(1));
       await service.loadOlderMessages(locationId: 'loc-1', beforeMessageId: 2);
       expect(
         http.cardRequests,
-        hasLength(3),
+        hasLength(1),
         reason: 'Older rounds do not refetch the tail card group',
       );
+      _rangeFrame(socket, 10, 10, newest: 2);
+      await _waitFor(() => http.cardRequests.length == 2);
+      await service.replyActions!.loadHistoryCards(
+        'loc-1',
+        roundIds: {10},
+        isCurrent: () => true,
+      );
+      expect(
+        http.cardRequests,
+        hasLength(2),
+        reason: 'Range update invalidates the cached round',
+      );
+      await service.replyActions!.clearCardsCache('loc-1');
       http.cardError = StateError('card read failed');
       final history = await service.refreshLatestMessages(locationId: 'loc-1');
       expect(history, hasLength(2));
@@ -6721,8 +6754,8 @@ void _replyCompletionTests() {
           await service.refreshLocationHistory(locationId: 'loc-1');
           expect(
             http.cardRequests,
-            hasLength(2),
-            reason: 'Cards belong to each matching history refresh',
+            hasLength(1),
+            reason: 'Matching history refreshes reuse the round card cache',
           );
         }
       },

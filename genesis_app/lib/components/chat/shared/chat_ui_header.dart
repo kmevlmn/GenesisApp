@@ -48,6 +48,9 @@ class ChatHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = this.style ?? ChatUiStyleConfig.standard;
     final topInset = GenesisSafeAreaInsets.top(context);
+    // Keep the back button in place; content starts 12px after its arrow.
+    final alignedContentLeft =
+        (kMinInteractiveDimension + style.headerBackIconSize) / 2 + 12;
     final headerSidePadding = trailing == null
         ? style.headerTrailingPlaceholderWidth
         : _chatHeaderTrailingWidth;
@@ -104,7 +107,7 @@ class ChatHeader extends StatelessWidget {
                 ),
                 if (verticallyCenteredTitleIcon)
                   Positioned(
-                    left: style.headerTrailingPlaceholderWidth,
+                    left: alignedContentLeft,
                     top: 0,
                     bottom: 0,
                     child: Align(
@@ -117,9 +120,7 @@ class ChatHeader extends StatelessWidget {
                     ),
                   ),
                 Positioned(
-                  left: alignContentLeft
-                      ? style.headerTrailingPlaceholderWidth
-                      : 0,
+                  left: alignContentLeft ? alignedContentLeft : 0,
                   right:
                       alignContentLeft &&
                           !trailingInTitleRow &&

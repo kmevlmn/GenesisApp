@@ -26,7 +26,7 @@ class PageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GenesisTopSafeArea(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           horizontalPadding,
@@ -38,12 +38,13 @@ class PageHeader extends StatelessWidget {
           children: [
             SizedBox(
               height: kGenesisTopBarHeight,
-              child: Stack(
-                alignment: Alignment.center,
+              child: Row(
                 children: [
-                  Center(child: GenesisPageTitle(text: pageName)),
-                  if (trailing != null)
-                    Align(alignment: Alignment.centerRight, child: trailing),
+                  Expanded(child: GenesisPageTitle(text: pageName)),
+                  if (trailing != null) ...[
+                    const SizedBox(width: 12),
+                    trailing!,
+                  ],
                 ],
               ),
             ),
@@ -87,11 +88,23 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.titleKey,
     this.onTitleTap,
     this.titleStyle,
+    this.systemOverlayStyle = SystemUiOverlayStyle.light,
+    this.centerTitle = false,
+    this.titleSpacing,
+    this.horizontalInset = 16,
+    this.backgroundColor = GenesisColors.darkBackground,
+    this.foregroundColor = GenesisColors.darkTextPrimary,
     this.titleWidget,
     this.titleSideInset,
-    this.systemOverlayStyle,
   });
 
+  final bool centerTitle;
+  final double? titleSpacing;
+
+  /// Aligns the back icon and the trailing title edge. Actions own their insets.
+  final double horizontalInset;
+  final Color backgroundColor;
+  final Color foregroundColor;
   final String pageName;
   final VoidCallback? onBack;
   final List<Widget>? actions;
@@ -111,22 +124,24 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       toolbarHeight: kGenesisTopBarHeight,
-      backgroundColor: Colors.white,
+      backgroundColor: backgroundColor,
       elevation: 0,
       scrolledUnderElevation: 0,
       systemOverlayStyle: systemOverlayStyle,
-      centerTitle: true,
-      leadingWidth: 37,
+      centerTitle: centerTitle,
+      titleSpacing: titleSpacing ?? (centerTitle ? null : 12),
+      leadingWidth: horizontalInset + 17,
       leading: Padding(
-        padding: const EdgeInsets.only(left: 20),
+        padding: EdgeInsets.only(left: horizontalInset),
         child: Align(
           alignment: Alignment.centerLeft,
           child: IconButton(
+            tooltip: 'Back',
             constraints: const BoxConstraints.tightFor(width: 17, height: 17),
             padding: EdgeInsets.zero,
-            icon: const Icon(
+            icon: Icon(
               Icons.arrow_back_ios_new,
-              color: Colors.black,
+              color: foregroundColor,
               size: 17,
             ),
             onPressed: onBack ?? () => Navigator.of(context).maybePop(),
@@ -150,9 +165,34 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
               onTap: onTitleTap,
               child:
                   titleWidget ??
-                  PageTitleText(pageName: pageName, style: titleStyle),
+                  (centerTitle
+                      ? PageTitleText(
+                          pageName: pageName,
+                          style: TextStyle(
+                            color: foregroundColor,
+                          ).merge(titleStyle),
+                        )
+                      : Text(
+                          pageName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GenesisUiTheme.of(context).pageTitleStyle
+                              .copyWith(color: foregroundColor)
+                              .merge(titleStyle),
+                        )),
             ),
-      actions: actions,
+      actions: actions?.isNotEmpty == true
+          ? actions
+          : (!centerTitle
+                ? [
+                    SizedBox(
+                      width: (horizontalInset - (titleSpacing ?? 12)).clamp(
+                        0.0,
+                        double.infinity,
+                      ),
+                    ),
+                  ]
+                : null),
     );
   }
 }

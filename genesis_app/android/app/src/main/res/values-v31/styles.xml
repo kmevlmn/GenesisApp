@@ -1,16 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="LaunchTheme" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@android:color/white</item>
+        <item name="windowSplashScreenBackground">@color/genesis_dark_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/genesis_launch_logo_android12</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="postSplashScreenTheme">@style/NormalTheme</item>
+        <item name="android:navigationBarColor">@color/genesis_dark_background</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
-    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
-    </style>
 </resources>

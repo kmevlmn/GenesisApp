@@ -103,7 +103,7 @@ class _OriginCharacterRow extends StatelessWidget {
                 Text(
                   tagline,
                   style: _bodyTextStyle.copyWith(
-                    color: originWorldDetailSheetAccentSoftColor,
+                    color: GenesisColors.redSecondary,
                   ),
                 ),
               ],
@@ -234,30 +234,6 @@ const _mutedBodyTextStyle = TextStyle(
   decoration: TextDecoration.none,
 );
 
-const _originTickContentLabelStyle = TextStyle(
-  fontSize: 13,
-  height: 1.4,
-  fontWeight: FontWeight.w600,
-  color: originWorldDetailSheetPrimaryTextColor,
-  decoration: TextDecoration.none,
-);
-
-const _originTickContentTextStyle = TextStyle(
-  fontSize: 13,
-  height: 1.4,
-  fontWeight: FontWeight.w400,
-  color: originWorldDetailSheetSecondaryTextColor,
-  decoration: TextDecoration.none,
-);
-
-const _originTickContentTimestampStyle = TextStyle(
-  fontSize: 13,
-  height: 1.4,
-  fontWeight: FontWeight.w400,
-  color: originWorldDetailSheetTertiaryTextColor,
-  decoration: TextDecoration.none,
-);
-
 String _characterStableId(OriginCharacter character) {
   final explicitId = character.characterId.trim();
   if (explicitId.isNotEmpty) return explicitId;
@@ -272,48 +248,6 @@ List<String> _splitTags(String tags) {
       .map((e) => e.trim())
       .where((e) => e.isNotEmpty)
       .toList();
-}
-
-Map<String, dynamic>? _originPreviewTick(OriginDetail origin) {
-  final tick = _originTick1(origin);
-  if (tick == null) return null;
-  final result = tick['tick_result'] is Map
-      ? (tick['tick_result'] as Map).cast<String, dynamic>()
-      : const <String, dynamic>{};
-  final narrator = _mapString(result, const ['narrator']);
-  final paragraphsRaw = result['paragraphs'];
-  final paragraphs = paragraphsRaw is List
-      ? paragraphsRaw
-            .whereType<Map>()
-            .map((item) => item.cast<String, dynamic>())
-            .where(_originPreviewParagraphHasText)
-            .toList(growable: false)
-      : const <Map<String, dynamic>>[];
-
-  return <String, dynamic>{
-    'created_at': tick['created_at'] ?? origin.updatedAt,
-    'tick_result': <String, dynamic>{
-      'current_time': _mapString(result, const ['current_time']),
-      'narrator': narrator,
-      'paragraphs': paragraphs,
-    },
-  };
-}
-
-Map<String, dynamic>? _originTick1(OriginDetail origin) {
-  for (final tick in origin.ticks) {
-    if (_mapInt(tick, const ['tick_no']) == 1) return tick;
-  }
-  return origin.ticks.isEmpty ? null : origin.ticks.first;
-}
-
-bool _originPreviewParagraphHasText(Map<String, dynamic> paragraph) {
-  return _mapString(paragraph, const [
-    'content',
-    'text',
-    'summary',
-    'narrator',
-  ]).isNotEmpty;
 }
 
 class _SectionTitle extends StatelessWidget {

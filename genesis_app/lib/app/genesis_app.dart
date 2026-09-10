@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import '../components/gems/membership_guest_login_gate.dart';
 import 'package:flutter/services.dart';
 
 import '../components/developer_debug_floating_button.dart';
 import '../components/internal_build_indicator.dart';
-import '../components/gems/membership_guest_login_gate.dart';
 import 'agent_control/agent_control_host.dart';
 import 'debug_page_tracker.dart';
 import 'genesis_navigator.dart';
@@ -54,20 +54,25 @@ class GenesisApp extends StatelessWidget {
             return AppRouter.onGenerateRoute(settings);
           },
           builder: (context, child) {
-            return AnnotatedRegion<SystemUiOverlayStyle>(
-              value: kGenesisDefaultSystemUiOverlayStyle,
-              child: GenesisTelemetryTapRegion(
-                child: GenesisBottomSystemBarBoundary(
-                  child: InternalBuildIndicator(
-                    child: ForceUpgradeGate(
-                      child: DeveloperDebugFloatingButton(
-                        navigatorKey: genesisNavigatorKey,
-                        child: MembershipGuestLoginGate(
-                          service: AppServicesScope.read(
-                            context,
-                          ).membershipPurchases,
+            // Root overlays and builder decorations sit outside page Material
+            // widgets, so they also need the application's default font.
+            return DefaultTextStyle(
+              style: GenesisTypography.body,
+              child: AnnotatedRegion<SystemUiOverlayStyle>(
+                value: kGenesisDefaultSystemUiOverlayStyle,
+                child: GenesisTelemetryTapRegion(
+                  child: GenesisBottomSystemBarBoundary(
+                    child: InternalBuildIndicator(
+                      child: ForceUpgradeGate(
+                        child: DeveloperDebugFloatingButton(
                           navigatorKey: genesisNavigatorKey,
-                          child: child ?? const SizedBox.shrink(),
+                          child: MembershipGuestLoginGate(
+                            service: AppServicesScope.read(
+                              context,
+                            ).membershipPurchases,
+                            navigatorKey: genesisNavigatorKey,
+                            child: child ?? const SizedBox.shrink(),
+                          ),
                         ),
                       ),
                     ),

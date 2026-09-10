@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+
 import 'genesis_action_box.dart';
 import 'genesis_center_toast.dart';
 import 'genesis_modal_routes.dart';
@@ -15,7 +17,9 @@ Future<bool> showGenesisContentSubmissionDialog({
   required GenesisContentSubmitter onSubmit,
   required String successMessage,
   required String failureMessage,
+  Brightness? brightness,
 }) async {
+  final toastBrightness = brightness ?? Theme.of(context).brightness;
   final submitted = await showGenesisDialog<bool>(
     context: context,
     barrierColor: const Color(0x52000000),
@@ -26,6 +30,7 @@ Future<bool> showGenesisContentSubmissionDialog({
         onSubmit: onSubmit,
         successMessage: successMessage,
         failureMessage: failureMessage,
+        toastBrightness: toastBrightness,
       );
     },
   );
@@ -39,6 +44,7 @@ class _GenesisContentSubmissionDialog extends StatefulWidget {
     required this.onSubmit,
     required this.successMessage,
     required this.failureMessage,
+    required this.toastBrightness,
   });
 
   final String title;
@@ -46,6 +52,7 @@ class _GenesisContentSubmissionDialog extends StatefulWidget {
   final GenesisContentSubmitter onSubmit;
   final String successMessage;
   final String failureMessage;
+  final Brightness toastBrightness;
 
   @override
   State<_GenesisContentSubmissionDialog> createState() =>
@@ -75,12 +82,20 @@ class _GenesisContentSubmissionDialogState
       final overlay = Overlay.maybeOf(context, rootOverlay: true);
       Navigator.of(context).pop(true);
       if (overlay != null) {
-        showGenesisToastInOverlay(overlay, widget.successMessage);
+        showGenesisToastInOverlay(
+          overlay,
+          widget.successMessage,
+          brightness: widget.toastBrightness,
+        );
       }
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      showGenesisToast(context, widget.failureMessage);
+      showGenesisToast(
+        context,
+        widget.failureMessage,
+        brightness: Brightness.dark,
+      );
     }
   }
 
@@ -94,26 +109,32 @@ class _GenesisContentSubmissionDialogState
         key: widget.contentInputKey,
         controller: _controller,
         focusNode: _focusNode,
-        cursorColor:
-            Theme.of(context).textTheme.bodyLarge?.color ??
-            const Color(0xFF111111),
+        cursorColor: GenesisColors.darkTextPrimary,
+        style: const TextStyle(color: GenesisColors.darkTextPrimary),
         autofocus: true,
         minLines: 3,
         maxLines: 3,
         textInputAction: TextInputAction.newline,
         decoration: InputDecoration(
+          filled: true,
+          fillColor: GenesisColors.darkFaintFill,
           hintText: 'Describe the issue',
+          hintStyle: const TextStyle(color: GenesisColors.darkInputPlaceholder),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 12,
             vertical: 10,
           ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFD8D8DE)),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFD8D8DE)),
+            borderSide: BorderSide.none,
           ),
         ),
         onChanged: (_) => setState(() {}),

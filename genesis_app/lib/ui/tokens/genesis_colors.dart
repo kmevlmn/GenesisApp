@@ -1,10 +1,48 @@
 import 'package:flutter/material.dart';
 
 abstract final class GenesisColors {
-  static const Color brand = Color(0xFFFF2442);
+  static const Color darkBackground = Color(0xFF151517);
+  static const Color darkTextPrimary = Color(0xF2FFFFFF);
+  static const Color darkTextSecondary = Color(0xB8FFFFFF);
+  static const Color darkTextTertiary = Color(0x73FFFFFF);
+  static const Color darkRaisedBackground = Color(0xFF181C1F);
+
+  /// Translucent panels for action dialogs and generation overlays.
+  static final Color darkOverlayBackground = darkRaisedBackground.withValues(
+    alpha: 0.4,
+  );
+  static const Color darkInputPlaceholder = Color(0x52FFFFFF);
+  static const Color darkHandleActive = darkTextPrimary;
+  static const Color darkHandleInactive = darkTextTertiary;
+
+  // Worldo Detail's Write a post fill, shared by discussion surfaces.
+  static const Color darkFaintFill = Color(0x1FFFFFFF);
+  // The same fill composited over #151517 for surfaces that must be opaque.
+  static const Color darkFaintSurface = Color(0xFF313133);
+
+  // Opaque toast surface sampled from the approved dark reference.
+  static const Color darkToastBackground = Color(0xFF424244);
+
+  // Red hierarchy: actions, readable accent text, pale/disabled fills.
+  static const Color redPrimary = Color(0xFFFF2442);
+  static const Color redSecondary = Color(0xFFFF8A9A);
+  static const Color redTertiary = Color(0xFFFFB8C3);
+
+  // Disabled filled primary actions on dark surfaces; preserve icon-button styles.
+  static final Color darkButtonDisabledBackground = redPrimary.withValues(
+    alpha: 0.4,
+  );
+  // Flatten secondary white over the base surface so red cannot tint the text.
+  static final Color darkButtonDisabledForeground = Color.alphaBlend(
+    darkTextSecondary,
+    darkBackground,
+  );
+
+  // Existing semantic names remain aliases of the shared red hierarchy.
+  static const Color brand = redPrimary;
   static const Color brandBright = brand;
-  static const Color brandSoft = Color(0xFFFFB8C3);
-  static const Color create = Color(0xFFFF2442);
+  static const Color brandSoft = redTertiary;
+  static const Color create = redPrimary;
   static const Color createAdd = Color(0xFFC41F2E);
 
   static const Color surface = Colors.white;
@@ -21,5 +59,5 @@ abstract final class GenesisColors {
 
   static const Color border = Color(0xFFE6E6E8);
   static const Color borderStrong = Color(0xFFDCDCDC);
-  static const Color danger = Color(0xFFFF2442);
+  static const Color danger = redPrimary;
 }

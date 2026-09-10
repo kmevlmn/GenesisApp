@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../../ui/tokens/genesis_blur.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/bootstrap/service_registry.dart';
 import '../../app/config/genesis_image_config.dart';
@@ -25,12 +26,14 @@ import '../../components/common/genesis_modal_routes.dart';
 import '../../components/common/genesis_report_actions.dart';
 import '../../components/gems/gem_balance_prompt.dart';
 import '../../components/gems/memory_model_entry_button.dart';
+import '../../features/location_chat_reply/edit/edit.dart';
+import '../../features/location_chat_reply/go_on/go_on.dart';
+import '../../features/location_chat_reply/inspiration/inspiration.dart';
+import '../../features/location_chat_reply/regenerate/regenerate.dart';
 import '../../components/world_new_badge.dart';
 import '../../network/chatroom/chatroom_connection_controller.dart';
 import '../../network/chatroom/chatroom_message_type.dart';
 import '../../network/chatroom/chatroom_models.dart';
-import '../../network/chatroom/chatroom_inspiration.dart';
-import '../../network/chatroom/chatroom_inspiration_controller.dart';
 import '../../network/chatroom/chatroom_message_batch.dart';
 import '../../network/chatroom/chatroom_timeline_payload.dart';
 import '../../network/chatroom/world_chatroom_service.dart';
@@ -46,12 +49,14 @@ import '../../ui/components/genesis_primary_button.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/components/genesis_static_network_image.dart';
 import '../../ui/components/genesis_tab_bar.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/genesis_image_resource.dart';
 import '../../utils/genesis_ugc_text.dart';
-import '../create/create_form_widgets.dart' show CreateFormDeleteButton;
+import '../../ui/components/genesis_delete_button.dart';
 import 'location_chat_scroll_coordinator.dart';
 import 'location_chat_reply_presentation.dart';
+import 'location_chat_reply_card_switcher.dart';
 import 'location_chat_loading_bubble.dart';
 import 'message_parsers/location_chat_message_parsers.dart';
 import '../world/world_constants.dart' show worldCharacterAvatarLogicalSize;
@@ -59,9 +64,12 @@ import '../world/world_constants.dart' show worldCharacterAvatarLogicalSize;
 part 'location_chat_panel_connection.dart';
 part 'location_chat_message_reconciler.dart';
 part 'location_chat_send_actions.dart';
+part '../../features/location_chat_reply/regenerate/src/location_chat_regenerate_binding.dart';
+part '../../features/location_chat_reply/go_on/src/location_chat_go_on_binding.dart';
 part 'location_chat_reply_binding.dart';
-part 'location_chat_inspiration_binding.dart';
-part 'location_chat_edit_page.dart';
+part '../../features/location_chat_reply/edit/src/location_chat_edit_binding.dart';
+part '../../features/location_chat_reply/inspiration/src/location_chat_inspiration_binding.dart';
+part '../../features/location_chat_reply/edit/src/location_chat_edit_page.dart';
 part 'location_chat_message_window.dart';
 part 'location_chat_mentions.dart';
 part 'location_chat_composer_input.dart';
@@ -141,12 +149,7 @@ ChatUiStyleConfig resolveLocationChatHeaderEffectStyle({
   final surfaceOpacity = settings.transparencyStrength
       .clamp(0.0, 1.0)
       .toDouble();
-  final blurSigma = settings.blurSigma
-      .clamp(
-        LocationChatHeaderEffectSettings.minBlurSigma,
-        LocationChatHeaderEffectSettings.maxBlurSigma,
-      )
-      .toDouble();
+  final blurSigma = GenesisBlur.normalize(settings.blurSigma);
   final surfaceBackground = baseStyle.conversationBackgroundColor.withValues(
     alpha: surfaceOpacity,
   );
@@ -400,6 +403,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
   bool _replyRebuildScheduled = false;
   int _replyBindingGeneration = 0;
   bool _preparingReplyAction = false;
+  bool _replyCardTransitionBusy = false;
   bool _replyRequestLoading = false;
   bool _replyStreamStarted = false;
   bool _replyLoadingForRegeneration = false;
@@ -788,6 +792,7 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
                 joined &&
                 _hasDraftText &&
                 !_sending &&
+                !_replyCardTransitionBusy &&
                 !_sendAwaitingResponse &&
                 !inputBlocked,
             sending: false,
@@ -890,6 +895,20 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         _awaitingTickProgressMessage ||
         replyGoOnPending ||
         _preparingReplyAction;
+    final regenerateFeature = _regenerateFeature(replyBlocked, replyState);
+    final goOnFeature = _goOnFeature(
+      replyBlocked,
+      replyState,
+      replyGoOnPending,
+    );
+    final editFeature = _editFeature(
+      replyBlocked,
+      replyState,
+      style,
+      ordinaryMessageBubbleMaxWidthCaps.selfMessage,
+      ordinaryMessageBubbleMaxWidthCaps.otherMessage,
+    );
+    final inspirationFeature = _inspirationFeature();
     final managesKeyboardInset = locationChatManagesKeyboardInsetForTesting(
       platform: Theme.of(context).platform,
       androidSdkInt: _androidSdkInt,
@@ -909,50 +928,32 @@ class _LocationChatPanelState extends State<LocationChatPanel> {
         replyActionsAnchorIndex: replyPresentation.anchorIndex,
         replyPresentationRevision: replyState?.presentationRevision ?? 0,
         replyStatus: _replyStatusWidget(replyState, style),
+        replyCards: _replyCardPages(replyState, style),
+        replyCurrentCardId: replyState?.viewedCardId ?? 0,
+        replyCardBindingIdentity:
+            '$_replyBindingGeneration/${widget.worldId}/${widget.locationId}/${replyState?.roundId}',
+        replyCardSwitchEnabled:
+            !replyBlocked &&
+            !(replyState?.busy ?? true) &&
+            !(replyState?.frozen ?? true),
+        onReplyCardSelected: _commitReplyCard,
+        onReplyCardTransitionChanged: (busy) {
+          if (mounted) {
+            _setLocationChatState(() => _replyCardTransitionBusy = busy);
+          }
+        },
         isMember: widget.isMember,
-        onRegenerate: () => unawaited(
-          _runReplyAction(
-            (controller) => controller.regenerate(widget.locationId),
-            generating: true,
-            regenerating: true,
-          ),
-        ),
-        onGoOn: () => unawaited(
-          _runReplyAction(
-            (controller) => controller.goOn(widget.locationId),
-            generating: true,
-          ),
-        ),
-        regenerateEnabled:
-            !replyBlocked && (replyState?.canRegenerate ?? false),
-        goOnEnabled: !replyBlocked && (replyState?.canGoOn ?? false),
-        editEnabled: !replyBlocked && (replyState?.canEdit ?? false),
-        regenerateBusy: replyState?.generating ?? false,
-        goOnBusy: replyGoOnPending,
-        editBusy: _preparingReplyAction,
+        regenerateFeature: regenerateFeature,
+        goOnFeature: goOnFeature,
+        editFeature: editFeature,
         replyCardIndex: math.max(0, (replyState?.cardPosition ?? 1) - 1),
         replyCardCount: replyState?.cardCount ?? 0,
         replyCardsConfirmed: replyState?.confirmed ?? false,
         onPreviousReplyCard: () => _browseReplyCard(-1),
         onNextReplyCard: () => _browseReplyCard(1),
-        inspirationMessages: _inspirationMessages,
-        inspirationLoading: _inspirationLoading,
-        inspirationEnabled:
-            _currentInspirationSource != null &&
-            !_sending &&
-            !_preparingReplyAction,
+        inspirationFeature: inspirationFeature,
         inspirationIdentity:
             '${_currentInspirationSource?.key}:$_inspirationResetRevision',
-        onInspirationExpanded: _onInspirationExpanded,
-        onInspirationSend: _sendInspiration,
-        onInspirationEdit: _editInspiration,
-        onEditReply: () => unawaited(
-          _editCurrentReply(
-            style,
-            ordinaryMessageBubbleMaxWidthCaps.selfMessage,
-            ordinaryMessageBubbleMaxWidthCaps.otherMessage,
-          ),
-        ),
         topTitle: '',
         oldestEdgeLoading: _showOlderMessagesLoading,
         onOldestEdgeLoadingCollapsed: _handleOlderMessagesLoadingCollapsed,
@@ -1122,7 +1123,7 @@ class _LocationChatRoster extends StatelessWidget {
     required this.selfOccupantId,
   });
 
-  static const double _blurSigma = 14;
+  static const double _blurSigma = GenesisBlur.strong;
 
   final List<WorldChatroomEntity> occupants;
   final String selfOccupantId;
@@ -1134,8 +1135,8 @@ class _LocationChatRoster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const accent = Color(0xFFFF2442);
-    const accentSoft = Color(0xFFFF8A9A);
+    const accent = GenesisColors.redPrimary;
+    const accentSoft = GenesisColors.redSecondary;
     const softWhite = Color(0xFFF4F3F6);
     const white = Colors.white;
     final radius = BorderRadius.circular(14);

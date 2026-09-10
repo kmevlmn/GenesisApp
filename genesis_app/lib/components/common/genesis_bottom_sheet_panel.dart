@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/components/genesis_dark_close_button.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_radii.dart';
 
 class GenesisBottomSheetCloseButton extends StatelessWidget {
@@ -14,6 +16,9 @@ class GenesisBottomSheetCloseButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Theme.of(context).brightness == Brightness.dark) {
+      return GenesisDarkCloseButton(key: buttonKey, onPressed: onPressed);
+    }
     return SizedBox.square(
       key: buttonKey,
       dimension: 24,
@@ -43,6 +48,7 @@ class GenesisBottomSheetPanel extends StatelessWidget {
     this.padding = const EdgeInsets.fromLTRB(16, 20, 16, 14),
     this.titleBottomSpacing = 20,
     this.titleTextStyle,
+    this.backgroundColor,
     this.titleWidget,
     this.maintainBottomViewPadding = false,
     this.showHeader = true,
@@ -64,14 +70,18 @@ class GenesisBottomSheetPanel extends StatelessWidget {
   final EdgeInsets padding;
   final double titleBottomSpacing;
   final TextStyle? titleTextStyle;
+  final Color? backgroundColor;
   final Widget? titleWidget;
   final bool maintainBottomViewPadding;
   final bool showHeader;
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.white,
+      color:
+          backgroundColor ??
+          (dark ? GenesisColors.darkRaisedBackground : Colors.white),
       borderRadius: borderRadius,
       child: SafeArea(
         top: false,
@@ -94,7 +104,11 @@ class GenesisBottomSheetPanel extends StatelessWidget {
                               title,
                               style:
                                   titleTextStyle ??
-                                  GenesisBottomSheetPanel.titleStyle,
+                                  (dark
+                                      ? titleStyle.copyWith(
+                                          color: GenesisColors.darkTextPrimary,
+                                        )
+                                      : titleStyle),
                             ),
                       ),
                       if (trailing != null) trailing!,

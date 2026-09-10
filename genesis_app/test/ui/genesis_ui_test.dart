@@ -1,11 +1,12 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/components/common/genesis_action_box.dart';
 import 'package:genesis_flutter_android/components/page_header.dart';
 import 'package:genesis_flutter_android/components/search_bar.dart';
 import 'package:genesis_flutter_android/icons/custom_icon_assets.dart';
-import 'package:genesis_flutter_android/ui/components/genesis_unread_badge.dart';
 import 'package:genesis_flutter_android/ui/genesis_ui.dart';
 
 void main() {
@@ -186,7 +187,9 @@ void main() {
       ),
     );
 
-    final placeholder = tester.widget<Text>(find.text('Explore'));
+    final placeholder = tester.widget<Text>(
+      find.text('Worldo, Character, Tags'),
+    );
     expect(placeholder.maxLines, 1);
     expect(placeholder.overflow, TextOverflow.ellipsis);
     expect(placeholder.softWrap, isFalse);
@@ -252,9 +255,9 @@ void main() {
     );
 
     expect(find.text('Worldo'), findsOneWidget);
-    expect(find.text('Explore'), findsOneWidget);
+    expect(find.text('Worldo, Character, Tags'), findsOneWidget);
 
-    await tester.tap(find.text('Explore'));
+    await tester.tap(find.text('Worldo, Character, Tags'));
     expect(tapped, isTrue);
   });
 
@@ -262,19 +265,18 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(body: SearchBarPlaceholder(hintText: 'Explore')),
-      ),
+      const MaterialApp(home: Scaffold(body: SearchBarPlaceholder())),
     );
 
     expect(
       tester.widget<SearchBarPlaceholder>(find.byType(SearchBarPlaceholder)),
       isA<GenesisSearchField>(),
     );
-    final image = tester.widget<Image>(find.byType(Image));
-    expect((image.image as AssetImage).assetName, searchIconAsset);
+    final icon = tester.widget<Icon>(find.byIcon(CupertinoIcons.search));
+    expect(icon.size, 16);
+    expect(find.byType(Image), findsNothing);
     expect(find.byIcon(Icons.search), findsNothing);
-    expect(find.text('Explore'), findsOneWidget);
+    expect(find.text('Worldo, Character, Tags'), findsOneWidget);
   });
 
   testWidgets('search and clear icons use symmetric horizontal insets', (
@@ -300,7 +302,7 @@ void main() {
     );
 
     final fieldRect = tester.getRect(find.byType(SearchBarPlaceholder));
-    final searchIconRect = tester.getRect(find.byType(Image));
+    final searchIconRect = tester.getRect(find.byIcon(CupertinoIcons.search));
     final clearIconRect = tester.getRect(find.byIcon(Icons.close));
     final searchInset = searchIconRect.left - fieldRect.left;
     final clearInset = fieldRect.right - clearIconRect.right;
@@ -398,6 +400,58 @@ void main() {
       Colors.white,
     );
   });
+
+  testWidgets(
+    'GenesisPrimaryButton uses muted dark disabled and loading states',
+    (tester) async {
+      var taps = 0;
+      for (final loading in [false, true]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: GenesisPrimaryButton(
+                label: 'Save',
+                onPressed: loading ? () => taps++ : null,
+                isLoading: loading,
+              ),
+            ),
+          ),
+        );
+        final button = tester.widget<FilledButton>(find.byType(FilledButton));
+        expect(button.onPressed, isNull);
+        expect(GenesisColors.darkButtonDisabledForeground.a, 1);
+        expect(
+          Color.alphaBlend(
+            GenesisColors.darkButtonDisabledForeground,
+            GenesisColors.redPrimary,
+          ),
+          GenesisColors.darkButtonDisabledForeground,
+        );
+        expect(
+          button.style?.backgroundColor?.resolve({WidgetState.disabled}),
+          GenesisColors.redPrimary.withValues(alpha: 0.4),
+        );
+        expect(
+          button.style?.foregroundColor?.resolve({WidgetState.disabled}),
+          GenesisColors.darkButtonDisabledForeground,
+        );
+        expect(button.style?.backgroundColor?.resolve({}), GenesisColors.brand);
+        await tester.tap(find.byType(FilledButton));
+        expect(taps, 0);
+        if (loading) {
+          expect(
+            tester
+                .widget<CircularProgressIndicator>(
+                  find.byType(CircularProgressIndicator),
+                )
+                .color,
+            GenesisColors.darkButtonDisabledForeground,
+          );
+        }
+      }
+    },
+  );
 
   testWidgets('GenesisPrimaryButton reports taps while disabled', (
     tester,
@@ -985,19 +1039,41 @@ void main() {
     );
     expect(navSizedBoxes.any((box) => box.height == 49), isTrue);
 
-    final decoration = tester
-        .widgetList<DecoratedBox>(
-          find.descendant(
-            of: find.byType(GenesisBottomNavigation),
-            matching: find.byType(DecoratedBox),
-          ),
-        )
-        .map((box) => box.decoration)
-        .whereType<BoxDecoration>()
-        .singleWhere((decoration) => decoration.boxShadow != null);
-    expect(decoration.color, Colors.white);
-    expect(decoration.boxShadow, isNotNull);
-    expect(decoration.boxShadow!.single.offset.dy, lessThan(0));
+    final surfaces = tester.widgetList<ColoredBox>(
+      find.descendant(
+        of: find.byType(GenesisBottomNavigation),
+        matching: find.byType(ColoredBox),
+      ),
+    );
+    expect(surfaces.first.color, GenesisColors.darkBackground);
+    expect(
+      surfaces.any((box) => box.color == GenesisColors.darkFaintFill),
+      isTrue,
+    );
+    expect(find.byType(BackdropFilter), findsNothing);
+
+    // Preserve the white SVG cutouts when the selected silhouette turns white.
+    final selectedMapper =
+        (icons[1].bytesLoader as SvgAssetLoader).colorMapper!;
+    expect(
+      selectedMapper.substitute(null, 'path', 'fill', const Color(0xFF333333)),
+      GenesisColors.darkTextPrimary,
+    );
+    expect(
+      selectedMapper.substitute(null, 'polyline', 'stroke', Colors.white),
+      GenesisColors.darkBackground,
+    );
+    final unselectedMapper =
+        (icons[0].bytesLoader as SvgAssetLoader).colorMapper!;
+    expect(
+      unselectedMapper.substitute(
+        null,
+        'path',
+        'fill',
+        const Color(0xFF666666),
+      ),
+      GenesisColors.darkTextSecondary,
+    );
 
     final badgePosition = tester.widget<Positioned>(
       find.ancestor(
@@ -1009,28 +1085,65 @@ void main() {
     expect(badgePosition.left, 19);
   });
 
-  testWidgets('GenesisUnreadBadge applies platform optical offsets', (
+  testWidgets('GenesisUnreadBadge centers numbers on both platforms', (
     tester,
   ) async {
-    Future<double> textOffsetFor(TargetPlatform platform) async {
+    for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+      for (final count in [1, 4, 8, 10, 99, 100]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: GenesisTheme.light().copyWith(platform: platform),
+            home: Scaffold(
+              body: Center(
+                child: DefaultTextStyle(
+                  style: const TextStyle(
+                    fontSize: 30,
+                    height: 2,
+                    letterSpacing: 3,
+                  ),
+                  child: GenesisUnreadBadge(count: count),
+                ),
+              ),
+            ),
+          ),
+        );
+        final badge = find.byType(GenesisUnreadBadge);
+        final label = find.text(count > 99 ? '99+' : '$count');
+        final size = tester.getSize(badge);
+        expect(size.height, 16);
+        if (count < 10) {
+          expect(size.width, 16);
+        } else {
+          expect(size.width, tester.getSize(label).width + 8);
+        }
+        expect(tester.getCenter(label), tester.getCenter(badge));
+        final style = tester.widget<Text>(label).style!;
+        expect(style.inherit, isFalse);
+        expect(style.fontFamily, GenesisTypography.fontFamily);
+        expect(style.fontFamilyFallback, GenesisTypography.fontFamilyFallback);
+        expect(style.fontSize, 10);
+        expect(style.height, 1);
+        expect(style.fontWeight, FontWeight.w600);
+        expect(
+          find.descendant(of: badge, matching: find.byType(Transform)),
+          findsNothing,
+        );
+      }
+    }
+  });
+
+  testWidgets('GenesisUnreadBadge hides nonpositive counts', (tester) async {
+    for (final count in [0, -1]) {
       await tester.pumpWidget(
         MaterialApp(
-          key: ValueKey(platform),
-          theme: GenesisTheme.light().copyWith(platform: platform),
-          home: const Scaffold(body: GenesisUnreadBadge(count: 4)),
+          home: Scaffold(
+            body: Center(child: GenesisUnreadBadge(count: count)),
+          ),
         ),
       );
-      final transform = tester.widget<Transform>(
-        find.descendant(
-          of: find.byType(GenesisUnreadBadge),
-          matching: find.byType(Transform),
-        ),
-      );
-      return transform.transform.getTranslation().y;
+      expect(tester.getSize(find.byType(GenesisUnreadBadge)), Size.zero);
+      expect(find.byType(GenesisCountBadge), findsNothing);
     }
-
-    expect(await textOffsetFor(TargetPlatform.iOS), -0.5);
-    expect(await textOffsetFor(TargetPlatform.android), 0.5);
   });
 
   testWidgets('GenesisBottomNavigation can show an icon-only create action', (
@@ -1068,7 +1181,7 @@ void main() {
 
     final createIcon = tester.widget<Icon>(find.byIcon(Icons.add_rounded));
     expect(createIcon.size, 26);
-    expect(createIcon.color, Colors.white);
+    expect(createIcon.color, GenesisColors.darkTextPrimary);
     expect(createIcon.shadows, hasLength(4));
 
     final decoration = tester
@@ -1183,7 +1296,7 @@ void main() {
     tester,
   ) async {
     MediaQueryData? innerMediaQuery;
-    const systemBarColor = Color(0xFFEDF3EF);
+    const systemBarColor = GenesisColors.darkBackground;
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(scaffoldBackgroundColor: systemBarColor),
@@ -1211,6 +1324,24 @@ void main() {
           ),
         ),
       ),
+    );
+
+    // The shared system-bar style is published after the first frame.
+    await tester.pump();
+
+    final systemOverlay = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find
+          .ancestor(
+            of: find.byKey(
+              const ValueKey('genesis-bottom-system-bar-opaque-overlay'),
+            ),
+            matching: find.byType(AnnotatedRegion<SystemUiOverlayStyle>),
+          )
+          .first,
+    );
+    expect(
+      systemOverlay.value.systemNavigationBarIconBrightness,
+      Brightness.light,
     );
 
     expect(
@@ -1266,6 +1397,9 @@ void main() {
         ),
       ),
     );
+
+    // The shared system-bar style is published after the first frame.
+    await tester.pump();
 
     expect(
       tester.getSize(find.byKey(const ValueKey('gesture-content'))).height,

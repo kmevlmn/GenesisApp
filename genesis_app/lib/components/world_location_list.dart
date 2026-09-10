@@ -8,6 +8,7 @@ import '../icons/custom_icon_assets.dart';
 import '../ui/components/recent_chat_marker.dart';
 import '../ui/components/genesis_list_image.dart';
 import '../ui/tokens/genesis_image_radii.dart';
+import '../ui/tokens/genesis_colors.dart';
 import '../utils/genesis_image_resource.dart';
 import 'world_details_shell.dart';
 import 'world_new_badge.dart';
@@ -631,17 +632,19 @@ class _PointListItem extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.place_outlined,
                         size: 14,
-                        color: Colors.black,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? GenesisColors.darkTextSecondary
+                            : Colors.black,
                       ),
                       const SizedBox(width: 2),
                       Flexible(
                         fit: FlexFit.loose,
                         child: Text(
                           point.name,
-                          style: _locationNameStyle(level),
+                          style: _locationNameStyle(context, level),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -705,7 +708,7 @@ class _NodeHeader extends StatelessWidget {
               fit: FlexFit.loose,
               child: Text(
                 '- ${point.name}',
-                style: _locationNameStyle(level),
+                style: _locationNameStyle(context, level),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -764,17 +767,19 @@ class _LocationCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.place_outlined,
                         size: 14,
-                        color: Colors.black,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? GenesisColors.darkTextSecondary
+                            : Colors.black,
                       ),
                       const SizedBox(width: 2),
                       Flexible(
                         fit: FlexFit.loose,
                         child: Text(
                           point.name,
-                          style: _locationNameStyle(level),
+                          style: _locationNameStyle(context, level),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -812,19 +817,23 @@ class _LocationCard extends StatelessWidget {
   }
 }
 
-TextStyle _locationNameStyle(int level) {
+TextStyle _locationNameStyle(BuildContext context, int level) {
   if (level <= 0) {
-    return const TextStyle(
+    return TextStyle(
       fontSize: 16,
       fontWeight: FontWeight.w600,
-      color: Colors.black,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? GenesisColors.darkTextPrimary
+          : Colors.black,
     );
   }
   return TextStyle(
     fontSize: 14,
     height: 1.2,
     fontWeight: level == 1 ? FontWeight.w600 : FontWeight.w400,
-    color: Colors.black,
+    color: Theme.of(context).brightness == Brightness.dark
+        ? GenesisColors.darkTextPrimary
+        : Colors.black,
   );
 }
 
@@ -890,6 +899,9 @@ class _PointCharacterGroups extends StatelessWidget {
 class _PointCharacterGroupRow extends StatelessWidget {
   const _PointCharacterGroupRow({required this.iconAsset, required this.users});
 
+  static const _fontSize = 12.0;
+  static const _lineHeight = 1.4;
+
   final String iconAsset;
   final List<UserAvatar> users;
 
@@ -900,11 +912,18 @@ class _PointCharacterGroupRow extends StatelessWidget {
       children: [
         SizedBox(
           width: 12,
-          height: 15,
+          height:
+              MediaQuery.textScalerOf(context).scale(_fontSize) * _lineHeight,
           child: Align(
-            alignment: Alignment.topCenter,
+            alignment: Alignment.center,
             child: SvgPicture.asset(
               iconAsset,
+              colorFilter: Theme.of(context).brightness == Brightness.dark
+                  ? const ColorFilter.mode(
+                      GenesisColors.darkTextSecondary,
+                      BlendMode.srcIn,
+                    )
+                  : null,
               width: 12,
               height: 12,
               fit: BoxFit.contain,
@@ -916,11 +935,13 @@ class _PointCharacterGroupRow extends StatelessWidget {
         Expanded(
           child: Text.rich(
             TextSpan(children: _characterSpans()),
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.4,
+            style: TextStyle(
+              fontSize: _fontSize,
+              height: _lineHeight,
               fontWeight: FontWeight.w400,
-              color: Colors.black,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? GenesisColors.darkTextPrimary
+                  : Colors.black,
             ),
           ),
         ),
@@ -969,11 +990,13 @@ class _PointSummaryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       description,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12,
         height: 1.25,
         fontWeight: FontWeight.w400,
-        color: Colors.black,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? GenesisColors.darkTextSecondary
+            : Colors.black,
       ),
       maxLines: 3,
       overflow: TextOverflow.ellipsis,
@@ -1049,11 +1072,29 @@ class _LocationCoverImage extends StatelessWidget {
           logicalWidth: logicalWidth,
           devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
         );
-        return GenesisListImage(
-          imageUrl: resizedUrl.isNotEmpty ? resizedUrl : rawUrl,
+        final imageUrl = rawUrl.isEmpty
+            ? _locationDefaultImageAsset
+            : (resizedUrl.isNotEmpty ? resizedUrl : rawUrl);
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        final image = GenesisListImage(
+          imageUrl: imageUrl,
           width: logicalWidth,
           height: logicalHeight,
           placeholderAsset: _locationDefaultImageAsset,
+          placeholder: dark
+              ? const ColoredBox(color: GenesisColors.darkFaintFill)
+              : null,
+        );
+        if (!dark || imageUrl != _locationDefaultImageAsset) return image;
+        return DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            borderRadius: GenesisImageRadii.content,
+            border: Border.all(
+              color: GenesisColors.darkFaintFill.withValues(alpha: 0.06),
+            ),
+          ),
+          child: image,
         );
       },
     );

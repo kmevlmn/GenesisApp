@@ -6,10 +6,7 @@ import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/auth/login_guard.dart';
 import '../../components/common/genesis_generation_wait_overlay.dart';
-import '../../components/genesis_logo.dart';
 import '../../network/api_client.dart';
-import '../../network/json_utils.dart';
-import '../../utils/display_name_formatter.dart';
 import '../origin_editor/origin_debug_tools.dart';
 import '../origin_editor/origin_draft_repository.dart';
 import '../origin_editor/origin_editor_pages.dart';
@@ -39,7 +36,7 @@ class _CreateOriginPageState extends State<CreateOriginPage> {
   int _reloadSignal = 0;
   late final VoidCallback _removeCreateOutcomeListener;
   bool _didResumePendingCreate = false;
-  List<String> _generationWaitLines = const <String>[];
+  List<GenesisGenerationWaitAvatar> _generationWaitAvatars = const [];
 
   @override
   void initState() {
@@ -94,13 +91,9 @@ class _CreateOriginPageState extends State<CreateOriginPage> {
       children: [
         flow,
         Positioned.fill(
-          child: GenesisGenerationWaitOverlay(
-            title: 'Creating your Worldo',
-            illustration: const Center(
-              child: GenesisLogo(height: 88, width: 152),
-            ),
-            perspectiveLines: _generationWaitLines,
-            centeredPerspectiveLineCount: 2,
+          child: OriginGenerationWaitOverlay(
+            publishing: false,
+            avatars: _generationWaitAvatars,
             onBackPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
@@ -122,19 +115,9 @@ class _CreateOriginPageState extends State<CreateOriginPage> {
     final api = AppServicesScope.read(context).api;
     setState(() {
       _submitStatus = OriginDraftSubmitStatus.checkingPending;
-      _generationWaitLines = originDraftGenerationWaitLines(draft);
+      _generationWaitAvatars = originDraftGenerationWaitAvatars(draft);
     });
     try {
-      final originatorName = await _readOriginatorName(context);
-      if (!context.mounted) {
-        return const OriginSubmitResult(message: '', showMessage: false);
-      }
-      setState(
-        () => _generationWaitLines = originDraftGenerationWaitLines(
-          draft,
-          originatorName: originatorName,
-        ),
-      );
       GenesisTelemetry.collectLog(
         actionType: 'event',
         action: 'create_worldo_submit_start',
@@ -168,7 +151,7 @@ class _CreateOriginPageState extends State<CreateOriginPage> {
 
   void _resumePendingCreate() {
     final api = AppServicesScope.read(context).api;
-    unawaited(_loadPendingCreateWaitLines());
+    unawaited(_loadPendingCreateWaitAvatars());
     unawaited(
       _pendingCoordinator.ensureCreatingPolling(
         loadOriginInfo: (originId) => api.v1.origin.info(
@@ -181,15 +164,11 @@ class _CreateOriginPageState extends State<CreateOriginPage> {
     _syncSubmitStatus();
   }
 
-  Future<void> _loadPendingCreateWaitLines() async {
-    final originatorName = await _readOriginatorName(context);
+  Future<void> _loadPendingCreateWaitAvatars() async {
     final draft = await CreateOriginDraftStore.loadFinal();
     if (!mounted) return;
     setState(() {
-      _generationWaitLines = originDraftGenerationWaitLines(
-        draft,
-        originatorName: originatorName,
-      );
+      _generationWaitAvatars = originDraftGenerationWaitAvatars(draft);
     });
   }
 
@@ -213,21 +192,5 @@ class _CreateOriginPageState extends State<CreateOriginPage> {
       _submitStatus = OriginDraftSubmitStatus.idle;
       _reloadSignal++;
     });
-  }
-
-  Future<String> _readOriginatorName(BuildContext context) async {
-    final services = AppServicesScope.read(context);
-    final userInfo = await services.sessionStore.readUserInfo();
-    final uid = (await services.sessionStore.readUid())?.trim() ?? '';
-    final rawName = userInfo == null
-        ? ''
-        : asString(
-            userInfo['name'] ??
-                userInfo['user_name'] ??
-                userInfo['username'] ??
-                userInfo['display_name'] ??
-                userInfo['nickname'],
-          );
-    return formatUidForDisplay(rawName, fallback: uid.isEmpty ? 'You' : uid);
   }
 }

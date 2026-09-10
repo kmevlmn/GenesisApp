@@ -4,11 +4,15 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/tokens/genesis_typography.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/debug/world_new_content_debug_settings.dart';
 import '../../components/ai_content_disclaimer.dart';
 import '../../components/chat/shared/chat_scene_plate_tokens.dart';
+import '../../components/chat/shared/chat_ui.dart';
 import '../../components/common/copyable_id_label.dart';
 import '../../components/common/genesis_center_toast.dart';
 import '../../components/common/genesis_image_viewer_overlay.dart';

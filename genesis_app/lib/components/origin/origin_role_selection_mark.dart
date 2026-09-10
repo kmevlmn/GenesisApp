@@ -10,11 +10,13 @@ class OriginRoleSelectionMark extends StatelessWidget {
     required this.selected,
     this.semanticLabel,
     this.style = OriginRoleSelectionMarkStyle.checkbox,
+    this.starUnselectedColor = const Color(0xFF999999),
   });
 
   final bool selected;
   final String? semanticLabel;
   final OriginRoleSelectionMarkStyle style;
+  final Color starUnselectedColor;
 
   @override
   Widget build(BuildContext context) {
@@ -23,14 +25,22 @@ class OriginRoleSelectionMark extends StatelessWidget {
       inMutuallyExclusiveGroup: style == OriginRoleSelectionMarkStyle.star,
       label: semanticLabel,
       child: style == OriginRoleSelectionMarkStyle.star
-          ? _OriginRoleStarMark(selected: selected)
+          ? _OriginRoleStarMark(
+              selected: selected,
+              unselectedColor: starUnselectedColor,
+            )
           : _OriginRoleCheckboxMark(selected: selected),
     );
   }
 }
 
 class _OriginRoleStarMark extends StatelessWidget {
-  const _OriginRoleStarMark({required this.selected});
+  const _OriginRoleStarMark({
+    required this.selected,
+    required this.unselectedColor,
+  });
+
+  final Color unselectedColor;
 
   final bool selected;
 
@@ -43,7 +53,7 @@ class _OriginRoleStarMark extends StatelessWidget {
         child: Icon(
           selected ? Icons.star_rounded : Icons.star_border_rounded,
           size: 16,
-          color: selected ? GenesisColors.brand : const Color(0xFF999999),
+          color: selected ? GenesisColors.redPrimary : unselectedColor,
         ),
       ),
     );
@@ -61,9 +71,16 @@ class _OriginRoleCheckboxMark extends StatelessWidget {
       width: 26,
       height: 26,
       decoration: BoxDecoration(
-        color: selected ? GenesisColors.brand : Colors.white10,
+        color: selected
+            ? GenesisColors.redPrimary
+            : GenesisColors.darkFaintFill,
         borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(
+          color: selected
+              ? GenesisColors.redPrimary
+              : GenesisColors.darkFaintFill,
+          width: 2,
+        ),
         boxShadow: const [
           BoxShadow(
             color: Color(0x33000000),
@@ -73,7 +90,11 @@ class _OriginRoleCheckboxMark extends StatelessWidget {
         ],
       ),
       child: selected
-          ? const Icon(Icons.check, size: 18, color: Colors.white)
+          ? const Icon(
+              Icons.check,
+              size: 18,
+              color: GenesisColors.darkTextPrimary,
+            )
           : null,
     );
   }

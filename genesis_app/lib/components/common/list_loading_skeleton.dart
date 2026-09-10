@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../ui/tokens/genesis_image_radii.dart';
+import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/components/genesis_world_list_card_layout.dart';
 import '../../ui/tokens/genesis_origin_card_geometry.dart';
 
 enum _GenesisListSkeletonType { world, originGrid }
@@ -18,9 +20,10 @@ class GenesisListLoadingSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (_type) {
-      _GenesisListSkeletonType.world => _SkeletonShimmer(
-        child: _WorldListSkeleton(itemCount: itemCount),
-      ),
+      _GenesisListSkeletonType.world =>
+        Theme.of(context).brightness == Brightness.dark
+            ? _WorldListSkeleton(itemCount: itemCount)
+            : _SkeletonShimmer(child: _WorldListSkeleton(itemCount: itemCount)),
       _GenesisListSkeletonType.originGrid => _OriginGridSkeleton(
         itemCount: itemCount,
       ),
@@ -65,10 +68,15 @@ class GenesisOriginCardLoadingBone extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFE8EBF0), Color(0xFFF3F4F6)],
+          colors: Theme.of(context).brightness == Brightness.dark
+              ? const [
+                  GenesisColors.darkRaisedBackground,
+                  GenesisColors.darkFaintSurface,
+                ]
+              : const [Color(0xFFE8EBF0), Color(0xFFF3F4F6)],
         ),
       ),
     );
@@ -89,9 +97,9 @@ class GenesisSearchResultLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _SkeletonShimmer(
-      child: _SearchResultSkeletonList(type: type, itemCount: itemCount),
-    );
+    final list = _SearchResultSkeletonList(type: type, itemCount: itemCount);
+    if (Theme.of(context).brightness == Brightness.dark) return list;
+    return _SkeletonShimmer(child: list);
   }
 }
 
@@ -195,16 +203,20 @@ class _WorldListSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return ListView.separated(
       key: const ValueKey<String>('genesis-world-list-skeleton'),
       primary: false,
-      padding: EdgeInsets.zero,
+      padding: dark
+          ? const EdgeInsets.only(top: 10, bottom: 36)
+          : EdgeInsets.zero,
       physics: const BouncingScrollPhysics(
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: itemCount,
-      separatorBuilder: (context, index) =>
-          const Divider(height: 25, thickness: 1, color: Color(0xFFEFEFEF)),
+      separatorBuilder: (context, index) => dark
+          ? const SizedBox(height: 30)
+          : const Divider(height: 25, thickness: 1, color: Color(0xFFEFEFEF)),
       itemBuilder: (context, index) {
         return const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16),
@@ -220,6 +232,42 @@ class _WorldSkeletonItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Theme.of(context).brightness == Brightness.dark) {
+      return const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonBone(
+            key: ValueKey<String>('genesis-world-list-thumbnail-skeleton'),
+            width: GenesisWorldListCardLayout.coverWidth,
+            height: GenesisWorldListCardLayout.coverHeight,
+            borderRadius: GenesisImageRadii.contentValue,
+          ),
+          SizedBox(width: GenesisWorldListCardLayout.contentGap),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SkeletonBone(widthFactor: 0.65, height: 14),
+                SizedBox(height: 6),
+                _SkeletonBone(widthFactor: 0.78, height: 12),
+                SizedBox(height: 6),
+                _SkeletonBone(widthFactor: 0.95, height: 12),
+                SizedBox(height: 5),
+                _SkeletonBone(widthFactor: 0.7, height: 12),
+                SizedBox(height: 6),
+                Row(
+                  children: [
+                    _SkeletonBone(width: 25, height: 25, borderRadius: 8),
+                    SizedBox(width: 6),
+                    _SkeletonBone(width: 90, height: 12),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -421,7 +469,14 @@ class _SkeletonBone extends StatelessWidget {
     Widget child = SizedBox(
       width: width,
       height: height,
-      child: animation == null || disableAnimations
+      child: Theme.of(context).brightness == Brightness.dark
+          ? DecoratedBox(
+              decoration: BoxDecoration(
+                color: GenesisColors.darkFaintFill,
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+            )
+          : animation == null || disableAnimations
           ? _buildDecoratedBox(0)
           : AnimatedBuilder(
               animation: animation,

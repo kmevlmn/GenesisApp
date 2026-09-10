@@ -1,7 +1,10 @@
 import 'dart:async';
+
+import '../../components/discuss/discuss_dark_style.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../components/auth/login_guard.dart';
@@ -16,6 +19,7 @@ import '../../routers/app_router.dart';
 import '../../ui/components/genesis_avatar.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/tokens/genesis_avatar_radii.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/entity_deleted.dart';
 import '../../utils/genesis_timestamp_formatter.dart';
@@ -28,19 +32,19 @@ const String _postDetailReplyAsset =
     'assets/custom-icons/png/discuss_reply.png';
 const double _postInputReservedHeight = 96;
 const TextStyle _postDetailMetaStyle = TextStyle(
-  color: Color(0xFF8B8B8B),
+  color: DiscussDarkColors.muted,
   fontSize: 12,
   height: 1.2,
   fontWeight: FontWeight.w400,
 );
 const TextStyle _postDetailNameStyle = TextStyle(
-  color: Color(0xFF666666),
+  color: DiscussDarkColors.secondary,
   fontSize: 14,
   height: 1.18,
   fontWeight: FontWeight.w600,
 );
 const TextStyle _postDetailBodyStyle = TextStyle(
-  color: Color(0xFF111111),
+  color: DiscussDarkColors.primary,
   fontSize: 14,
   height: 1.45,
   fontWeight: FontWeight.w400,
@@ -138,10 +142,20 @@ class _PostDetailPageState extends State<PostDetailPage> {
         rootDiscussId: rootDiscussId,
         page: page,
       );
-      if (!loaded) showGenesisToast(context, 'Load replies failed');
+      if (!loaded) {
+        showGenesisToast(
+          context,
+          'Load replies failed',
+          brightness: Brightness.dark,
+        );
+      }
     } catch (_) {
       if (mounted && generation == _loadGeneration) {
-        showGenesisToast(context, 'Load replies failed');
+        showGenesisToast(
+          context,
+          'Load replies failed',
+          brightness: Brightness.dark,
+        );
       }
     }
   }
@@ -157,7 +171,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
         },
       );
     } catch (_) {
-      if (mounted) showGenesisToast(context, 'Load replies failed');
+      if (mounted) {
+        showGenesisToast(
+          context,
+          'Load replies failed',
+          brightness: Brightness.dark,
+        );
+      }
     }
   }
 
@@ -181,63 +201,77 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: Colors.white,
-      appBar: const GenesisBackAppBar(pageName: 'Post Detail'),
-      body: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          final item = _currentItem;
-          if (item == null) {
-            return widget.item == null
-                ? const Center(child: Text('Post unavailable'))
-                : const Center(child: CircularProgressIndicator());
-          }
+    return DiscussDarkTheme(
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        backgroundColor: DiscussDarkColors.background,
+        appBar: const GenesisBackAppBar(
+          pageName: 'Post Detail',
+          backgroundColor: DiscussDarkColors.background,
+          foregroundColor: DiscussDarkColors.primary,
+          titleStyle: TextStyle(color: DiscussDarkColors.primary),
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+        ),
+        body: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final item = _currentItem;
+            if (item == null) {
+              return widget.item == null
+                  ? const Center(child: Text('Post unavailable'))
+                  : const Center(child: CircularProgressIndicator());
+            }
 
-          final bottomPadding =
-              _postInputReservedHeight + GenesisSafeAreaInsets.bottom(context);
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: ListView(
-                  key: ValueKey<String>('post-detail-session-$_loadGeneration'),
-                  padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding),
-                  children: [
-                    _PostDetailRoot(
-                      controller: _controller,
-                      item: item,
-                      onReplyTap: () => unawaited(_openReplyComposer(item)),
+            final bottomPadding =
+                _postInputReservedHeight +
+                GenesisSafeAreaInsets.bottom(context);
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: ListView(
+                    key: ValueKey<String>(
+                      'post-detail-session-$_loadGeneration',
                     ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
-                      child: Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Color(0xFFEDEDED),
+                    padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding),
+                    children: [
+                      _PostDetailRoot(
+                        controller: _controller,
+                        item: item,
+                        onReplyTap: () => unawaited(_openReplyComposer(item)),
                       ),
-                    ),
-                    _PostDetailReplies(
-                      controller: _controller,
-                      item: item,
-                      onReplyTap: (reply) =>
-                          unawaited(_openReplyComposer(item, reply: reply)),
-                      onLoadMore: () => unawaited(_loadMoreReplies(item)),
-                    ),
-                  ],
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: DiscussDarkColors.border,
+                        ),
+                      ),
+                      _PostDetailReplies(
+                        controller: _controller,
+                        item: item,
+                        onReplyTap: (reply) =>
+                            unawaited(_openReplyComposer(item, reply: reply)),
+                        onLoadMore: () => unawaited(_loadMoreReplies(item)),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _PostDetailCommentBar(
-                  onTap: () => unawaited(_openReplyComposer(item)),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Material(
+                    color: DiscussDarkColors.background,
+                    child: _PostDetailCommentBar(
+                      onTap: () => unawaited(_openReplyComposer(item)),
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -308,7 +342,7 @@ class _PostDetailReplies extends StatelessWidget {
         Text(
           'All Replies $replyCount',
           style: const TextStyle(
-            color: Color(0xFF1D1D1D),
+            color: DiscussDarkColors.secondary,
             fontSize: 14,
             height: 1.15,
             fontWeight: FontWeight.w600,
@@ -354,7 +388,7 @@ class _PostDetailReplies extends StatelessWidget {
                     : Text(
                         'View all ${controller.replyButtonCount(item)} replies',
                         style: const TextStyle(
-                          color: Color(0xFF2F4F7A),
+                          color: DiscussDarkColors.secondary,
                           fontSize: 12,
                           height: 1.25,
                           fontWeight: FontWeight.w600,
@@ -456,8 +490,8 @@ class _ReplyActionRow extends StatelessWidget {
     final normalizedDiscussId = discussId.trim();
     final likePending = controller.isLikePending(normalizedDiscussId);
     final activeColor = isLiked
-        ? const Color(0xFFFF2442)
-        : const Color(0xFF7D8178);
+        ? DiscussDarkColors.accent
+        : DiscussDarkColors.muted;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -480,12 +514,13 @@ class _ReplyActionRow extends StatelessWidget {
           child: _PostDetailActionCluster(
             iconAsset: _postDetailReplyAsset,
             count: replyCount,
-            color: _postDetailMetaStyle.color ?? const Color(0xFF8B8B8B),
+            color: _postDetailMetaStyle.color ?? DiscussDarkColors.muted,
           ),
         ),
         const Spacer(),
         GenesisMoreActionMenuButton(
           key: ValueKey('post-detail-reply-report-$normalizedDiscussId'),
+          iconColor: DiscussDarkColors.secondary,
           buttonSize: 28,
           iconSize: 18,
           items: [
@@ -533,7 +568,9 @@ class _ReplyActionRow extends StatelessWidget {
         isLiked: previousLiked,
         likeCount: previousCount,
       );
-      if (context.mounted) showGenesisToast(context, 'Like failed');
+      if (context.mounted) {
+        showGenesisToast(context, 'Like failed', brightness: Brightness.dark);
+      }
     } finally {
       controller.setLikePending(normalizedDiscussId, false);
     }
@@ -563,6 +600,9 @@ class _PostDetailActionCluster extends StatelessWidget {
         children: [
           Image.asset(
             iconAsset,
+            color: color == DiscussDarkColors.accent
+                ? DiscussDarkColors.accent
+                : DiscussDarkColors.secondary,
             width: _iconSize,
             height: _iconSize,
             fit: BoxFit.contain,
@@ -601,19 +641,19 @@ class _PostDetailCommentBar extends StatelessWidget {
             behavior: HitTestBehavior.opaque,
             onTap: onTap,
             child: Container(
-              constraints: const BoxConstraints(minHeight: 48),
+              constraints: const BoxConstraints(minHeight: 40),
               alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F2),
+                color: DiscussDarkColors.inputFill,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
                 'Write a reply',
                 style: TextStyle(
-                  color: Color(0xFF8B8B8B),
+                  color: GenesisColors.darkInputPlaceholder,
                   fontSize: 14,
-                  height: 1.2,
+                  height: 1.4,
                   fontWeight: FontWeight.w400,
                   letterSpacing: 0,
                 ),
@@ -730,7 +770,7 @@ TextSpan _replyDisplayContentSpan(Map<String, dynamic> json) {
         text: '@$replyToName ',
         style: const TextStyle(
           fontWeight: FontWeight.w400,
-          color: Color(0xFF4B6192),
+          color: DiscussDarkColors.secondary,
         ),
       ),
       TextSpan(text: content),

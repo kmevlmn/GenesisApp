@@ -782,7 +782,7 @@ class _OriginSetupRoleCardState extends State<_OriginSetupRoleCard>
     if (widget.busy || !_editing || form == null) return;
     final validationMessage = _editValidationMessage;
     if (validationMessage != null) {
-      showGenesisToast(context, validationMessage);
+      showGenesisToast(context, validationMessage, brightness: Brightness.dark);
       return;
     }
     widget.onEditedRoleChanged?.call(
@@ -927,9 +927,9 @@ class _OriginSetupRoleCardState extends State<_OriginSetupRoleCard>
                                   'origin-setup-role-edit-done-icon-$stableId',
                                 ),
                                 size: 16,
-                                color: Colors.white.withValues(
-                                  alpha: editActionAvailable ? 0.95 : 0.35,
-                                ),
+                                color: editActionAvailable
+                                    ? GenesisColors.darkTextPrimary
+                                    : Colors.white.withValues(alpha: 0.35),
                               )
                             : Center(
                                 child: Transform.scale(
@@ -943,11 +943,11 @@ class _OriginSetupRoleCardState extends State<_OriginSetupRoleCard>
                                     width: 16,
                                     height: 16,
                                     colorFilter: ColorFilter.mode(
-                                      Colors.white.withValues(
-                                        alpha: editActionAvailable
-                                            ? 0.95
-                                            : 0.35,
-                                      ),
+                                      editActionAvailable
+                                          ? GenesisColors.darkTextPrimary
+                                          : Colors.white.withValues(
+                                              alpha: 0.35,
+                                            ),
                                       BlendMode.srcIn,
                                     ),
                                   ),
@@ -1053,7 +1053,7 @@ class _OriginSetupRoleInlineEditor extends StatelessWidget {
                     emptyLabelFontWeight: FontWeight.w600,
                     emptyLabelFontSize: 1,
                     emptyIconLabelGap: 0,
-                    emptyBackgroundColor: originWorldDetailSheetBackgroundColor,
+                    emptyBackgroundColor: GenesisColors.darkFaintFill,
                     emptyBorderColor: originWorldDetailSheetTertiaryTextColor,
                     emptyIconColor: GenesisColors.createAdd,
                     emptyLabelColor: originWorldDetailSheetTertiaryTextColor,

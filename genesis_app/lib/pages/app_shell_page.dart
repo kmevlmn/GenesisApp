@@ -18,6 +18,8 @@ import '../platform/billing/billing_models.dart';
 import '../platform/privacy/app_tracking_transparency_service.dart';
 import '../platform/session/user_session_store.dart';
 import '../ui/system/genesis_system_ui.dart';
+import '../ui/navigation/genesis_dark_page_route.dart';
+import '../ui/tokens/genesis_colors.dart';
 import 'create/create_origin_page.dart';
 import 'home/home_page.dart';
 import 'me/me_page.dart';
@@ -358,9 +360,9 @@ class _AppShellPageState extends State<AppShellPage>
     if (index == 2) {
       if (!await _ensureMainTabLogin()) return;
       if (!mounted) return;
-      await Navigator.of(
-        context,
-      ).push(MaterialPageRoute<void>(builder: (_) => const CreateOriginPage()));
+      await Navigator.of(context).push(
+        GenesisDarkPageRoute<void>(builder: (_) => const CreateOriginPage()),
+      );
       return;
     }
 
@@ -666,8 +668,21 @@ class _AppShellPageState extends State<AppShellPage>
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: kGenesisDefaultSystemUiOverlayStyle,
+      value:
+          _selectedIndex == 0 ||
+              _selectedIndex == 1 ||
+              _selectedIndex == 3 ||
+              _selectedIndex == 4
+          ? kGenesisLightSystemUiOverlayStyle
+          : kGenesisDefaultSystemUiOverlayStyle,
       child: Scaffold(
+        backgroundColor:
+            _selectedIndex == 0 ||
+                _selectedIndex == 1 ||
+                _selectedIndex == 3 ||
+                _selectedIndex == 4
+            ? GenesisColors.darkBackground
+            : null,
         // Home and Origin own the iOS status-bar gesture so they can route it
         // to their explicitly controlled active list.
         primary: _selectedIndex != 0 && _selectedIndex != 1,

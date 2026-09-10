@@ -173,13 +173,19 @@ class _TilemapSettingsPanel extends StatelessWidget {
                     size: 19,
                   ),
                 ),
-                IconButton(
-                  key: const ValueKey<String>('tilemap-settings-close'),
-                  tooltip: 'Close',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onClose,
-                  icon: Icon(Icons.close, color: foregroundColor, size: 19),
-                ),
+                if (isDark)
+                  GenesisDarkCloseButton(
+                    key: const ValueKey<String>('tilemap-settings-close'),
+                    onPressed: onClose,
+                  )
+                else
+                  IconButton(
+                    key: const ValueKey<String>('tilemap-settings-close'),
+                    tooltip: 'Close',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onClose,
+                    icon: Icon(Icons.close, color: foregroundColor, size: 19),
+                  ),
               ],
             ),
             const SizedBox(height: 4),

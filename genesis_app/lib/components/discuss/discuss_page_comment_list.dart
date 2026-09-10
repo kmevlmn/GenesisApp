@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';
+import 'discuss_dark_style.dart';
 import '../../network/json_utils.dart';
 import '../../routers/app_router.dart';
 import '../../ui/components/genesis_avatar.dart';
@@ -209,7 +210,7 @@ class _DiscussPagePostRowState extends State<DiscussPagePostRow> {
               Text(
                 widget.item.content,
                 style: const TextStyle(
-                  color: Color(0xFF111111),
+                  color: DiscussDarkColors.primary,
                   fontSize: 14,
                   height: 1.45,
                   fontWeight: FontWeight.w400,
@@ -251,7 +252,7 @@ class _DiscussPageMeta extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: const TextStyle(
-        color: Color(0xFF666666),
+        color: DiscussDarkColors.secondary,
         fontSize: 14,
         height: 1.18,
         fontWeight: FontWeight.w600,
@@ -326,8 +327,8 @@ class _DiscussPageActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final likePending = controller.isLikePending(item.discussId);
     final activeColor = item.isLiked
-        ? const Color(0xFFFF2442)
-        : const Color(0xFF7D8178);
+        ? DiscussDarkColors.accent
+        : DiscussDarkColors.muted;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -362,12 +363,13 @@ class _DiscussPageActions extends StatelessWidget {
           child: _DiscussActionCluster(
             iconAsset: _discussReplyAsset,
             count: item.replyCount,
-            color: _timeStyle.color ?? const Color(0xFF8B8B8B),
+            color: _timeStyle.color ?? DiscussDarkColors.muted,
           ),
         ),
         const Spacer(),
         GenesisMoreActionMenuButton(
           key: ValueKey('discuss-page-report-${item.discussId}'),
+          iconColor: DiscussDarkColors.secondary,
           buttonSize: 28,
           iconSize: 18,
           items: [
@@ -442,6 +444,9 @@ class _DiscussActionCluster extends StatelessWidget {
         children: [
           Image.asset(
             iconAsset,
+            color: color == DiscussDarkColors.accent
+                ? DiscussDarkColors.accent
+                : DiscussDarkColors.secondary,
             width: _iconSize,
             height: _iconSize,
             fit: BoxFit.contain,
@@ -498,11 +503,11 @@ class _DiscussPageReplyPreview extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(width: 3, color: const Color(0xFFD7DBE3)),
+            Container(width: 3, color: DiscussDarkColors.border),
             Expanded(
               child: Container(
                 width: double.infinity,
-                color: const Color(0xFFF6F7F9),
+                color: DiscussDarkColors.inputFill,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 8,
@@ -523,7 +528,7 @@ class _DiscussPageReplyPreview extends StatelessWidget {
                           fontSize: 12,
                           height: 1.25,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF4B6192),
+                          color: DiscussDarkColors.secondary,
                         ),
                       ),
                     ],
@@ -591,14 +596,17 @@ class _DiscussPageReplyPreviewLine extends StatelessWidget {
         children: [
           TextSpan(
             text: '$authorName: ',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: DiscussDarkColors.secondary,
+            ),
           ),
           if (showReplyTo)
             TextSpan(
               text: '@$replyToName ',
               style: const TextStyle(
                 fontWeight: FontWeight.w400,
-                color: Color(0xFF4B6192),
+                color: DiscussDarkColors.secondary,
               ),
             ),
           TextSpan(text: content),
@@ -610,7 +618,7 @@ class _DiscussPageReplyPreviewLine extends StatelessWidget {
         fontSize: 12,
         height: 1.25,
         fontWeight: FontWeight.w400,
-        color: Color(0xFF666666),
+        color: DiscussDarkColors.primary,
       ),
     );
   }
@@ -631,7 +639,7 @@ String _discussLikeFilledOrOutline(bool isLiked) {
 const String _discussReplyAsset = 'assets/custom-icons/png/discuss_reply.png';
 
 const _timeStyle = TextStyle(
-  color: Color(0xFF8B8B8B),
+  color: DiscussDarkColors.muted,
   fontSize: 12,
   height: 1.2,
   fontWeight: FontWeight.w400,

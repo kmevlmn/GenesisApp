@@ -19,8 +19,7 @@ import 'chatroom_message_storage.dart';
 import 'chatroom_models.dart';
 import 'chatroom_reply_actions_controller.dart';
 import 'chatroom_reply_action_storage.dart';
-import 'chatroom_inspiration_controller.dart';
-import 'chatroom_inspiration_storage.dart';
+import '../../features/location_chat_reply/inspiration/inspiration.dart';
 
 export 'chatroom_reply_actions_controller.dart';
 import 'chatroom_timeline_payload.dart';
@@ -255,6 +254,10 @@ class WorldChatroomService {
       ),
       replaceCompletedRound: _replaceCompletedReplyRound,
       onGoOnAccepted: (location, round) => _bindWaitingConversationRound(
+        locationId: location,
+        conversationRoundId: '$round',
+      ),
+      onGoOnFinished: (location, round) => _completeConversationRound(
         locationId: location,
         conversationRoundId: '$round',
       ),
@@ -1348,6 +1351,12 @@ class WorldChatroomService {
     _cancelHistoryRefreshes();
     await Future.wait(_locationWrites.values.toList());
     await _messageStorage.clearCache(ownerUid);
+    final replies = _replyActionsController;
+    if (replies != null) {
+      for (final location in replies.locationIds.toList()) {
+        await replies.clearCardsCache(location);
+      }
+    }
     _deletedMessageIds.clear();
     _localMessageCacheGeneration += 1;
     _localHydratedMessageKeys.clear();

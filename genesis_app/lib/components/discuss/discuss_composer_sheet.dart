@@ -142,7 +142,7 @@ class _DiscussComposerSheetState extends State<_DiscussComposerSheet>
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      showGenesisToast(context, 'Post failed');
+      showGenesisToast(context, 'Post failed', brightness: Brightness.dark);
     }
   }
 
@@ -188,11 +188,19 @@ class _DiscussComposerSheetState extends State<_DiscussComposerSheet>
     }
     if (!mounted) return;
     if (pickError != null) {
-      showGenesisToast(context, _imagePickErrorText(pickError));
+      showGenesisToast(
+        context,
+        _imagePickErrorText(pickError),
+        brightness: Brightness.dark,
+      );
       return;
     }
     if (rejectedUnsupportedGif) {
-      showGenesisToast(context, unsupportedGifImageMessage);
+      showGenesisToast(
+        context,
+        unsupportedGifImageMessage,
+        brightness: Brightness.dark,
+      );
     }
     if (picked == null || picked.isEmpty) return;
 
@@ -293,7 +301,11 @@ class _DiscussComposerSheetState extends State<_DiscussComposerSheet>
         attachment.processing = false;
         attachment.uploading = false;
       });
-      showGenesisToast(context, 'Image upload failed');
+      showGenesisToast(
+        context,
+        'Image upload failed',
+        brightness: Brightness.dark,
+      );
       rethrow;
     }
   }

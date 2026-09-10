@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/components/genesis_map_top_glass_bar.dart';
+
 import '../../components/world_details_shell.dart';
 
 const String worldSectionEventsIconAsset = 'assets/custom-icons/svg/events.svg';
@@ -9,8 +12,10 @@ const String worldSectionCastIconAsset =
     'assets/custom-icons/svg/world_tab_cast.svg';
 const String worldDetailIconAsset =
     'assets/custom-icons/svg/worlddetail-icon.svg';
-const double worldMapTabsHeight = 38;
-const double worldMapBackButtonLeft = 12;
+const double worldMapTabsHeight = genesisMapBackButtonDimension;
+const double worldMapBackButtonLeft = genesisMapBackButtonLeft;
+const double worldMapBackButtonTop = genesisMapBackButtonTop;
+const double worldMapTopBarRightInset = genesisMapTopBarRightInset;
 const double worldMapIdentityHorizontalGap = 10;
 const double worldMainTabsHeight = 49;
 const double worldBottomTagHeight = 34;
@@ -22,8 +27,9 @@ const double worldStatsTopSpacerHeight =
     (worldMainTabsHeight + worldBottomTagHeight) / 2 -
     WorldDetailsPageScaffold.inlineContentTopPadding +
     worldBottomTagToStatsGap;
-const double worldInfoHeaderHeight = 49;
-const double worldLaunchedInfoHeaderHeight = 60;
+// Reserve the same footer space even when the visitor has no role avatar.
+const double worldInfoHeaderHeight = 60;
+const double worldLaunchedInfoHeaderHeight = worldInfoHeaderHeight;
 const double worldCollapsedPanelBaseHeight =
     WorldDetailsPageScaffold.inlineContentTopPadding +
     worldStatsTopSpacerHeight +
@@ -39,7 +45,7 @@ const double worldMapContentTopOffset =
 const double worldCharacterAvatarLogicalSize = 48;
 const int worldMainPageCount = 1;
 
-const Color worldHeaderMetaColor = Color(0xFF666666);
+const Color worldHeaderMetaColor = GenesisColors.darkTextSecondary;
 const TextStyle worldHeaderMetaTextStyle = TextStyle(
   fontSize: 12,
   height: 1.1,
@@ -50,5 +56,5 @@ const TextStyle worldDetailBodyTextStyle = TextStyle(
   fontSize: 13,
   height: 1.4,
   fontWeight: FontWeight.w400,
-  color: Color(0xFF111111),
+  color: GenesisColors.darkTextPrimary,
 );

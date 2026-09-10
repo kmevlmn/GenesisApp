@@ -181,7 +181,7 @@ class _OriginCharactersEditorPageState
   }
 
   void _showError(String message) {
-    showGenesisToast(context, message);
+    showGenesisToast(context, message, brightness: Brightness.dark);
   }
 
   OriginCharacterForm _characterFormFromDraft(
@@ -212,10 +212,26 @@ class _OriginCharactersEditorPageState
 
   @override
   Widget build(BuildContext context) {
+    return GenesisDarkTheme(
+      child: GenesisBottomSystemBarStyleScope(
+        style: const GenesisBottomSystemBarStyle(
+          color: GenesisColors.darkBackground,
+        ),
+        child: CreateFormTheme(child: _buildPage(context)),
+      ),
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: Colors.white,
-      appBar: const GenesisBackAppBar(pageName: 'Characters'),
+      backgroundColor: GenesisColors.darkBackground,
+      appBar: const GenesisBackAppBar(
+        pageName: 'Characters',
+        backgroundColor: GenesisColors.darkBackground,
+        foregroundColor: GenesisColors.darkTextPrimary,
+        systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+      ),
       body: CreateKeyboardDismissArea(
         child: SafeArea(
           top: false,
@@ -232,7 +248,7 @@ class _OriginCharactersEditorPageState
                         child: Text(
                           '${_forms.length}/$_maxCharacters (Added / Max)',
                           style: const TextStyle(
-                            color: createFormText,
+                            color: GenesisColors.darkTextTertiary,
                             fontSize: 14,
                             height: 1.2,
                           ),
@@ -271,6 +287,8 @@ class _OriginCharactersEditorPageState
               _KeyboardHiddenBottomAction(
                 child: GenesisPrimaryButton(
                   label: _isSaving ? 'Saving...' : 'Save',
+                  backgroundColor: GenesisColors.redPrimary,
+                  foregroundColor: GenesisColors.darkTextPrimary,
                   width: _primaryActionButtonWidth(context),
                   onPressed: _canUseSaveButton ? _saveCharacters : null,
                   onDisabledPressed: () => _showError(_saveDisabledReason),

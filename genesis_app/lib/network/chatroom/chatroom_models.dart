@@ -8,7 +8,7 @@ import 'chatroom_timeline_payload.dart';
 
 export 'chatroom_llm_cards.dart';
 part 'chatroom_card_events.dart';
-part 'chatroom_go_on.dart';
+part '../../features/location_chat_reply/go_on/src/chatroom_go_on_models.dart';
 
 class ChatroomProtocolException implements Exception {
   const ChatroomProtocolException(this.message, {this.error});

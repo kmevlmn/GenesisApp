@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:genesis_flutter_android/icons/custom_icon_assets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genesis_flutter_android/components/ai_content_disclaimer.dart';
-import 'package:genesis_flutter_android/icons/custom_icon_assets.dart';
+import 'package:genesis_flutter_android/components/chat/shared/chat_ui.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/network/models/origin.dart';
 import 'package:genesis_flutter_android/network/models/world.dart';
 import 'package:genesis_flutter_android/pages/world/world_sections.dart';
@@ -271,17 +273,32 @@ void main() {
       expect(
         tester
             .widget<Text>(find.text('A signal reaches the harbor.'))
-            .style
+            .textSpan
+            ?.style
             ?.color,
-        const Color(0xFF111111),
+        GenesisColors.darkTextSecondary,
       );
       expect(
         tester
             .widget<Text>(find.text('The harbor lights answer in sequence.'))
-            .style
+            .textSpan
+            ?.style
             ?.color,
-        const Color(0xFF111111),
+        GenesisColors.darkTextSecondary,
       );
+      expect(find.byType(ChatTickHeader), findsOneWidget);
+      expect(find.byType(ChatTickGlobalSection), findsOneWidget);
+      expect(find.text('Global'), findsNothing);
+      final tickHeader = tester.widget<Text>(find.text('Tick 4-1'));
+      expect(tickHeader.style?.fontSize, 13);
+      expect(tickHeader.style?.fontWeight, FontWeight.w600);
+      expect(tickHeader.style?.color, GenesisColors.darkTextPrimary);
+      final global = tester.widget<Text>(
+        find.text('A signal reaches the harbor.'),
+      );
+      expect(global.textSpan?.style?.fontStyle, FontStyle.italic);
+      expect(global.textSpan?.style?.fontSize, 13);
+      expect(global.textSpan?.style?.height, 1.3);
       expect(find.text('Follow the light toward the gate.'), findsOneWidget);
       expect(
         find.byWidgetPredicate(
@@ -292,7 +309,10 @@ void main() {
         findsOneWidget,
       );
       final clueText = find.text('Follow the light toward the gate.');
-      expect(tester.widget<Text>(clueText).style?.fontStyle, FontStyle.italic);
+      expect(
+        tester.widget<Text>(clueText).textSpan?.style?.fontStyle,
+        FontStyle.italic,
+      );
       expect(
         find.ancestor(of: clueText, matching: find.byType(Transform)),
         findsNothing,
@@ -300,9 +320,10 @@ void main() {
       expect(
         tester
             .widget<Text>(find.text('Follow the light toward the gate.'))
-            .style
+            .textSpan
+            ?.style
             ?.color,
-        const Color(0xFF666666),
+        GenesisColors.redSecondary,
       );
     },
   );
@@ -312,7 +333,6 @@ void main() {
   ) async {
     const aiRoleName =
         'Oracle With A Very Long Ceremonial Name That Wraps Below';
-    const visibleRoleNames = '$aiRoleName, Iris';
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -365,39 +385,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Day 4, 20:25'), findsOneWidget);
-    expect(find.text(visibleRoleNames), findsOneWidget);
-    expect(find.text(aiRoleName), findsNothing);
-    expect(find.text('Iris'), findsNothing);
+    expect(find.byType(ChatTickStoryEventParagraph), findsOneWidget);
+    expect(find.text(aiRoleName), findsOneWidget);
+    expect(find.text('Iris'), findsOneWidget);
     expect(
       tester.widget<Text>(find.text('Day 4, 20:25')).style?.color,
-      const Color(0xFF666666),
+      GenesisColors.darkTextTertiary,
     );
     expect(
-      tester.widget<Text>(find.text(visibleRoleNames)).style?.color,
-      const Color(0xFF666666),
+      tester.widget<Text>(find.text(aiRoleName)).style?.color,
+      GenesisColors.darkTextSecondary,
     );
-    final aiIcon = find.byWidgetPredicate(
-      (widget) =>
-          widget is SvgPicture &&
-          widget.bytesLoader.toString().contains(characterStatIconAsset),
-    );
-    final userIcon = find.byWidgetPredicate(
-      (widget) =>
-          widget is SvgPicture &&
-          widget.bytesLoader.toString().contains(userStatIconAsset),
-    );
-    expect(aiIcon, findsOneWidget);
-    expect(userIcon, findsNothing);
     expect(
-      tester.getTopLeft(find.text('Day 4, 20:25')).dy,
-      closeTo(tester.getTopLeft(find.text(visibleRoleNames)).dy, 2),
+      tester.widget<Text>(find.text('Iris')).style?.color,
+      GenesisColors.darkTextPrimary,
     );
-    expect(tester.getSize(find.text(visibleRoleNames)).width, greaterThan(224));
-    expect(tester.getSize(find.text(visibleRoleNames)).height, greaterThan(20));
     expect(
-      tester.getTopLeft(aiIcon).dy,
-      closeTo(tester.getTopLeft(find.text(visibleRoleNames)).dy + 2, 0.1),
+      find.byKey(const ValueKey('chat-tick-visible-role-avatar-char_oracle')),
+      findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('chat-tick-visible-role-avatar-char_iris')),
+      findsOneWidget,
+    );
+    expect(
+      tester.getTopLeft(find.text(aiRoleName)).dy,
+      greaterThan(tester.getTopLeft(find.text('Day 4, 20:25')).dy),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('latest sub-tick starts a 500 sub-tick page', (tester) async {

@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../ui/tokens/genesis_colors.dart';
+
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/bootstrap/service_registry.dart';
 import '../../app/debug/location_chat_debug_slice.dart';
@@ -522,11 +524,15 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
       }
       if (_initialLoadError != null) {
         return Scaffold(
+          backgroundColor: GenesisColors.darkBackground,
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Load failed'),
+                const Text(
+                  'Load failed',
+                  style: TextStyle(color: GenesisColors.darkTextSecondary),
+                ),
                 const SizedBox(height: 10),
                 FilledButton(
                   onPressed: () => _fetchWorld(isInitial: true),
@@ -676,8 +682,9 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
           eventLocationIds: eventMapLocationIds,
           animationsPaused: _worldBottomSheetOpen || mapPausedForLocationChat,
           reloadRevision: _tilemapReloadRevision,
-          visualModeToggleTop: topPadding + 8 + worldMapTabsHeight + 8,
-          visualModeToggleRight: worldMapBackButtonLeft,
+          visualModeToggleTop:
+              topPadding + worldMapBackButtonTop + worldMapTabsHeight + 8,
+          visualModeToggleRight: worldMapTopBarRightInset,
           restorationController: _tilemapRestorationController,
           onMapTap: _recordWorldTilemapClick,
           onDisplayReadinessChanged: _handleTilemapDisplayReadinessChanged,
@@ -735,6 +742,7 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
           children: [
             WorldDetailsPageScaffold(
               backgroundColor: _tilemapLoadingBackgroundColor,
+              panelBackgroundColor: GenesisColors.darkBackground,
               panelTopGap: 50,
               panelCollapsedHeightOffset: 120,
               scrollPhysics: const NeverScrollableScrollPhysics(),
@@ -759,12 +767,12 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
                 top: 0,
                 right: 0,
                 height: topPadding,
-                child: const ColoredBox(color: Colors.white),
+                child: const ColoredBox(color: GenesisColors.darkBackground),
               ),
             if (_worldMainTabIndex != 0)
               Positioned(
-                left: 9.5,
-                top: topPadding + 6,
+                left: worldMapBackButtonLeft,
+                top: topPadding + worldMapBackButtonTop,
                 child: WorldMapBackButton(
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),

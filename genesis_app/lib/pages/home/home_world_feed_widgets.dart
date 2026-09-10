@@ -146,7 +146,7 @@ class _MyWorldsEmptyState extends StatelessWidget {
                       TextSpan(text: 'Launch a '),
                       TextSpan(
                         text: '#Worldo',
-                        style: TextStyle(color: Color(0xFF4B6192)),
+                        style: TextStyle(color: GenesisColors.redSecondary),
                       ),
                       TextSpan(text: ' to generate\n'),
                       TextSpan(text: 'your own World'),
@@ -154,7 +154,7 @@ class _MyWorldsEmptyState extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                   style: textTheme.titleMedium?.copyWith(
-                    color: GenesisColors.textPrimary,
+                    color: GenesisColors.darkTextPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     height: 1.25,
@@ -166,7 +166,7 @@ class _MyWorldsEmptyState extends StatelessWidget {
                   'Worldo is the blueprint. Launch to create a live World you can enter and grow.',
                   textAlign: TextAlign.center,
                   style: textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF666666),
+                    color: GenesisColors.darkTextSecondary,
                     fontSize: 14,
                     height: 1.25,
                     letterSpacing: 0,

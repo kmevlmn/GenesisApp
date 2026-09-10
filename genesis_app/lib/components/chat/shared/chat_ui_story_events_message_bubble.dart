@@ -71,7 +71,7 @@ class _ChatStoryEventParagraph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (scenePlate) {
-      return _ChatTickSceneStoryEventParagraph(
+      return ChatTickStoryEventParagraph(
         messageLocalId: messageLocalId,
         index: index,
         paragraph: paragraph,
@@ -186,8 +186,9 @@ class _ChatStoryEventParagraph extends StatelessWidget {
   }
 }
 
-class _ChatTickSceneStoryEventParagraph extends StatelessWidget {
-  const _ChatTickSceneStoryEventParagraph({
+class ChatTickStoryEventParagraph extends StatelessWidget {
+  const ChatTickStoryEventParagraph({
+    super.key,
     required this.messageLocalId,
     required this.index,
     required this.paragraph,
@@ -244,7 +245,7 @@ class _ChatTickSceneStoryEventParagraph extends StatelessWidget {
                       'chat-story-event-timestamp-$messageLocalId-$index',
                     ),
                     style: TextStyle(
-                      color: _tickMessageHeaderColor.withValues(alpha: 0.45),
+                      color: GenesisColors.darkTextTertiary,
                       fontSize: 11,
                       height: 1,
                       fontWeight: FontWeight.w400,
@@ -263,9 +264,7 @@ class _ChatTickSceneStoryEventParagraph extends StatelessWidget {
                         : Text(
                             genesisDisplaySafeText(visibilityLabel),
                             style: TextStyle(
-                              color: _tickMessageHeaderColor.withValues(
-                                alpha: 0.72,
-                              ),
+                              color: GenesisColors.darkTextSecondary,
                               fontSize: 13,
                               height: 1,
                             ),
@@ -277,7 +276,7 @@ class _ChatTickSceneStoryEventParagraph extends StatelessWidget {
                   text: paragraph.text,
                   textAlign: TextAlign.left,
                   style: TextStyle(
-                    color: _tickMessageHeaderColor.withValues(alpha: 0.73),
+                    color: GenesisColors.darkTextSecondary,
                     fontSize: 13,
                     height: 1.3,
                     fontWeight: FontWeight.w400,
@@ -301,7 +300,7 @@ class _ChatTickSceneStoryEventParagraph extends StatelessWidget {
                           width: 13,
                           height: 13,
                           colorFilter: const ColorFilter.mode(
-                            _tickMessageClueColor,
+                            GenesisColors.redSecondary,
                             BlendMode.srcIn,
                           ),
                         ),
@@ -312,7 +311,7 @@ class _ChatTickSceneStoryEventParagraph extends StatelessWidget {
                           text: paragraph.clue,
                           textAlign: TextAlign.left,
                           style: const TextStyle(
-                            color: _tickMessageClueColor,
+                            color: GenesisColors.redSecondary,
                             fontSize: 13,
                             height: 1.3,
                             fontWeight: FontWeight.w400,
@@ -376,7 +375,7 @@ class _ChatTickSceneVisibleRole extends StatelessWidget {
             size: 18,
             borderRadius: 6,
             textStyle: const TextStyle(
-              color: _tickMessageHeaderColor,
+              color: GenesisColors.darkTextPrimary,
               fontSize: 9.5,
               height: 1,
               fontWeight: FontWeight.w800,
@@ -384,15 +383,17 @@ class _ChatTickSceneVisibleRole extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Text(
-          genesisDisplaySafeText(role.name),
-          style: TextStyle(
-            color: _tickMessageHeaderColor.withValues(
-              alpha: isPlayerRole ? 1 : 0.72,
+        Flexible(
+          child: Text(
+            genesisDisplaySafeText(role.name),
+            style: TextStyle(
+              color: isPlayerRole
+                  ? GenesisColors.darkTextPrimary
+                  : GenesisColors.darkTextSecondary,
+              fontSize: 11,
+              height: 1,
+              fontWeight: FontWeight.w800,
             ),
-            fontSize: 11,
-            height: 1,
-            fontWeight: FontWeight.w800,
           ),
         ),
       ],

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../ui/tokens/genesis_typography.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';
@@ -47,6 +48,12 @@ typedef DiscussImageProcessorForTesting =
 
 @visibleForTesting
 DiscussImageProcessorForTesting? debugDiscussImageProcessorOverride;
+
+const Color _discussComposerSurface = GenesisColors.darkFaintSurface;
+const Color _discussComposerPrimary = GenesisColors.darkTextPrimary;
+const Color _discussComposerSecondary = GenesisColors.darkTextSecondary;
+const Color _discussComposerMuted = GenesisColors.darkTextTertiary;
+const Color _discussComposerBorder = Color(0x24FFFFFF);
 
 const int discussPostMaxImages = 6;
 const int _discussComposerMinTextLines = 3;

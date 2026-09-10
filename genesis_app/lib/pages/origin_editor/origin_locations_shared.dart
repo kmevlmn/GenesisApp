@@ -64,6 +64,11 @@ class _LocationCard extends StatelessWidget {
                 form.previewImageBytes = bytes;
               },
               label: 'IMAGE\n(Optional)',
+              emptyBackgroundColor: GenesisColors.darkFaintFill,
+              emptyBorderColor: GenesisColors.darkTextTertiary,
+              emptyIconColor: GenesisColors.createAdd,
+              emptyLabelColor: GenesisColors.darkTextSecondary,
+              borderRadius: 8,
               width: 96,
               height: 144,
               iconSize: 36,
@@ -144,12 +149,12 @@ class _InitialCharactersField extends StatelessWidget {
           : null,
       constraints: const BoxConstraints(minHeight: 40),
       decoration: BoxDecoration(
-        color: createFormFieldFill,
+        color: GenesisColors.darkFaintFill,
         borderRadius: BorderRadius.circular(8),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final leftPadding = selectedCharacters.isEmpty ? 12.0 : 4.0;
+          final leftPadding = selectedCharacters.isEmpty ? 14.0 : 4.0;
           final trailingWidth = usesInlineSelection ? 0.0 : 46.0;
           final chipAreaWidth =
               constraints.maxWidth - leftPadding - trailingWidth;
@@ -158,7 +163,9 @@ class _InitialCharactersField extends StatelessWidget {
             selectedCharacters,
             chipAreaWidth <= 0 ? 0 : chipAreaWidth,
           );
-          final contentPadding = chipsWrap
+          final contentPadding = selectedCharacters.isEmpty
+              ? const EdgeInsets.symmetric(horizontal: 14, vertical: 10)
+              : chipsWrap
               ? EdgeInsets.fromLTRB(leftPadding, 6, 4, 6)
               : EdgeInsets.fromLTRB(leftPadding, 4, 4, 4);
           return Padding(
@@ -169,7 +176,8 @@ class _InitialCharactersField extends StatelessWidget {
                 Expanded(
                   child: selectedCharacters.isEmpty
                       ? SizedBox(
-                          height: 32,
+                          height:
+                              MediaQuery.textScalerOf(context).scale(14) * 1.4,
                           child: Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
@@ -179,9 +187,10 @@ class _InitialCharactersField extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: createFormHint,
+                                color: GenesisColors.darkInputPlaceholder,
                                 fontSize: 14,
-                                height: 1.2,
+                                height: 1.4,
+                                fontWeight: FontWeight.w400,
                               ),
                             ),
                           ),
@@ -210,7 +219,11 @@ class _InitialCharactersField extends StatelessWidget {
                   const SizedBox(
                     width: 38,
                     height: 32,
-                    child: Icon(Icons.add, color: createFormGreen, size: 28),
+                    child: Icon(
+                      Icons.add,
+                      color: GenesisColors.redSecondary,
+                      size: 28,
+                    ),
                   ),
                 ],
               ],
@@ -226,7 +239,7 @@ class _InitialCharactersField extends StatelessWidget {
         Text(
           'Initial Characters (Optional)',
           style: TextStyle(
-            color: createFormText,
+            color: GenesisColors.darkTextPrimary,
             fontSize: 14,
             fontWeight: labelFontWeight,
             height: 1.2,
@@ -254,7 +267,7 @@ class _InitialCharactersField extends StatelessWidget {
             child: Text(
               'Available to select',
               style: TextStyle(
-                color: createFormText,
+                color: GenesisColors.darkTextPrimary,
                 fontSize: 14,
                 height: 1.2,
                 fontWeight: labelFontWeight,
@@ -271,7 +284,7 @@ class _InitialCharactersField extends StatelessWidget {
                         'an initial location.',
               key: const ValueKey('available-initial-characters-empty'),
               style: const TextStyle(
-                color: createFormMuted,
+                color: GenesisColors.darkTextTertiary,
                 fontSize: 13,
                 height: 1.2,
               ),
@@ -322,7 +335,12 @@ class _InitialCharactersField extends StatelessWidget {
     final textPainter = TextPainter(
       text: TextSpan(
         text: name,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        style: const TextStyle(
+          fontFamily: GenesisTypography.fontFamily,
+          fontFamilyFallback: GenesisTypography.fontFamilyFallback,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       maxLines: 1,
       textDirection: Directionality.of(context),
@@ -364,9 +382,8 @@ class _AvailableInitialCharacterChip extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 180),
         padding: const EdgeInsets.fromLTRB(6, 0, 10, 0),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: GenesisColors.darkFaintFill,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0xFFD9E5DF)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -384,7 +401,7 @@ class _AvailableInitialCharacterChip extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: createFormText,
+                  color: GenesisColors.darkTextPrimary,
                   fontSize: 12,
                   height: 1.2,
                   fontWeight: FontWeight.w600,
@@ -421,9 +438,8 @@ class _InitialCharacterChip extends StatelessWidget {
         height: 32,
         padding: const EdgeInsets.only(left: 10, right: 4),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: GenesisColors.darkFaintFill,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0xFFD9E5DF)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -434,7 +450,7 @@ class _InitialCharacterChip extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: createFormText,
+                  color: GenesisColors.darkTextPrimary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   height: 1.2,
@@ -444,7 +460,11 @@ class _InitialCharacterChip extends StatelessWidget {
             const SizedBox(width: 1),
             const Padding(
               padding: EdgeInsets.all(3),
-              child: Icon(Icons.close, size: 14, color: createFormMuted),
+              child: Icon(
+                Icons.close,
+                size: 14,
+                color: GenesisColors.darkTextTertiary,
+              ),
             ),
           ],
         ),
@@ -472,6 +492,7 @@ class _CharacterPickerSheetState extends State<_CharacterPickerSheet> {
   @override
   Widget build(BuildContext context) {
     return GenesisBottomSheetPanel(
+      backgroundColor: GenesisColors.darkBackground,
       title: 'Select Characters',
       height: MediaQuery.sizeOf(context).height * 0.58,
       trailing: GenesisBottomSheetCloseButton(
@@ -516,9 +537,8 @@ class _CharacterPickerSheetState extends State<_CharacterPickerSheet> {
                 child: GenesisPrimaryButton(
                   label: 'Cancel',
                   onPressed: () => Navigator.of(context).pop(),
-                  backgroundColor: Colors.white,
-                  foregroundColor: createFormText,
-                  side: const BorderSide(color: createFormBorder),
+                  backgroundColor: GenesisColors.darkFaintFill,
+                  foregroundColor: GenesisColors.darkTextPrimary,
                 ),
               ),
               const SizedBox(width: 18),
@@ -527,8 +547,8 @@ class _CharacterPickerSheetState extends State<_CharacterPickerSheet> {
                   label: 'Select',
                   onPressed: () =>
                       Navigator.of(context).pop(_selectedIds.toList()),
-                  backgroundColor: createFormGreen,
-                  foregroundColor: Colors.white,
+                  backgroundColor: GenesisColors.redPrimary,
+                  foregroundColor: GenesisColors.darkTextPrimary,
                 ),
               ),
             ],
@@ -578,9 +598,14 @@ class _CharacterPickerTile extends StatelessWidget {
                     width: 26,
                     height: 26,
                     decoration: BoxDecoration(
-                      color: selected ? GenesisColors.brand : Colors.white10,
+                      color: selected
+                          ? GenesisColors.redPrimary
+                          : GenesisColors.darkFaintFill,
                       borderRadius: BorderRadius.circular(7),
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(
+                        color: GenesisColors.darkFaintFill,
+                        width: 2,
+                      ),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x33000000),
@@ -590,7 +615,11 @@ class _CharacterPickerTile extends StatelessWidget {
                       ],
                     ),
                     child: selected
-                        ? const Icon(Icons.check, color: Colors.white, size: 18)
+                        ? const Icon(
+                            Icons.check,
+                            color: GenesisColors.darkTextPrimary,
+                            size: 18,
+                          )
                         : null,
                   ),
                 ),
@@ -607,7 +636,7 @@ class _CharacterPickerTile extends StatelessWidget {
               fontSize: 14,
               height: 1.1,
               fontWeight: FontWeight.w400,
-              color: Color(0xFF111111),
+              color: GenesisColors.darkTextPrimary,
             ),
           ),
         ],

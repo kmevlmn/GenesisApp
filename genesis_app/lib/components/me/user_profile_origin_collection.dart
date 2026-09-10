@@ -3,6 +3,7 @@ part of 'user_profile_library.dart';
 class _OriginProfileCollectionList extends StatelessWidget {
   const _OriginProfileCollectionList({
     required this.items,
+    required this.emptyText,
     required this.isLoading,
     required this.listenable,
     required this.onRefresh,
@@ -13,6 +14,7 @@ class _OriginProfileCollectionList extends StatelessWidget {
   });
 
   final List<UserProfileOriginItem> items;
+  final String emptyText;
   final bool isLoading;
   final ValueListenable<UserProfileCollectionState<UserProfileOriginItem>>?
   listenable;
@@ -108,7 +110,7 @@ class _OriginProfileCollectionList extends StatelessWidget {
             ),
           )
           .toList(growable: false),
-      emptyText: 'No Worldo you created yet.',
+      emptyText: emptyText,
       isLoading: isLoading,
       loadingKey: const ValueKey('profile-origin-list-loading'),
       onRefresh: onRefresh,

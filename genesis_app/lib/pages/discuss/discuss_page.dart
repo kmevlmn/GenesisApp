@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
+import '../../components/discuss/discuss_dark_style.dart';
 import '../../components/discuss/discuss_page_comment_list.dart';
 import '../../components/discuss/discuss_post_input.dart';
 import '../../components/discuss/origin_discuss_list.dart';
@@ -15,6 +18,7 @@ import '../../routers/app_router.dart';
 import '../../ui/components/genesis_list_image.dart';
 import '../../ui/components/genesis_safe_area.dart';
 import '../../ui/tokens/genesis_avatar_radii.dart';
+import '../../ui/tokens/genesis_colors.dart';
 import '../../ui/tokens/genesis_image_radii.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/entity_deleted.dart';
@@ -139,111 +143,129 @@ class _DiscussPageState extends State<DiscussPage> {
   @override
   Widget build(BuildContext context) {
     final origin = _origin;
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: Colors.white,
-      appBar: const GenesisBackAppBar(pageName: 'Discuss'),
-      body: FutureBuilder<OriginDetail>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              origin == null) {
-            return const _DiscussPageLoadingSkeleton();
-          }
+    return DiscussDarkTheme(
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        backgroundColor: DiscussDarkColors.background,
+        appBar: const GenesisBackAppBar(
+          pageName: 'Discuss',
+          backgroundColor: DiscussDarkColors.background,
+          foregroundColor: DiscussDarkColors.primary,
+          titleStyle: TextStyle(color: DiscussDarkColors.primary),
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+        ),
+        body: FutureBuilder<OriginDetail>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                origin == null) {
+              return const _DiscussPageLoadingSkeleton();
+            }
 
-          if (snapshot.hasError && origin == null) {
-            return Center(
-              child: TextButton(
-                onPressed: () => setState(() {
-                  _future = _loadOriginDetail();
-                }),
-                child: const Text('Retry'),
-              ),
-            );
-          }
+            if (snapshot.hasError && origin == null) {
+              return Center(
+                child: TextButton(
+                  onPressed: () => setState(() {
+                    _future = _loadOriginDetail();
+                  }),
+                  child: const Text('Retry'),
+                ),
+              );
+            }
 
-          final data = snapshot.data ?? origin;
-          if (data == null) return const SizedBox.shrink();
+            final data = snapshot.data ?? origin;
+            if (data == null) return const SizedBox.shrink();
 
-          final bottomPadding =
-              _postInputReservedHeight + GenesisSafeAreaInsets.bottom(context);
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: RefreshIndicator(
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  onRefresh: _refresh,
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: _handleScrollNotification,
-                    child: ListView(
-                      key: ValueKey<String>(
-                        'discuss-session-$_sessionListGeneration',
-                      ),
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPadding),
-                      children: [
-                        _DiscussOriginSummary(origin: data),
-                        const Padding(
-                          padding: EdgeInsets.only(top: 10, bottom: 16),
-                          child: Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Color(0xFFEDEDED),
+            final bottomPadding =
+                _postInputReservedHeight +
+                GenesisSafeAreaInsets.bottom(context);
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: GenesisRefreshIndicator(
+                    backgroundColor: DiscussDarkColors.surface,
+                    onRefresh: _refresh,
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: _handleScrollNotification,
+                      child: ListView(
+                        key: ValueKey<String>(
+                          'discuss-session-$_sessionListGeneration',
+                        ),
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPadding),
+                        children: [
+                          _DiscussOriginSummary(origin: data),
+                          const Padding(
+                            padding: EdgeInsets.only(top: 10, bottom: 16),
+                            child: Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: DiscussDarkColors.border,
+                            ),
                           ),
-                        ),
-                        DiscussPageCommentList(
-                          controller: _discussController,
-                          onItemReplyTap: _openReplyComposer,
-                          onReplyTap: _handleReplyListItemTap,
-                          onViewAllRepliesTap: _openPostDetail,
-                        ),
-                        AnimatedBuilder(
-                          animation: _discussController,
-                          builder: (context, _) {
-                            if (!_discussController.isLoadingMore) {
-                              return const SizedBox.shrink();
-                            }
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(
-                                child: SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                          DiscussPageCommentList(
+                            controller: _discussController,
+                            onItemReplyTap: _openReplyComposer,
+                            onReplyTap: _handleReplyListItemTap,
+                            onViewAllRepliesTap: _openPostDetail,
+                          ),
+                          AnimatedBuilder(
+                            animation: _discussController,
+                            builder: (context, _) {
+                              if (!_discussController.isLoadingMore) {
+                                return const SizedBox.shrink();
+                              }
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(
+                                  child: SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: KeyedSubtree(
-                  key: const ValueKey<String>('discuss-page-post-input-bar'),
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
-                      child: DiscussPostInput(
-                        bizId: data.oid,
-                        onSubmitted: () =>
-                            unawaited(_discussController.refreshFirstPage()),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Material(
+                    color: DiscussDarkColors.background,
+                    child: KeyedSubtree(
+                      key: const ValueKey<String>(
+                        'discuss-page-post-input-bar',
+                      ),
+                      child: SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+                          child: DiscussPostInput(
+                            bizId: data.oid,
+                            backgroundColor: DiscussDarkColors.inputFill,
+                            placeholderColor:
+                                GenesisColors.darkInputPlaceholder,
+                            onSubmitted: () => unawaited(
+                              _discussController.refreshFirstPage(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -318,24 +340,26 @@ class _DiscussPageLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _DiscussLoadingShimmer(
-      child: ListView(
-        key: const ValueKey<String>('discuss-page-loading-skeleton'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-        children: const [
-          _DiscussOriginSummarySkeleton(),
-          Padding(
-            padding: EdgeInsets.only(top: 10, bottom: 16),
-            child: Divider(height: 1, thickness: 1, color: Color(0xFFEDEDED)),
+    return ListView(
+      key: const ValueKey<String>('discuss-page-loading-skeleton'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+      children: const [
+        _DiscussOriginSummarySkeleton(),
+        Padding(
+          padding: EdgeInsets.only(top: 10, bottom: 16),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: DiscussDarkColors.border,
           ),
-          _DiscussCommentSkeleton(),
-          SizedBox(height: 22),
-          _DiscussCommentSkeleton(),
-          SizedBox(height: 22),
-          _DiscussCommentSkeleton(compact: true),
-        ],
-      ),
+        ),
+        _DiscussCommentSkeleton(),
+        SizedBox(height: 22),
+        _DiscussCommentSkeleton(),
+        SizedBox(height: 22),
+        _DiscussCommentSkeleton(compact: true),
+      ],
     );
   }
 }
@@ -413,57 +437,6 @@ class _DiscussCommentSkeleton extends StatelessWidget {
   }
 }
 
-class _DiscussLoadingShimmer extends StatefulWidget {
-  const _DiscussLoadingShimmer({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_DiscussLoadingShimmer> createState() => _DiscussLoadingShimmerState();
-}
-
-class _DiscussLoadingShimmerState extends State<_DiscussLoadingShimmer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _DiscussSkeletonAnimation(
-      animation: _controller,
-      child: widget.child,
-    );
-  }
-}
-
-class _DiscussSkeletonAnimation extends InheritedWidget {
-  const _DiscussSkeletonAnimation({
-    required this.animation,
-    required super.child,
-  });
-
-  final Animation<double> animation;
-
-  static Animation<double>? maybeOf(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<_DiscussSkeletonAnimation>()
-        ?.animation;
-  }
-
-  @override
-  bool updateShouldNotify(covariant _DiscussSkeletonAnimation oldWidget) {
-    return animation != oldWidget.animation;
-  }
-}
-
 class _DiscussSkeletonBone extends StatelessWidget {
   const _DiscussSkeletonBone({
     this.width,
@@ -479,17 +452,13 @@ class _DiscussSkeletonBone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final animation = _DiscussSkeletonAnimation.maybeOf(context);
-    final disableAnimations = MediaQuery.disableAnimationsOf(context);
-    Widget child = SizedBox(
-      width: width,
-      height: height,
-      child: animation == null || disableAnimations
-          ? _decoratedBox(0)
-          : AnimatedBuilder(
-              animation: animation,
-              builder: (context, child) => _decoratedBox(animation.value),
-            ),
+    Widget child = DecoratedBox(
+      decoration: BoxDecoration(
+        // Match the static loading bones in Worldo Sheet.
+        color: const Color(0x1FFFFFFF),
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      child: SizedBox(width: width, height: height),
     );
 
     if (widthFactor case final factor?) {
@@ -500,25 +469,6 @@ class _DiscussSkeletonBone extends StatelessWidget {
       );
     }
     return child;
-  }
-
-  Widget _decoratedBox(double animationValue) {
-    final offset = -1.4 + animationValue * 2.8;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
-        gradient: LinearGradient(
-          begin: Alignment(offset - 0.8, 0),
-          end: Alignment(offset + 0.8, 0),
-          colors: const [
-            Color(0xFFE8EBF0),
-            Color(0xFFF6F7F9),
-            Color(0xFFE8EBF0),
-          ],
-          stops: const [0.25, 0.5, 0.75],
-        ),
-      ),
-    );
   }
 }
 
@@ -547,7 +497,7 @@ class _DiscussOriginSummary extends StatelessWidget {
                   fontSize: 14,
                   height: 1.2,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF4B6192),
+                  color: DiscussDarkColors.primary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -559,7 +509,7 @@ class _DiscussOriginSummary extends StatelessWidget {
                   fontSize: 12,
                   height: 1.2,
                   fontWeight: FontWeight.w400,
-                  color: Color(0xFF666666),
+                  color: DiscussDarkColors.secondary,
                 ),
               ),
             ],

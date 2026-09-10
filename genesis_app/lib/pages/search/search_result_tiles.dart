@@ -10,7 +10,7 @@ class _SearchResultTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUser = item.tab == _SearchTab.user;
     const titleStyle = TextStyle(
-      color: Color(0xFF4B6192),
+      color: GenesisColors.darkTextPrimary,
       fontSize: 14,
       height: 1.1,
       fontWeight: FontWeight.w600,
@@ -44,7 +44,7 @@ class _SearchResultTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: CopyableIdLabel.textStyle.copyWith(
-                color: const Color(0xFF888888),
+                color: GenesisColors.darkTextTertiary,
               ),
             )
           else
@@ -56,11 +56,13 @@ class _SearchResultTile extends StatelessWidget {
     final tile = item.tab == _SearchTab.world
         ? GenesisWorldListCardLayout(
             imageUrl: item.coverImage,
+            placeholder: const ColoredBox(color: GenesisColors.darkFaintFill),
             content: content,
           )
         : item.tab == _SearchTab.origin
         ? GenesisOriginListCardLayout(
             imageUrl: item.coverImage,
+            placeholder: const ColoredBox(color: GenesisColors.darkFaintFill),
             content: content,
           )
         : Row(
@@ -80,28 +82,30 @@ class _SearchResultTile extends StatelessWidget {
 }
 
 const _searchMetadataStyle = TextStyle(
-  color: Color(0xFF888888),
+  color: GenesisColors.darkTextTertiary,
   fontSize: 12,
   fontWeight: FontWeight.w400,
   height: 1.2,
 );
 
 const _searchSummaryStyle = TextStyle(
-  color: Color(0xFF666666),
+  fontFamily: GenesisTypography.fontFamily,
+  fontFamilyFallback: GenesisTypography.fontFamilyFallback,
+  color: GenesisColors.darkTextSecondary,
   fontSize: 12,
   fontWeight: FontWeight.w400,
   height: 1.2,
 );
 
 const _worldSearchMetadataStyle = TextStyle(
-  color: Color(0xFF888888),
+  color: GenesisColors.darkTextTertiary,
   fontSize: 12,
   fontWeight: FontWeight.w400,
   height: 1.2,
 );
 
 const _searchMatchStyle = TextStyle(
-  color: GenesisColors.danger,
+  color: GenesisColors.redSecondary,
   fontWeight: FontWeight.w600,
 );
 
@@ -158,7 +162,9 @@ class _OriginSearchMetadata extends StatelessWidget {
         'Originator: ${formatUidForDisplay(origin.owner.name, fallback: '-')}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: _searchMetadataStyle,
+        style: _searchMetadataStyle.copyWith(
+          color: GenesisColors.darkTextSecondary,
+        ),
       ),
       ...summaries.take(2),
     ];
@@ -207,7 +213,9 @@ class _WorldSearchMetadata extends StatelessWidget {
           'Owner: $owner',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: _worldSearchMetadataStyle,
+          style: _worldSearchMetadataStyle.copyWith(
+            color: GenesisColors.darkTextSecondary,
+          ),
         ),
       ],
     );
@@ -227,7 +235,7 @@ class _MatchedTagsSummary extends StatelessWidget {
     return DecoratedBox(
       key: const ValueKey<String>('origin-summary-tags'),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F3F6),
+        color: GenesisColors.darkFaintFill,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Padding(
@@ -321,7 +329,7 @@ class _OriginCharactersSummary extends StatelessWidget {
             width: 12,
             height: 12,
             colorFilter: const ColorFilter.mode(
-              Color(0xFF666666),
+              GenesisColors.darkTextSecondary,
               BlendMode.srcIn,
             ),
           ),
@@ -710,6 +718,7 @@ class _ResultThumb extends StatelessWidget {
         : resultCoverWidth;
     return GenesisListImage(
       imageUrl: item.coverImage,
+      placeholder: const ColoredBox(color: GenesisColors.darkFaintFill),
       width: resultCoverWidth,
       height: imageHeight,
       maxDevicePixelRatio: devicePixelRatio,
@@ -735,7 +744,7 @@ class _ResultStats extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          color: Color(0xFF666666),
+          color: GenesisColors.darkTextSecondary,
           fontSize: 12,
           height: 1.2,
           fontWeight: FontWeight.w400,
@@ -767,11 +776,11 @@ class _ResultStats extends StatelessWidget {
             iconAsset: stat.iconAsset,
             preserveIconAssetColor: stat.preserveIconAssetColor,
             iconSize: 12,
-            iconColor: const Color(0xFF666666),
+            iconColor: GenesisColors.darkTextSecondary,
             gap: 4,
             text: formatStatCount(stat.value),
             textStyle: const TextStyle(
-              color: Color(0xFF666666),
+              color: GenesisColors.darkTextSecondary,
               fontSize: 12,
               height: 1.2,
               fontWeight: FontWeight.w400,

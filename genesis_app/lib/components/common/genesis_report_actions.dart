@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../app/bootstrap/app_services_scope.dart';
+import '../../ui/tokens/genesis_typography.dart';
 import 'genesis_content_submission_dialog.dart';
 
 const TextStyle _genesisActionMenuTextStyle = TextStyle(
+  fontFamily: GenesisTypography.fontFamily,
+  fontFamilyFallback: GenesisTypography.fontFamilyFallback,
   fontSize: 12,
   height: 1.2,
   fontWeight: FontWeight.w400,
@@ -55,6 +58,7 @@ class GenesisMoreActionMenuButton extends StatefulWidget {
     super.key,
     required this.items,
     this.iconSize = 18,
+    this.appearance = GenesisActionMenuAppearance.standard,
     this.iconColor = Colors.black,
     this.buttonSize = 38,
     this.menuRightInset,
@@ -63,6 +67,7 @@ class GenesisMoreActionMenuButton extends StatefulWidget {
   });
 
   final List<GenesisActionMenuItem> items;
+  final GenesisActionMenuAppearance appearance;
   final double iconSize;
   final Color iconColor;
   final double buttonSize;
@@ -132,7 +137,7 @@ class _GenesisMoreActionMenuButtonState
       triggerRect: topLeft & box.size,
       items: widget.items,
       placement: _GenesisActionMenuPlacement.leftOfTrigger,
-      appearance: GenesisActionMenuAppearance.standard,
+      appearance: widget.appearance,
       rightInset: widget.menuRightInset,
       verticalOffset: widget.menuVerticalOffset,
     );
@@ -290,17 +295,20 @@ class _GenesisActionMenuLayout {
   TextStyle get defaultTextStyle =>
       appearance == GenesisActionMenuAppearance.message
       ? const TextStyle(
+          fontFamily: GenesisTypography.fontFamily,
+          fontFamilyFallback: GenesisTypography.fontFamilyFallback,
           fontSize: 12,
           height: 1.2,
           fontWeight: FontWeight.w400,
           color: _genesisActionMenuForegroundColor,
         )
-      : _genesisActionMenuTextStyle;
+      : _genesisActionMenuTextStyle.copyWith(color: foregroundColor);
 
-  ColorFilter get iconColorFilter => const ColorFilter.mode(
-    _genesisActionMenuForegroundColor,
-    BlendMode.srcIn,
-  );
+  ColorFilter get iconColorFilter =>
+      ColorFilter.mode(foregroundColor, BlendMode.srcIn);
+
+  TextStyle textStyleFor(GenesisActionMenuItem item) =>
+      GenesisTypography.withFallback(item.textStyle ?? defaultTextStyle);
 
   double _widthFor(List<GenesisActionMenuItem> items) {
     if (isHorizontal) {
@@ -319,10 +327,7 @@ class _GenesisActionMenuLayout {
 
   double itemWidth(GenesisActionMenuItem item) {
     final painter = TextPainter(
-      text: TextSpan(
-        text: item.label,
-        style: item.textStyle ?? defaultTextStyle,
-      ),
+      text: TextSpan(text: item.label, style: textStyleFor(item)),
       textDirection: TextDirection.ltr,
       textScaler: textScaler,
       maxLines: 1,
@@ -738,11 +743,7 @@ class _GenesisActionBubbleRow extends StatelessWidget {
                 ),
                 const SizedBox(width: _genesisActionMenuIconGap),
               ],
-              Text(
-                item.label,
-                maxLines: 1,
-                style: item.textStyle ?? layout.defaultTextStyle,
-              ),
+              Text(item.label, maxLines: 1, style: layout.textStyleFor(item)),
             ],
           ),
         ),

@@ -24,7 +24,7 @@ void main() {
     final settings = await locationChatHeaderEffectSettings.load();
 
     expect(settings.transparencyStrength, 0);
-    expect(settings.blurSigma, 20);
+    expect(settings.blurSigma, 14);
   });
 
   test('previews immediately and persists the final values', () async {
@@ -35,7 +35,7 @@ void main() {
       locationChatHeaderEffectSettings.value,
       const LocationChatHeaderEffectSettings(
         transparencyStrength: 0.35,
-        blurSigma: 6,
+        blurSigma: 4,
       ),
     );
 
@@ -51,7 +51,24 @@ void main() {
       prefs.getDouble(
         LocationChatHeaderEffectSettingsController.blurSigmaStorageKey,
       ),
-      6,
+      4,
     );
+  });
+  test('old blur values map to the shared presets', () async {
+    for (final (stored, expected) in [
+      (0.0, 0.0),
+      (4.0, 4.0),
+      (10.0, 14.0),
+      (20.0, 14.0),
+    ]) {
+      SharedPreferences.setMockInitialValues({
+        LocationChatHeaderEffectSettingsController.blurSigmaStorageKey: stored,
+      });
+      locationChatHeaderEffectSettings.resetForTesting();
+      expect(
+        (await locationChatHeaderEffectSettings.load()).blurSigma,
+        expected,
+      );
+    }
   });
 }

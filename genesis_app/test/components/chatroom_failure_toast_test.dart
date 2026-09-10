@@ -158,6 +158,17 @@ void main() {
         chatroomFailureToastMessage(
           const ChatroomFailureEvent(
             code: 'ack_timeout',
+            message: 'Timed out waiting for go_on ack',
+            sourceType: 'ack',
+            requestType: 'go_on',
+          ),
+        ),
+        'Could not confirm Go on. Please try again.',
+      );
+      expect(
+        chatroomFailureToastMessage(
+          const ChatroomFailureEvent(
+            code: 'ack_timeout',
             message: 'Timed out waiting for send_message ack',
             sourceType: 'ack',
             requestType: 'send_message',
@@ -313,11 +324,24 @@ void main() {
       }
     }
     final local = ApiException(
-      message: 'Network unavailable',
+      message: 'Request failed',
       kind: ApiExceptionKind.transport,
     );
     expect(isChatroomErrorPresentedGlobally(local), isFalse);
-    expect(chatroomOperationErrorMessage(local), 'Network unavailable');
+    expect(
+      chatroomOperationErrorMessage(local),
+      'Network unavailable. Check your connection and try again.',
+    );
+    expect(
+      chatroomOperationErrorMessage(
+        ApiException(message: 'Request failed', kind: ApiExceptionKind.timeout),
+      ),
+      'Request timed out. Please try again.',
+    );
+    expect(
+      chatroomOperationErrorMessage(TimeoutException('late')),
+      'Request timed out. Please try again.',
+    );
   });
 
   testWidgets(

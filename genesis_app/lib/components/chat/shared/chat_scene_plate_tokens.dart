@@ -1,3 +1,5 @@
+import '../../../ui/tokens/genesis_blur.dart';
+
 import 'package:flutter/material.dart';
 
 const double kLocationChatOuterPadding = 10;
@@ -9,7 +11,7 @@ const EdgeInsets kChatScenePlateBubblePadding = EdgeInsets.symmetric(
 );
 const Color kChatScenePlateAiBubbleColor = Color(0x993A3942);
 const Color kChatScenePlatePlayerRoleBorderColor = Color(0xFFFF2442);
-const double kChatScenePlateBubbleBlurSigma = 14;
+const double kChatScenePlateBubbleBlurSigma = GenesisBlur.strong;
 const TextStyle kChatScenePlateBubbleTextStyle = TextStyle(
   color: Color(0xFFF4F3F6),
   fontSize: 14,

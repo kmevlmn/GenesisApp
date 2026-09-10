@@ -17,6 +17,7 @@ class GenesisListImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.borderRadius = GenesisImageRadii.content,
     this.placeholderAsset = genesisDefaultListImageAsset,
+    this.placeholder,
     this.maxDevicePixelRatio = GenesisImageConfig.maxDevicePixelRatio,
     this.onImageLoaded,
   });
@@ -27,6 +28,7 @@ class GenesisListImage extends StatelessWidget {
   final BoxFit fit;
   final BorderRadiusGeometry borderRadius;
   final String placeholderAsset;
+  final Widget? placeholder;
   final double maxDevicePixelRatio;
   final VoidCallback? onImageLoaded;
 
@@ -76,6 +78,8 @@ class GenesisListImage extends StatelessWidget {
   }
 
   Widget _placeholder() {
+    final customPlaceholder = placeholder;
+    if (customPlaceholder != null) return customPlaceholder;
     return Image.asset(
       placeholderAsset,
       width: _finite(width),

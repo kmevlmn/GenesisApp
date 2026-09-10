@@ -38,10 +38,22 @@ class BottomTabs extends StatelessWidget {
           showLabel: false,
           iconSize: 26,
           iconShadows: [
-            Shadow(color: Colors.white, offset: Offset(0.5, 0)),
-            Shadow(color: Colors.white, offset: Offset(-0.5, 0)),
-            Shadow(color: Colors.white, offset: Offset(0, 0.5)),
-            Shadow(color: Colors.white, offset: Offset(0, -0.5)),
+            Shadow(
+              color: GenesisColors.darkTextPrimary,
+              offset: Offset(0.5, 0),
+            ),
+            Shadow(
+              color: GenesisColors.darkTextPrimary,
+              offset: Offset(-0.5, 0),
+            ),
+            Shadow(
+              color: GenesisColors.darkTextPrimary,
+              offset: Offset(0, 0.5),
+            ),
+            Shadow(
+              color: GenesisColors.darkTextPrimary,
+              offset: Offset(0, -0.5),
+            ),
           ],
         ),
         GenesisBottomNavigationItem(

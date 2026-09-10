@@ -106,6 +106,7 @@ extension _WorldPageSheets on _WorldPageState {
         actionContext,
         'Only worlds launched by you alone can be deleted.',
         duration: const Duration(seconds: 3),
+        brightness: Brightness.dark,
       );
       return;
     }
@@ -116,11 +117,7 @@ extension _WorldPageSheets on _WorldPageState {
       titleWidget: _DeleteWorldConfirmationTitle(name: world.name.trim()),
       titleHeight: null,
       actions: const [
-        GenesisActionBoxAction<bool>(
-          label: 'Delete',
-          value: true,
-          color: Color(0xFFFF2442),
-        ),
+        GenesisActionBoxAction<bool>(label: 'Delete', value: true),
       ],
       cancelLabel: 'Cancel',
     );
@@ -140,7 +137,11 @@ extension _WorldPageSheets on _WorldPageState {
       ).pop(WorldPageResult.deleted(deletedWorldId: worldId));
     } catch (error) {
       if (!actionContext.mounted) return;
-      showGenesisToast(actionContext, apiErrorMessage(error));
+      showGenesisToast(
+        actionContext,
+        apiErrorMessage(error),
+        brightness: Brightness.dark,
+      );
     }
   }
 }
@@ -149,12 +150,12 @@ class _DeleteWorldConfirmationTitle extends StatelessWidget {
   const _DeleteWorldConfirmationTitle({required this.name});
 
   static const _baseStyle = TextStyle(
-    color: Color(0xFF111111),
+    color: GenesisColors.darkTextPrimary,
     fontSize: 15,
     height: 1.16,
     fontWeight: FontWeight.w600,
   );
-  static const _nameStyle = TextStyle(color: Color(0xFF4B6192));
+  static const _nameStyle = TextStyle(color: GenesisColors.redSecondary);
 
   final String name;
 

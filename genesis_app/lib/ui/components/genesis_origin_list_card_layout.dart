@@ -10,6 +10,7 @@ class GenesisOriginListCardLayout extends StatelessWidget {
     super.key,
     required this.imageUrl,
     required this.content,
+    this.placeholder,
     this.thumbnailBorderRadius = GenesisImageRadii.contentValue,
   });
 
@@ -19,6 +20,7 @@ class GenesisOriginListCardLayout extends StatelessWidget {
 
   final String imageUrl;
   final Widget content;
+  final Widget? placeholder;
   final double thumbnailBorderRadius;
 
   @override
@@ -28,6 +30,7 @@ class GenesisOriginListCardLayout extends StatelessWidget {
       children: [
         GenesisListImage(
           imageUrl: imageUrl,
+          placeholder: placeholder,
           width: coverWidth,
           height: coverHeight,
           borderRadius: BorderRadius.circular(thumbnailBorderRadius),

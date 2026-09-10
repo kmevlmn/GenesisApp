@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
 import 'common/genesis_bottom_sheet_panel.dart';
@@ -9,6 +10,9 @@ import '../app/telemetry/genesis_telemetry.dart';
 import '../platform/auth/auth_cancelled_exception.dart';
 import '../platform/auth/auth_session.dart';
 import '../ui/tokens/genesis_colors.dart';
+import '../ui/components/genesis_dark_close_button.dart';
+import '../ui/components/genesis_safe_area.dart';
+import '../ui/theme/genesis_dark_theme.dart';
 
 class LoginSheet extends StatefulWidget {
   const LoginSheet({
@@ -41,7 +45,11 @@ class _LoginSheetState extends State<LoginSheet> {
         Navigator.of(context).pop(true);
       } else {
         debugPrint('[Auth][LoginSheet] login failed: onLogin returned false');
-        showGenesisToast(context, 'Sign-in failed');
+        showGenesisToast(
+          context,
+          'Sign-in failed',
+          brightness: Brightness.dark,
+        );
       }
     } on AuthCancelledException {
       debugPrint('[Auth][LoginSheet] login cancelled');
@@ -55,7 +63,11 @@ class _LoginSheetState extends State<LoginSheet> {
       debugPrint('[Auth][LoginSheet] stacktrace:\n$st');
       if (!mounted) return;
       final message = e.toString().trim();
-      showGenesisToast(context, message.isEmpty ? 'Sign-in failed' : message);
+      showGenesisToast(
+        context,
+        message.isEmpty ? 'Sign-in failed' : message,
+        brightness: Brightness.dark,
+      );
     } finally {
       debugPrint('[Auth][LoginSheet] submit end');
       if (mounted) setState(() => _submittingProvider = null);
@@ -70,55 +82,67 @@ class _LoginSheetState extends State<LoginSheet> {
 
     return PopScope(
       canPop: widget.isDismissible,
-      child: GenesisBottomSheetPanel(
-        title: 'Sign up to continue',
-        height: targetHeight,
-        trailing: widget.isDismissible
-            ? GenesisBottomSheetCloseButton(
-                onPressed: _submittingProvider != null
-                    ? null
-                    : () {
-                        GenesisTelemetry.event(
-                          'login_cancel',
-                          category: 'auth',
-                          data: const <String, Object?>{
-                            'source': 'close_button',
-                          },
-                        );
-                        Navigator.of(context).pop(false);
-                      },
-              )
-            : null,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(
-              width: double.infinity,
-              child: Text(
-                'Sign up and get 250 Gems!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: GenesisColors.brand,
-                  height: 1.35,
-                ),
+      child: GenesisDarkTheme(
+        child: GenesisBottomSystemBarStyleScope(
+          style: const GenesisBottomSystemBarStyle(
+            color: GenesisColors.darkRaisedBackground,
+          ),
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: const SystemUiOverlayStyle(
+              systemNavigationBarIconBrightness: Brightness.light,
+            ),
+            child: GenesisBottomSheetPanel(
+              title: 'Sign up to continue',
+              height: targetHeight,
+              trailing: widget.isDismissible
+                  ? GenesisDarkCloseButton(
+                      onPressed: _submittingProvider != null
+                          ? null
+                          : () {
+                              GenesisTelemetry.event(
+                                'login_cancel',
+                                category: 'auth',
+                                data: const <String, Object?>{
+                                  'source': 'close_button',
+                                },
+                              );
+                              Navigator.of(context).pop(false);
+                            },
+                    )
+                  : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      'Sign up and get 250 Gems!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: GenesisColors.redSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  LoginProviderButtons(
+                    loggingInProvider: _submittingProvider,
+                    onLogin: _submit,
+                    spacing: 12,
+                  ),
+                  const SizedBox(height: 14),
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 22),
+                      child: LoginLegalText(),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            LoginProviderButtons(
-              loggingInProvider: _submittingProvider,
-              onLogin: _submit,
-              spacing: 12,
-            ),
-            const SizedBox(height: 14),
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 22),
-                child: LoginLegalText(),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

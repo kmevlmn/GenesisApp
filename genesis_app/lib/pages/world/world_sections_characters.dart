@@ -16,7 +16,7 @@ class WorldStatusSection extends StatelessWidget {
       emptyText: 'No character status yet.',
       subtitleBuilder: (character) =>
           worldMetricStatusText(world.metric, character),
-      subtitleColor: const Color(0xFF666666),
+      subtitleColor: GenesisColors.darkTextSecondary,
       showCharacterDetails: false,
     );
   }
@@ -35,7 +35,7 @@ class WorldCharactersSection extends StatelessWidget {
       currentUid: currentUid,
       emptyText: 'No characters yet.',
       subtitleBuilder: worldCharacterDescriptionText,
-      subtitleColor: const Color(0xFF666666),
+      subtitleColor: GenesisColors.darkTextSecondary,
       showCharacterDetails: true,
     );
   }
@@ -179,7 +179,7 @@ class WorldCharacterRow extends StatelessWidget {
       fontSize: 13,
       height: 1.4,
       fontWeight: FontWeight.w400,
-      color: Color(0xFF111111),
+      color: GenesisColors.darkTextPrimary,
     );
 
     return Row(
@@ -219,7 +219,7 @@ class WorldCharacterRow extends StatelessWidget {
                                     TextSpan(
                                       text: ' $suffix',
                                       style: const TextStyle(
-                                        color: Color(0xFF888888),
+                                        color: GenesisColors.darkTextTertiary,
                                       ),
                                     ),
                                 ],
@@ -228,7 +228,7 @@ class WorldCharacterRow extends StatelessWidget {
                                 fontSize: 14,
                                 height: 1.15,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black,
+                                color: GenesisColors.darkTextPrimary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -257,7 +257,7 @@ class WorldCharacterRow extends StatelessWidget {
                         fontSize: 12,
                         height: 1.15,
                         fontWeight: FontWeight.w400,
-                        color: Color(0xFF8F8F8F),
+                        color: GenesisColors.darkTextTertiary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -278,7 +278,9 @@ class WorldCharacterRow extends StatelessWidget {
                     const SizedBox(height: 5),
                     Text(
                       brief,
-                      style: bodyStyle.copyWith(color: const Color(0xFFFF2442)),
+                      style: bodyStyle.copyWith(
+                        color: GenesisColors.redSecondary,
+                      ),
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -405,7 +407,7 @@ class WorldEmptySection extends StatelessWidget {
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF8A8A8A),
+            color: GenesisColors.darkTextTertiary,
           ),
         ),
       ),

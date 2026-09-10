@@ -5,6 +5,7 @@ import '../../app/telemetry/genesis_telemetry.dart';
 import 'genesis_safe_area.dart';
 import 'genesis_unread_badge.dart';
 import '../tokens/genesis_spacing.dart';
+import '../tokens/genesis_colors.dart';
 import '../theme/genesis_ui_theme.dart';
 
 class GenesisBottomNavigationItem {
@@ -52,32 +53,63 @@ class GenesisBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 8,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      child: GenesisBottomSafePadding(
-        minimum: minBottomPadding,
-        child: SizedBox(
-          height: height,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              for (var index = 0; index < items.length; index += 1)
-                GenesisBottomNavigationTile(
-                  item: items[index],
-                  selected: currentIndex == index,
-                  onTap: () => onTap(index),
+    final backgroundColor = GenesisUiTheme.of(
+      context,
+    ).bottomNavigationBackgroundColor;
+    return GenesisBottomSystemBarStyleScope(
+      style: GenesisBottomSystemBarStyle(color: backgroundColor),
+      child: ColoredBox(
+        color: backgroundColor,
+        child: Stack(
+          children: [
+            GenesisBottomSafePadding(
+              minimum: minBottomPadding,
+              child: SizedBox(
+                height: height,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    for (var index = 0; index < items.length; index += 1)
+                      GenesisBottomNavigationTile(
+                        item: items[index],
+                        selected: currentIndex == index,
+                        onTap: () => onTap(index),
+                      ),
+                  ],
                 ),
-            ],
-          ),
+              ),
+            ),
+            // Paint inside the bar without moving its content or hit targets.
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 1,
+              child: IgnorePointer(
+                child: ColoredBox(color: GenesisColors.darkFaintFill),
+              ),
+            ),
+            Positioned(
+              top: 1,
+              left: 0,
+              right: 0,
+              height: 3,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        GenesisColors.darkFaintFill.withValues(alpha: 0.04),
+                        GenesisColors.darkFaintFill.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -214,7 +246,7 @@ class _ProminentNavigationIcon extends StatelessWidget {
                     height: size,
                     fit: BoxFit.contain,
                     colorFilter: const ColorFilter.mode(
-                      Colors.white,
+                      GenesisColors.darkTextPrimary,
                       BlendMode.srcIn,
                     ),
                   )
@@ -223,9 +255,14 @@ class _ProminentNavigationIcon extends StatelessWidget {
                     width: size,
                     height: size,
                     fit: BoxFit.contain,
-                    color: Colors.white,
+                    color: GenesisColors.darkTextPrimary,
                   )
-          : Icon(icon, color: Colors.white, size: size, shadows: shadows),
+          : Icon(
+              icon,
+              color: GenesisColors.darkTextPrimary,
+              size: size,
+              shadows: shadows,
+            ),
     );
   }
 }
@@ -273,6 +310,12 @@ class _BadgedIcon extends StatelessWidget {
                     width: size,
                     height: size,
                     fit: BoxFit.contain,
+                    colorMapper: _NavigationIconColorMapper(
+                      foreground: color,
+                      background: GenesisUiTheme.of(
+                        context,
+                      ).bottomNavigationBackgroundColor,
+                    ),
                   )
                 : Image.asset(
                     assetName!,
@@ -294,4 +337,36 @@ class _BadgedIcon extends StatelessWidget {
       ),
     );
   }
+}
+
+// White SVG details are cutouts; recoloring the whole SVG would erase them.
+class _NavigationIconColorMapper extends ColorMapper {
+  const _NavigationIconColorMapper({
+    required this.foreground,
+    required this.background,
+  });
+
+  final Color foreground;
+  final Color background;
+
+  @override
+  Color substitute(
+    String? id,
+    String elementName,
+    String attributeName,
+    Color color,
+  ) {
+    if (color == Colors.white) return background;
+    if (color.a == 0) return color;
+    return foreground;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is _NavigationIconColorMapper &&
+      foreground == other.foreground &&
+      background == other.background;
+
+  @override
+  int get hashCode => Object.hash(foreground, background);
 }

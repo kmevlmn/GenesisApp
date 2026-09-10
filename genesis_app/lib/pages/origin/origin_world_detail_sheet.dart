@@ -1161,12 +1161,6 @@ class _OriginDetailDraggableSheetState
       const SizedBox(height: originDetailSectionGapForTesting),
       _WorldViewSection(origin: widget.origin),
     ];
-    if (_originPreviewTick(widget.origin) case final tick?) {
-      children.addAll([
-        const SizedBox(height: originDetailSectionGapForTesting),
-        _LaunchPreviewSection(origin: widget.origin, previewTick: tick),
-      ]);
-    }
     children.addAll([
       const SizedBox(height: originDetailSectionGapForTesting),
       _DiscussSection(origin: widget.origin, controller: discussController),
@@ -1737,8 +1731,8 @@ class _OriginCollapsedOpeningRoleAction extends StatelessWidget {
 class _OriginSheetPageIndicator extends StatelessWidget {
   const _OriginSheetPageIndicator({required this.page});
 
-  static const Color _activeColor = originWorldDetailSheetPrimaryTextColor;
-  static const Color _inactiveColor = originWorldDetailSheetTertiaryTextColor;
+  static const Color _activeColor = GenesisColors.darkHandleActive;
+  static const Color _inactiveColor = GenesisColors.darkHandleInactive;
 
   final double page;
 
@@ -2049,9 +2043,10 @@ class _OriginInlineEditAction extends StatelessWidget {
       onPressed: onTap,
       height: 34,
       width: 92,
-      backgroundColor: const Color(0xFFFF2442),
-      disabledBackgroundColor: const Color(0xFFFF2442).withValues(alpha: 0.62),
-      foregroundColor: Colors.white,
+      backgroundColor: GenesisColors.redPrimary,
+      disabledBackgroundColor: GenesisColors.darkButtonDisabledBackground,
+      disabledForegroundColor: GenesisColors.darkButtonDisabledForeground,
+      foregroundColor: GenesisColors.darkTextPrimary,
       fontSize: 14,
       padding: EdgeInsets.zero,
       minimumSize: Size.zero,

@@ -65,6 +65,28 @@ const List<WorldContentUpdateNotice> _multiWorldUpdatePushPreviewNotices = [
 ];
 
 extension _DeveloperPreviews on _DeveloperPageContentState {
+  Future<void> _showForceUpgradePreview() async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    if (widget.dismissBeforePreview) {
+      await widget.onDismissBeforePreview?.call();
+    }
+    if (!navigator.mounted) return;
+    await navigator.push(
+      GenesisDarkPageRoute<void>(
+        builder: (previewContext) => ForceUpgradePage(
+          preview: true,
+          response: AppVersionCheckResponse.fromJson({
+            'title': 'Update required',
+            'content':
+                'Please update to the latest version to continue using Worldo.',
+            'latest_version_name': 'Preview',
+          }),
+          onUpdate: () => showGenesisToast(previewContext, 'Preview only'),
+        ),
+      ),
+    );
+  }
+
   Future<void> _showWorldUpdatePushPreview({required bool multiple}) async {
     final notices = multiple
         ? _multiWorldUpdatePushPreviewNotices
@@ -118,9 +140,31 @@ extension _DeveloperPreviews on _DeveloperPageContentState {
   }
 
   Future<void> _showCreatingWaitOverlayPreview() async {
+    final api = AppServicesScope.read(context).api;
     final navigator = Navigator.of(context, rootNavigator: true);
     if (widget.dismissBeforePreview) {
       await widget.onDismissBeforePreview?.call();
+    }
+    if (!navigator.mounted) return;
+    final avatars = <GenesisGenerationWaitAvatar>[];
+    try {
+      final origins = await api.getOrigins(limit: 1);
+      if (origins.data.isNotEmpty) {
+        final origin = await api.getOrigin(origins.data.first.oid);
+        avatars.addAll(
+          origin.characters
+              .where((c) => c.avatar.trim().isNotEmpty)
+              .map(
+                (c) => GenesisGenerationWaitAvatar(name: c.name, url: c.avatar),
+              ),
+        );
+      }
+    } catch (_) {
+      if (navigator.mounted)
+        showGenesisToast(
+          navigator.context,
+          'Could not load Worldo preview. Showing default preview.',
+        );
     }
     if (!navigator.mounted) return;
     await showGeneralDialog<void>(
@@ -129,13 +173,8 @@ extension _DeveloperPreviews on _DeveloperPageContentState {
       barrierDismissible: false,
       transitionDuration: Duration.zero,
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
-        return GenesisGenerationWaitOverlay(
-          title: 'Creating your Worldo',
-          illustration: const Center(
-            child: GenesisLogo(height: 88, width: 152),
-          ),
-          perspectiveLines: _creatingPreviewWaitLines,
-          centeredPerspectiveLineCount: 2,
+        return OriginGenerationWaitOverlay(
+          avatars: avatars,
           onBarrierTap: () => Navigator.of(dialogContext).maybePop(),
           onBackPressed: () => Navigator.of(dialogContext).maybePop(),
         );

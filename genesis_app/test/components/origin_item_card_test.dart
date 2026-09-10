@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/ui/theme/genesis_dark_theme.dart';
+import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 import 'package:genesis_flutter_android/components/common/list_loading_skeleton.dart';
 import 'package:genesis_flutter_android/components/origin/origin_item_card.dart';
 import 'package:genesis_flutter_android/components/origin/origin_item_cover_gradient_painter.dart';
@@ -223,121 +225,135 @@ void main() {
     expect(subtitle.maxLines, 3);
   });
 
-  testWidgets('keeps the whole item hidden until its cover is ready', (
-    WidgetTester tester,
-  ) async {
-    final frame = Completer<ImageInfo>();
-    final sourceImage = await _solidImage(const Color(0xFFFF0000));
-    addTearDown(sourceImage.dispose);
-    debugOriginItemCoverImageProvider = (_) =>
-        _CompletingTestImageProvider(frame.future);
+  for (final dark in [false, true]) {
+    testWidgets(
+      'keeps the whole item hidden until its cover is ready (${dark ? 'dark' : 'light'})',
+      (WidgetTester tester) async {
+        final frame = Completer<ImageInfo>();
+        final sourceImage = await _solidImage(const Color(0xFFFF0000));
+        addTearDown(sourceImage.dispose);
+        debugOriginItemCoverImageProvider = (_) =>
+            _CompletingTestImageProvider(frame.future);
 
-    const item = OriginListItem(
-      oid: 'o_delayed',
-      status: 1,
-      versionNum: 1,
-      name: 'Delayed Origin',
-      cover: '',
-      displaySubtitle: 'Wait for the cover',
-      worldView: '',
-      createdUid: 'u_1',
-      createdUserName: 'Shawn',
-      createdAt: '2026-05-01T00:00:00Z',
-      updatedAt: '2026-05-02T00:00:00Z',
-      tags: <String>[],
-      copyCnt: 3,
-      connectCnt: 4,
-      discussCnt: 0,
-      characterCnt: 5,
-      locationCnt: 0,
-    );
-    var coverLoaded = false;
+        const item = OriginListItem(
+          oid: 'o_delayed',
+          status: 1,
+          versionNum: 1,
+          name: 'Delayed Origin',
+          cover: '',
+          displaySubtitle: 'Wait for the cover',
+          worldView: '',
+          createdUid: 'u_1',
+          createdUserName: 'Shawn',
+          createdAt: '2026-05-01T00:00:00Z',
+          updatedAt: '2026-05-02T00:00:00Z',
+          tags: <String>[],
+          copyCnt: 3,
+          connectCnt: 4,
+          discussCnt: 0,
+          characterCnt: 5,
+          locationCnt: 0,
+        );
+        var coverLoaded = false;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 220,
-            child: OriginItemCard(
-              item: item,
-              onCoverLoaded: () => coverLoaded = true,
+        await tester.pumpWidget(
+          MaterialApp(
+            builder: (context, child) =>
+                dark ? GenesisDarkTheme(child: child!) : child!,
+            home: Scaffold(
+              body: SizedBox(
+                width: 220,
+                child: OriginItemCard(
+                  item: item,
+                  onCoverLoaded: () => coverLoaded = true,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
-    await tester.pump();
+        );
+        await tester.pump();
 
-    final loadingFinder = find.byKey(
-      const ValueKey<String>('origin-item-card-loading'),
-    );
-    expect(loadingFinder, findsOneWidget);
-    expect(
-      tester.getSize(loadingFinder),
-      const Size(220, 330 + genesisOriginCardBottomExtension),
-    );
-    final placeholderFinder = find.descendant(
-      of: loadingFinder,
-      matching: find.byType(DecoratedBox),
-    );
-    expect(placeholderFinder, findsOneWidget);
-    final initialDecoration =
-        tester.widget<DecoratedBox>(placeholderFinder).decoration
-            as BoxDecoration;
-    final initialGradient = initialDecoration.gradient! as LinearGradient;
-    expect(initialGradient.colors, const [
-      Color(0xFFE8EBF0),
-      Color(0xFFF3F4F6),
-    ]);
-    await tester.pump(const Duration(milliseconds: 350));
-    final movedDecoration =
-        tester.widget<DecoratedBox>(placeholderFinder).decoration
-            as BoxDecoration;
-    final movedGradient = movedDecoration.gradient! as LinearGradient;
-    expect(movedGradient, initialGradient);
-    expect(
-      find.descendant(
-        of: loadingFinder,
-        matching: find.byType(AnimatedBuilder),
-      ),
-      findsNothing,
-    );
-    expect(find.text('#Delayed Origin'), findsNothing);
-    expect(
-      find.byKey(const ValueKey<String>('origin-item-card-footer-extension')),
-      findsNothing,
-    );
-    expect(coverLoaded, isFalse);
+        final loadingFinder = find.byKey(
+          const ValueKey<String>('origin-item-card-loading'),
+        );
+        expect(loadingFinder, findsOneWidget);
+        expect(
+          tester.getSize(loadingFinder),
+          const Size(220, 330 + genesisOriginCardBottomExtension),
+        );
+        final placeholderFinder = find.descendant(
+          of: loadingFinder,
+          matching: find.byType(DecoratedBox),
+        );
+        expect(placeholderFinder, findsOneWidget);
+        final initialDecoration =
+            tester.widget<DecoratedBox>(placeholderFinder).decoration
+                as BoxDecoration;
+        final initialGradient = initialDecoration.gradient! as LinearGradient;
+        expect(
+          initialGradient.colors,
+          dark
+              ? const [
+                  GenesisColors.darkRaisedBackground,
+                  GenesisColors.darkFaintSurface,
+                ]
+              : const [Color(0xFFE8EBF0), Color(0xFFF3F4F6)],
+        );
+        await tester.pump(const Duration(milliseconds: 350));
+        final movedDecoration =
+            tester.widget<DecoratedBox>(placeholderFinder).decoration
+                as BoxDecoration;
+        final movedGradient = movedDecoration.gradient! as LinearGradient;
+        expect(movedGradient, initialGradient);
+        expect(
+          find.descendant(
+            of: loadingFinder,
+            matching: find.byType(AnimatedBuilder),
+          ),
+          findsNothing,
+        );
+        expect(find.text('#Delayed Origin'), findsNothing);
+        expect(
+          find.byKey(
+            const ValueKey<String>('origin-item-card-footer-extension'),
+          ),
+          findsNothing,
+        );
+        expect(coverLoaded, isFalse);
 
-    frame.complete(ImageInfo(image: sourceImage.clone()));
-    await _pumpUntilOriginCardReady(tester);
+        frame.complete(ImageInfo(image: sourceImage.clone()));
+        await _pumpUntilOriginCardReady(tester);
 
-    expect(loadingFinder, findsNothing);
-    expect(
-      find.byKey(const ValueKey<String>('origin-item-card-ready')),
-      findsOneWidget,
+        expect(loadingFinder, findsNothing);
+        expect(
+          find.byKey(const ValueKey<String>('origin-item-card-ready')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(OriginItemCard),
+            matching: find.byType(AnimatedOpacity),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(OriginItemCard),
+            matching: find.byType(FadeTransition),
+          ),
+          findsNothing,
+        );
+        expect(find.text('#Delayed Origin'), findsOneWidget);
+        expect(
+          find.byKey(
+            const ValueKey<String>('origin-item-card-footer-extension'),
+          ),
+          findsOneWidget,
+        );
+        expect(coverLoaded, isTrue);
+      },
     );
-    expect(
-      find.descendant(
-        of: find.byType(OriginItemCard),
-        matching: find.byType(AnimatedOpacity),
-      ),
-      findsNothing,
-    );
-    expect(
-      find.descendant(
-        of: find.byType(OriginItemCard),
-        matching: find.byType(FadeTransition),
-      ),
-      findsNothing,
-    );
-    expect(find.text('#Delayed Origin'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey<String>('origin-item-card-footer-extension')),
-      findsOneWidget,
-    );
-    expect(coverLoaded, isTrue);
-  });
+  }
 
   testWidgets('retries a queued cover superseded before loading', (
     WidgetTester tester,

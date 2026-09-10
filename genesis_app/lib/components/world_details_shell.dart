@@ -80,6 +80,7 @@ class WorldDetailsPageScaffold extends StatefulWidget {
     this.persistentTopOverlay,
     this.onPanelTopPullUp,
     this.backgroundColor,
+    this.panelBackgroundColor = Colors.white,
   });
 
   static const double defaultPanelTopGap = 30;
@@ -106,6 +107,7 @@ class WorldDetailsPageScaffold extends StatefulWidget {
   final Widget? persistentTopOverlay;
   final VoidCallback? onPanelTopPullUp;
   final Color? backgroundColor;
+  final Color panelBackgroundColor;
 
   @override
   State<WorldDetailsPageScaffold> createState() =>
@@ -261,7 +263,7 @@ class _WorldDetailsPageScaffoldState extends State<WorldDetailsPageScaffold> {
           SliverToBoxAdapter(child: SizedBox(height: mapHeight)),
           DecoratedSliver(
             key: const ValueKey<String>('world-details-content-background'),
-            decoration: const BoxDecoration(color: Colors.white),
+            decoration: BoxDecoration(color: widget.panelBackgroundColor),
             sliver: SliverMainAxisGroup(
               slivers: [
                 SliverToBoxAdapter(
@@ -333,7 +335,7 @@ class _WorldDetailsPageScaffoldState extends State<WorldDetailsPageScaffold> {
         onPullUp: widget.onPanelTopPullUp,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: widget.panelBackgroundColor,
             borderRadius: BorderRadius.vertical(
               top: Radius.circular(widget.panelTopRadius),
             ),

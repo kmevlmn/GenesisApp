@@ -3,9 +3,9 @@ part of 'origin_world_page.dart';
 extension _OriginWorldPageMapShell on _OriginWorldPageState {
   Widget _buildPersistentMapOverlay(double top, {OriginDetail? origin}) {
     return Positioned(
-      left: 12,
-      right: 12,
-      top: top + 8,
+      left: genesisMapBackButtonLeft,
+      right: genesisMapTopBarRightInset,
+      top: top + genesisMapBackButtonTop,
       child: _OriginWorldNameOverlay(
         worldoName: origin == null
             ? originDisplayName(widget.initialName)
@@ -124,11 +124,11 @@ class _OriginWorldNameOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       key: const ValueKey<String>('origin-top-overlay-bar'),
-      height: genesisSearchFieldHeight,
+      height: genesisMapBackButtonDimension,
       child: Row(
         children: [
           GenesisMapGlassBackButton(
-            dimension: genesisSearchFieldHeight,
+            dimension: genesisMapBackButtonDimension,
             onPressed: () => Navigator.of(context).maybePop(),
             glassKey: const ValueKey<String>('origin-top-back-glass'),
             surfaceKey: const ValueKey<String>('origin-top-back-surface'),

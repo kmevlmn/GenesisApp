@@ -9,6 +9,11 @@ class GenesisPageTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(text, style: GenesisUiTheme.of(context).pageTitleStyle);
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: GenesisUiTheme.of(context).pageTitleStyle,
+    );
   }
 }

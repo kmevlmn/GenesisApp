@@ -18,4 +18,3 @@ dependencies:
   dio: ^5.2.0
   http2: ^2.1.0
   meta: ^1.9.1
-

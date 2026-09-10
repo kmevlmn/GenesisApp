@@ -26,7 +26,7 @@ import '../../components/common/genesis_modal_routes.dart';
 import '../../components/common/genesis_generation_wait_overlay.dart';
 import '../../components/gems/gem_purchase_bottom_sheet.dart';
 import '../../components/gems/daily_check_in_dialog.dart';
-import '../../components/genesis_logo.dart';
+import '../origin_editor/origin_generation_wait_content.dart';
 import '../../components/tilemap/tilemap_settings_button_visibility.dart';
 import '../../app/gems/gem_wallet_store.dart';
 import '../../app/telemetry/telemetry_runtime_controller.dart';
@@ -47,7 +47,10 @@ import '../../routers/app_router.dart';
 import '../../utils/gem_amount.dart';
 import '../gems/gem_wallet_page.dart';
 import '../world/world_update_push_banner.dart';
+import '../origin_editor/origin_debug_tools.dart';
 import '../../ui/genesis_ui.dart';
+import '../../app/version/force_upgrade_gate.dart';
+import '../../network/models/app_version_check.dart';
 import 'about_us_page.dart';
 import 'developer_membership_set_form.dart';
 
@@ -66,15 +69,6 @@ const String _buildModeLabel = kReleaseMode
     : kProfileMode
     ? 'profile'
     : 'debug';
-
-const List<String> _creatingPreviewWaitLines = [
-  'Originator',
-  'Eve',
-  'A floating city where every district changes its laws at sunrise, and every resident keeps a private map of the rules they trust.',
-  'Magic behaves like public infrastructure. Promises, debts, weather, and streetlights all run through the same civic engine.',
-  'Mira: Exiled route-maker. Patient, skeptical, and protective of anyone who admits they are lost.',
-  'Jon: Archive courier. Restless, charming, and far too willing to trade secrets for a shortcut.',
-];
 
 const List<String> _developerPageCoreTabs = <String>[
   'basic',
@@ -106,13 +100,16 @@ void resetDeveloperPageTabForTesting() {
 }
 
 class DeveloperPage extends StatelessWidget {
-  const DeveloperPage({super.key});
+  const DeveloperPage({super.key, this.randomAction});
+
+  final OriginDebugRandomAction? randomAction;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: DeveloperPageContent(
+          randomAction: randomAction,
           headerLeading: _DeveloperPageBackButton(
             onPressed: () => Navigator.of(context).maybePop(),
           ),
@@ -123,9 +120,14 @@ class DeveloperPage extends StatelessWidget {
 }
 
 class DeveloperPageSheet extends StatelessWidget {
-  const DeveloperPageSheet({super.key, this.sheetScrollController});
+  const DeveloperPageSheet({
+    super.key,
+    this.sheetScrollController,
+    this.randomAction,
+  });
 
   final ScrollController? sheetScrollController;
+  final OriginDebugRandomAction? randomAction;
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +140,7 @@ class DeveloperPageSheet extends StatelessWidget {
           showHeader: false,
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
           child: DeveloperPageContent(
+            randomAction: randomAction,
             dismissBeforePreview: true,
             sheetScrollController: sheetScrollController,
             headerTrailing: GenesisBottomSheetCloseButton(
@@ -162,6 +165,7 @@ class DeveloperPageContent extends StatefulWidget {
     this.headerLeading,
     this.headerTrailing,
     this.sheetScrollController,
+    this.randomAction,
   });
 
   final bool dismissBeforePreview;
@@ -169,6 +173,7 @@ class DeveloperPageContent extends StatefulWidget {
   final Widget? headerLeading;
   final Widget? headerTrailing;
   final ScrollController? sheetScrollController;
+  final OriginDebugRandomAction? randomAction;
 
   @override
   State<DeveloperPageContent> createState() => _DeveloperPageContentState();
@@ -921,15 +926,23 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
                       _DeveloperSliderControl(
                         label: 'Gaussian blur radius',
                         valueLabel: blurLabel,
-                        value: headerEffectSettings.blurSigma,
-                        min: LocationChatHeaderEffectSettings.minBlurSigma,
-                        max: LocationChatHeaderEffectSettings.maxBlurSigma,
-                        divisions: 20,
+                        value: GenesisBlur.presets
+                            .indexOf(
+                              GenesisBlur.normalize(
+                                headerEffectSettings.blurSigma,
+                              ),
+                            )
+                            .toDouble(),
+                        min: 0,
+                        max: 2,
+                        divisions: 2,
                         sliderKey: const ValueKey<String>(
                           'developer-location-chat-header-blur-slider',
                         ),
-                        onChanged:
-                            locationChatHeaderEffectSettings.previewBlurSigma,
+                        onChanged: (index) =>
+                            locationChatHeaderEffectSettings.previewBlurSigma(
+                              GenesisBlur.presets[index.round()],
+                            ),
                         onChangeEnd: (_) {
                           unawaited(_saveLocationChatHeaderEffectSettings());
                         },
@@ -984,6 +997,11 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
       ),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
+        if (buildOriginDebugRandomContentButton(action: widget.randomAction)
+            case final randomButton?) ...[
+          randomButton,
+          const SizedBox(height: _itemGap),
+        ],
         Row(
           children: [
             Expanded(
@@ -1027,6 +1045,13 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
         GenesisPrimaryButton(
           label: 'Preview purchase overlay',
           onPressed: _showGemPurchaseOverlayPreview,
+          backgroundColor: const Color(0xFFE1E1E3),
+          foregroundColor: Colors.black,
+        ),
+        const SizedBox(height: _itemGap),
+        GenesisPrimaryButton(
+          label: 'Preview force upgrade',
+          onPressed: _showForceUpgradePreview,
           backgroundColor: const Color(0xFFE1E1E3),
           foregroundColor: Colors.black,
         ),

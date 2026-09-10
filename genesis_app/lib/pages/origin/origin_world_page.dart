@@ -31,7 +31,6 @@ import '../../components/tilemap/tilemap_renderer.dart';
 import '../../components/tilemap/tilemap_settings_store.dart';
 import '../../components/world_map.dart';
 import '../../network/genesis_http_cache_manager.dart';
-import '../../components/world_tick_event_item.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../network/chatroom/world_chatroom_service.dart';
 import '../../ui/components/genesis_static_network_image.dart';
@@ -926,7 +925,11 @@ class _OriginWorldPageState extends State<OriginWorldPage> {
     final userInfo = await services.sessionStore.readUserInfo();
     if (userInfo == null || userInfo.isEmpty) {
       if (mounted) {
-        showGenesisToast(context, 'No saved profile found');
+        showGenesisToast(
+          context,
+          'No saved profile found',
+          brightness: Brightness.dark,
+        );
       }
       return null;
     }
@@ -961,11 +964,15 @@ class _OriginWorldPageState extends State<OriginWorldPage> {
     if (origin == null) {
       if (_initialLoadError != null) {
         return Scaffold(
+          backgroundColor: GenesisColors.darkBackground,
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Load failed'),
+                const Text(
+                  'Load failed',
+                  style: TextStyle(color: GenesisColors.darkTextSecondary),
+                ),
                 const SizedBox(height: 10),
                 FilledButton(
                   onPressed: () {

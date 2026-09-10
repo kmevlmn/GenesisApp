@@ -40,7 +40,7 @@ class WorldNewBadge extends StatelessWidget {
                   inherit: false,
                   fontFamily: GenesisTypography.fontFamily,
                   fontFamilyFallback: GenesisTypography.fontFamilyFallback,
-                  color: const Color(0xF2FFFFFF),
+                  color: GenesisColors.darkTextPrimary,
                   fontSize: 9.5,
                   height: 1,
                   fontWeight: FontWeight.w800,

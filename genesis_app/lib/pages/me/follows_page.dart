@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../components/auth/login_guard.dart';
 import '../../components/common/genesis_center_toast.dart';
@@ -12,6 +13,9 @@ import '../../network/genesis_api.dart';
 import '../../network/json_utils.dart';
 import '../../platform/session/session_revision_subscription.dart';
 import '../../ui/components/secend_tabs.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
+import '../../ui/tokens/genesis_colors.dart';
+import '../../ui/system/genesis_system_ui.dart';
 import '../../utils/api_error_message.dart';
 import '../../utils/display_name_formatter.dart';
 import '../../utils/entity_deleted.dart';
@@ -224,7 +228,11 @@ class _FollowsPageState extends State<FollowsPage>
     } catch (error) {
       if (!mounted || generation != _loadGeneration) return;
       setState(() => _loadingUids.remove(uid));
-      showGenesisToast(context, apiErrorMessage(error));
+      showGenesisToast(
+        context,
+        apiErrorMessage(error),
+        brightness: Brightness.dark,
+      );
     }
   }
 
@@ -249,56 +257,67 @@ class _FollowsPageState extends State<FollowsPage>
   Widget build(BuildContext context) {
     final followingCount = formatStatCount(_followingTotal ?? 0);
     final followersCount = formatStatCount(_followersTotal ?? 0);
-    return Scaffold(
-      appBar: GenesisBackAppBar(pageName: _title),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // const SizedBox(height: 12),
-            SecendTabs(
-              controller: _tabController,
-              labels: [
-                '$followingCount Following',
-                '$followersCount Followers',
-              ],
-              // horizontalPadding: 28,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-            ),
-            Expanded(
-              child: TabBarView(
-                key: ValueKey<String>('follows-session-$_loadGeneration'),
+    return GenesisDarkTheme(
+      child: Scaffold(
+        backgroundColor: GenesisColors.darkBackground,
+        appBar: GenesisBackAppBar(
+          pageName: _title,
+          backgroundColor: GenesisColors.darkBackground,
+          foregroundColor: GenesisColors.darkTextPrimary,
+          systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
+        ),
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // const SizedBox(height: 12),
+              SecendTabs(
                 controller: _tabController,
-                children: [
-                  _FollowUsersPane(
-                    future:
-                        _followingFuture ??
-                        Future.value(const <_FollowUserItem>[]),
-                    emptyText: 'No following yet.',
-                    defaultFollowed: true,
-                    loadingUids: _loadingUids,
-                    followStateOverrides: _followStateOverrides,
-                    canToggleFollow: _canToggleFollow,
-                    onRefresh: () => _refresh(_FollowListType.following),
-                    onToggleFollow: _toggleFollow,
-                  ),
-                  _FollowUsersPane(
-                    future:
-                        _followersFuture ??
-                        Future.value(const <_FollowUserItem>[]),
-                    emptyText: 'No followers yet.',
-                    defaultFollowed: false,
-                    loadingUids: _loadingUids,
-                    followStateOverrides: _followStateOverrides,
-                    canToggleFollow: _canToggleFollow,
-                    onRefresh: () => _refresh(_FollowListType.followers),
-                    onToggleFollow: _toggleFollow,
-                  ),
+                labelColor: GenesisColors.darkTextPrimary,
+                unselectedLabelColor: GenesisColors.darkTextSecondary,
+                indicatorColor: GenesisColors.redPrimary,
+                labels: [
+                  '$followingCount Following',
+                  '$followersCount Followers',
                 ],
+                // horizontalPadding: 28,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 8),
               ),
-            ),
-          ],
+              Expanded(
+                child: TabBarView(
+                  key: ValueKey<String>('follows-session-$_loadGeneration'),
+                  controller: _tabController,
+                  children: [
+                    _FollowUsersPane(
+                      future:
+                          _followingFuture ??
+                          Future.value(const <_FollowUserItem>[]),
+                      emptyText: 'No following yet.',
+                      defaultFollowed: true,
+                      loadingUids: _loadingUids,
+                      followStateOverrides: _followStateOverrides,
+                      canToggleFollow: _canToggleFollow,
+                      onRefresh: () => _refresh(_FollowListType.following),
+                      onToggleFollow: _toggleFollow,
+                    ),
+                    _FollowUsersPane(
+                      future:
+                          _followersFuture ??
+                          Future.value(const <_FollowUserItem>[]),
+                      emptyText: 'No followers yet.',
+                      defaultFollowed: false,
+                      loadingUids: _loadingUids,
+                      followStateOverrides: _followStateOverrides,
+                      canToggleFollow: _canToggleFollow,
+                      onRefresh: () => _refresh(_FollowListType.followers),
+                      onToggleFollow: _toggleFollow,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -335,23 +354,32 @@ class _FollowUsersPane extends StatelessWidget {
         final items = snapshot.data ?? const <_FollowUserItem>[];
         if (snapshot.connectionState == ConnectionState.waiting &&
             items.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: GenesisLoadingIndicator());
         }
         if (snapshot.hasError && items.isEmpty) {
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Load failed'),
+                const Text(
+                  'Load failed',
+                  style: TextStyle(color: GenesisColors.darkTextSecondary),
+                ),
                 const SizedBox(height: 8),
-                FilledButton(onPressed: onRefresh, child: const Text('Retry')),
+                FilledButton(
+                  onPressed: onRefresh,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: GenesisColors.darkFaintFill,
+                    foregroundColor: GenesisColors.darkTextPrimary,
+                  ),
+                  child: const Text('Retry'),
+                ),
               ],
             ),
           );
         }
         if (items.isEmpty) {
-          return RefreshIndicator(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          return GenesisRefreshIndicator(
             onRefresh: onRefresh,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -363,7 +391,7 @@ class _FollowUsersPane extends StatelessWidget {
                       emptyText,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF8A8A8A),
+                        color: GenesisColors.darkTextSecondary,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
@@ -373,15 +401,14 @@ class _FollowUsersPane extends StatelessWidget {
             ),
           );
         }
-        return RefreshIndicator(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        return GenesisRefreshIndicator(
           onRefresh: onRefresh,
           child: ListView.builder(
             // ignore: deprecated_member_use
             cacheExtent: 0,
             itemExtent: GenesisFollowUserListTile.itemExtent,
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];

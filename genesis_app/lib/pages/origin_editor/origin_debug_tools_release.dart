@@ -1,15 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
-import '../create/create_origin_draft_store.dart';
 import 'origin_draft_repository.dart';
+import 'origin_debug_random_action.dart';
 
-typedef OriginDebugDraftGenerator =
-    FutureOr<CreateOriginDraft> Function(
-      BuildContext context,
-      CreateOriginDraft currentDraft,
-    );
+export 'origin_debug_random_action.dart';
 
 OriginDebugDraftGenerator? createOriginDebugDraftGenerator() => null;
 
@@ -17,9 +11,17 @@ OriginDebugDraftGenerator? editOriginDebugDraftGenerator(
   TextEditingController updateNotesController,
 ) => null;
 
-Widget? buildOriginDebugRandomContentButton({
-  required OriginDraftRepository repository,
-  required OriginDebugDraftGenerator? generator,
-  required bool enabled,
+VoidCallback registerOriginDebugRandomAction({
+  required BuildContext context,
+  required String Function() label,
+  required OriginDraftRepository Function() repository,
+  required OriginDebugDraftGenerator? Function() generator,
+  required bool Function() enabled,
   required Future<void> Function() onGenerated,
+}) => () {};
+
+OriginDebugRandomAction? captureOriginDebugRandomAction() => null;
+
+Widget? buildOriginDebugRandomContentButton({
+  required OriginDebugRandomAction? action,
 }) => null;
