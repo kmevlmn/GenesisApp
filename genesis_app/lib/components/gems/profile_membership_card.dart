@@ -1,14 +1,15 @@
-import '../../ui/tokens/genesis_colors.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../icons/custom_icon_assets.dart';
 import '../../routers/app_router.dart';
-import '../../ui/tokens/genesis_typography.dart';
-import 'gem_balance_text.dart';
-import 'gem_card_action_style.dart';
+import '../../ui/tokens/genesis_colors.dart';
+import 'pro_colors.dart';
 
+/// Membership entry on the profile, per design 9k / 9k2.
+///
+/// Two states share one ground: 9k offers the plan and carries a Subscribe
+/// button, 9k2 reports an active plan with an ACTIVE tag and an expiry date.
 /// Uses the server's membership status; dates and balances are display data.
 class ProfileMembershipCard extends StatelessWidget {
   const ProfileMembershipCard({
@@ -26,6 +27,17 @@ class ProfileMembershipCard extends StatelessWidget {
   final int? blueBalanceCent;
   final DateTime? blueGemsExpiresAt;
 
+  /// 9k is one line taller than 9k2 — the offer copy wraps to two lines.
+  static const double _offerHeight = 82;
+  static const double _activeHeight = 68;
+
+  static const TextStyle _bodyStyle = TextStyle(
+    color: proCardBody,
+    fontSize: 12,
+    height: 1.25,
+    fontWeight: FontWeight.w400,
+  );
+
   String _date(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-'
       '${date.month.toString().padLeft(2, '0')}-'
@@ -35,14 +47,9 @@ class ProfileMembershipCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final expiry = membershipExpiresAt;
     final isMember = isActive;
-    const title = Text(
-      'Pro',
-      style: TextStyle(
-        color: Color(0xFFF5DFA3),
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-      ),
-    );
+    final isLapsed = !isMember && isExpired;
+    // Only 9k's two-line offer copy needs the taller ground.
+    final height = isMember || isLapsed ? _activeHeight : _offerHeight;
     void openMembership() => Navigator.of(
       context,
     ).pushNamed(RouteNames.gemWallet, arguments: 'subscription');
@@ -54,177 +61,261 @@ class ProfileMembershipCard extends StatelessWidget {
         key: const ValueKey('user-profile-membership-entry'),
         onTap: openMembership,
         child: Container(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF841A32), Color(0xFF590C20), Color(0xFF3C0716)],
-              stops: [0, 0.55, 1],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFD8B568)),
-          ),
+          height: height,
           clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            gradient: proCardGradient,
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Stack(
             children: [
               Positioned(
-                top: isMember ? 20 : 12,
-                height: isMember ? 76 : 56,
-                right: isMember ? 60 : 73,
-                width: isMember ? 98 : 72,
+                right: -22,
+                top: -28,
                 child: IgnorePointer(
                   child: Opacity(
-                    opacity: 0.18,
+                    opacity: 0.42,
                     child: SvgPicture.asset(
-                      'assets/custom-icons/svg/pro_crown_pattern.svg',
+                      proCrownWatermarkIconAsset,
                       key: const ValueKey('user-profile-membership-pattern'),
-                      fit: BoxFit.fitHeight,
+                      width: 176,
+                      height: 125,
                     ),
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        SvgPicture.asset(
-                          proCrownFilledIconAsset,
-                          width: 28,
-                          height: 28,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: !isMember && isExpired
-                              ? Row(
-                                  children: [
-                                    title,
+              // Light catches the top half of the card only.
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                height: height / 2,
+                child: const IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x1AFFE296), Color(0x00FFFFFF)],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: Padding(
+                  // +4 on the left so the crown's art lines up with the red
+                  // gem below it, which sits inset inside its own 26 box.
+                  padding: const EdgeInsets.only(left: 20, right: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                SvgPicture.asset(
+                                  proCrownGoldIconAsset,
+                                  width: 26,
+                                  height: 17,
+                                ),
+                                const SizedBox(width: 8),
+                                // The wordmark yields before the status tag on
+                                // a narrow screen rather than overflowing.
+                                const Flexible(child: _ProTitle()),
+                                if (isMember) ...[
+                                  const SizedBox(width: 8),
+                                  const _StatusTag.active(),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            if (isMember)
+                              Text(
+                                'Expires ${expiry == null ? '—' : _date(expiry)}',
+                                key: const ValueKey(
+                                  'user-profile-membership-expiry',
+                                ),
+                                maxLines: 1,
+                                style: _bodyStyle,
+                              )
+                            else if (isLapsed)
+                              // The lapsed plan has no artboard; it borrows
+                              // 9k2's status line and 9k's Subscribe button.
+                              Row(
+                                children: [
+                                  const _StatusTag.expired(),
+                                  if (expiry != null) ...[
                                     const SizedBox(width: 8),
-                                    Container(
-                                      key: const ValueKey(
-                                        'user-profile-membership-expired-tag',
-                                      ),
-                                      height: 20,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                      ),
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0x1FFFFFFF),
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(
-                                          color: const Color(0x2EFFFFFF),
+                                    Flexible(
+                                      child: Text(
+                                        _date(expiry),
+                                        key: const ValueKey(
+                                          'user-profile-membership-expiry',
                                         ),
-                                      ),
-                                      child: const Text(
-                                        'Expired',
-                                        style: TextStyle(
-                                          color:
-                                              GenesisColors.darkTextSecondary,
-                                          fontSize: 11,
-                                          height: 14 / 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: _bodyStyle,
                                       ),
                                     ),
                                   ],
-                                )
-                              : title,
+                                ],
+                              )
+                            else
+                              const Padding(
+                                padding: EdgeInsets.only(right: 4),
+                                child: _OfferCopy(),
+                              ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        if (isMember)
-                          Text(
-                            'Expires ${expiry == null ? '—' : _date(expiry)}',
-                            maxLines: 1,
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(
-                              color: GenesisColors.darkTextSecondary,
-                              fontSize: 11,
-                              height: 1.4,
-                            ),
-                          )
-                        else
-                          TextButton(
-                            onPressed: openMembership,
-                            style: TextButton.styleFrom(
-                              backgroundColor: const Color(0xFFE8C77F),
-                              foregroundColor: const Color(0xFF590C20),
-                              minimumSize: const Size(0, 32),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              textStyle: GenesisTypography.resolve(
-                                context,
-                                gemCardActionTextStyle,
-                              ),
-                            ),
-                            child: const Text('Subscribe'),
-                          ),
+                      ),
+                      if (!isMember) ...[
+                        const SizedBox(width: 12),
+                        _SubscribeButton(onPressed: openMembership),
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (!isMember)
-                      const Text(
-                        'Monthly Blue Gems included',
-                        style: TextStyle(
-                          color: GenesisColors.darkTextSecondary,
-                          fontSize: 12,
-                          height: 1.4,
-                        ),
-                      )
-                    else ...[
-                      const Text(
-                        'Free',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 14 / 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFFFFD4DA),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          SvgPicture.asset(
-                            'assets/custom-icons/svg/icon_blue_gem.svg',
-                            width: 16,
-                            height: 24,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text.rich(
-                              blueBalanceCent == null
-                                  ? const TextSpan(text: '—')
-                                  : gemBalanceTextSpan(
-                                      blueBalanceCent!,
-                                      fontSize: 18,
-                                    ),
-                              key: const ValueKey(
-                                'user-profile-blue-gems-balance',
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: GenesisColors.darkTextPrimary,
-                                fontSize: 18,
-                                height: 22 / 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Worldo Premium" — a gold sweep clipped to the glyphs.
+class _ProTitle extends StatelessWidget {
+  const _ProTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (bounds) => proTitleGradient.createShader(bounds),
+      child: const Text(
+        'Worldo Premium',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          height: 1,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.08,
+        ),
+      ),
+    );
+  }
+}
+
+/// The chip beside the wordmark. 9k2 specifies ACTIVE; the lapsed plan has no
+/// artboard of its own, so it borrows the same chip in a neutral tone.
+class _StatusTag extends StatelessWidget {
+  const _StatusTag.active()
+    : label = 'ACTIVE',
+      fill = proActiveTagFill,
+      ink = proActiveTagInk,
+      tagKey = const ValueKey('user-profile-membership-active-tag');
+
+  const _StatusTag.expired()
+    : label = 'Expired',
+      fill = const Color(0x1FFFFFFF),
+      ink = GenesisColors.darkTextSecondary,
+      tagKey = const ValueKey('user-profile-membership-expired-tag');
+
+  final String label;
+  final Color fill;
+  final Color ink;
+  final Key tagKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: tagKey,
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: ink,
+          fontSize: 12,
+          height: 20 / 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.72,
+        ),
+      ),
+    );
+  }
+}
+
+class _OfferCopy extends StatelessWidget {
+  const _OfferCopy();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: 'Up to '),
+          TextSpan(
+            text: '3,500',
+            style: TextStyle(
+              color: proCardBodyStrong,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+          TextSpan(text: ' Gems monthly, plus full premium access.'),
+        ],
+      ),
+      key: ValueKey('user-profile-membership-offer'),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: proCardBody,
+        fontSize: 12,
+        height: 1.25,
+        fontWeight: FontWeight.w400,
+      ),
+    );
+  }
+}
+
+class _SubscribeButton extends StatelessWidget {
+  const _SubscribeButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: const ValueKey('user-profile-membership-subscribe'),
+      onTap: onPressed,
+      child: Container(
+        height: 30,
+        width: 82,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: proSubscribeFill,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+          'Subscribe',
+          style: TextStyle(
+            color: proSubscribeInk,
+            fontSize: 12,
+            height: 1,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),

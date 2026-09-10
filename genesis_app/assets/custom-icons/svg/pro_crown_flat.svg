@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="400" viewBox="-16 -6 128 100"><defs>
+      <linearGradient id="fltF1" gradientUnits="userSpaceOnUse" x1="11" y1="70" x2="6" y2="28"><stop offset="0" stop-color="#FCDA50"></stop><stop offset="1" stop-color="#FDEE7D"></stop></linearGradient>
+      <linearGradient id="fltF2" gradientUnits="userSpaceOnUse" x1="74" y1="63" x2="48" y2="20"><stop offset="0" stop-color="#FFB24A"></stop><stop offset="1" stop-color="#FDD571"></stop></linearGradient>
+      <linearGradient id="fltF3" gradientUnits="userSpaceOnUse" x1="85" y1="70" x2="80" y2="40"><stop offset="0" stop-color="#F7A125"></stop><stop offset="1" stop-color="#FFD05F"></stop></linearGradient>
+      <linearGradient id="fltT1" gradientUnits="userSpaceOnUse" x1="16" y1="40" x2="6" y2="28"><stop offset="0" stop-color="#F4C050"></stop><stop offset="1" stop-color="#FEBE49"></stop></linearGradient>
+      <linearGradient id="fltT2" gradientUnits="userSpaceOnUse" x1="48" y1="8" x2="29" y2="44"><stop offset="0" stop-color="#FFE170"></stop><stop offset="1" stop-color="#FEF9D1"></stop></linearGradient>
+      <linearGradient id="fltT3" gradientUnits="userSpaceOnUse" x1="72" y1="35" x2="67" y2="44"><stop offset="0" stop-color="#F19B22"></stop><stop offset="1" stop-color="#FFBB4B"></stop></linearGradient>
+      <linearGradient id="fltT4" gradientUnits="userSpaceOnUse" x1="67" y1="44" x2="90" y2="28"><stop offset="0" stop-color="#F8C748"></stop><stop offset="1" stop-color="#FFEF6E"></stop></linearGradient>
+      <linearGradient id="fltBASE" gradientUnits="userSpaceOnUse" x1="74" y1="63" x2="11" y2="70"><stop offset="0" stop-color="#FF7300"></stop><stop offset="1" stop-color="#F77D12"></stop></linearGradient>
+      <linearGradient id="fltSIDE" gradientUnits="userSpaceOnUse" x1="48" y1="70" x2="48" y2="82"><stop offset="0" stop-color="#D45A08"></stop><stop offset="1" stop-color="#9E3A06"></stop></linearGradient>
+      </defs>
+      <g transform="translate(48 44) rotate(-9) translate(-48 -44)"><g>
+      <path fill="#FFC35C" d="M6,28 L24,35 L48,8 L72,35 L90,28 L85,70 L11,70 Z"></path>
+      <path fill="url(#fltF1)" d="M6,28 L16,40 L22,63 L11,70 Z"></path>
+      <path fill="url(#fltF2)" d="M16,40 L29,44 L48,20 L67,44 L80,40 L74,63 L22,63 Z"></path>
+      <path fill="url(#fltF3)" d="M80,40 L90,28 L85,70 L74,63 Z"></path>
+      <path fill="url(#fltT1)" d="M6,28 L24,35 L29,44 L16,40 Z"></path>
+      <path fill="url(#fltT2)" d="M24,35 L48,8 L48,20 L29,44 Z"></path>
+      <path fill="url(#fltT3)" d="M48,8 L72,35 L67,44 L48,20 Z"></path>
+      <path fill="url(#fltT4)" d="M72,35 L90,28 L80,40 L67,44 Z"></path>
+      <path fill="url(#fltBASE)" d="M22,63 L74,63 L85,70 L11,70 Z"></path>
+      <path fill="#FFFFFF" fill-opacity=".2" d="M24,35 L48,8 L48,14 L31,40 Z"></path>
+      <path fill="#FFFFFF" fill-opacity=".1" d="M16,40 L29,44 L48,20 L48,26 L30,48 L19,45 Z"></path>
+      </g>
+      <path d="M-4 32 C-10 40 -10 52 -4 60" fill="none" stroke="#E9891B" stroke-width="5.6" stroke-linecap="round"></path>
+      <path d="M104 22 C110 30 110 42 104 50" fill="none" stroke="#E9891B" stroke-width="5.6" stroke-linecap="round"></path>
+      <path d="M98 72 C102 76 102 80 98 84" transform="rotate(20 100 78)" fill="none" stroke="#E9891B" stroke-width="4.2" stroke-linecap="round"></path>
+      </g></svg>

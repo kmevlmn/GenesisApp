@@ -50,5 +50,13 @@ const String inspirationIconAsset = 'assets/custom-icons/svg/inspiration.svg';
 const String proCrownIconAsset = 'assets/custom-icons/svg/pro_crown.svg';
 const String proCrownFilledIconAsset =
     'assets/custom-icons/svg/pro_crown_filled.svg';
+const String proCrownGoldIconAsset =
+    'assets/custom-icons/svg/pro_crown_gold.svg';
+const String proCrownWatermarkIconAsset =
+    'assets/custom-icons/svg/pro_crown_watermark.svg';
+const String proCrownDynamicIconAsset =
+    'assets/custom-icons/svg/pro_crown_dynamic.svg';
+const String proCrownFlatIconAsset =
+    'assets/custom-icons/svg/pro_crown_flat.svg';
 const String upgradeIconAsset = 'assets/custom-icons/svg/upgrade.svg';
 const String recordsIconAsset = 'assets/custom-icons/svg/records.svg';

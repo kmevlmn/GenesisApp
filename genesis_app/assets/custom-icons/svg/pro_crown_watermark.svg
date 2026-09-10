@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="68" viewBox="0 4 96 68">
+  <path fill="#FFE8B4" fill-opacity=".55" d="M6,28 L16,40 L22,63 L11,70 Z"/>
+  <path fill="#FFD98A" fill-opacity=".4" d="M16,40 L29,44 L48,20 L67,44 L80,40 L74,63 L22,63 Z"/>
+  <path fill="#FFC96A" fill-opacity=".5" d="M80,40 L90,28 L85,70 L74,63 Z"/>
+  <path fill="#FFF3D6" fill-opacity=".6" d="M6,28 L24,35 L29,44 L16,40 Z"/>
+  <path fill="#FFF8E6" fill-opacity=".75" d="M24,35 L48,8 L48,20 L29,44 Z"/>
+  <path fill="#FFC96A" fill-opacity=".45" d="M48,8 L72,35 L67,44 L48,20 Z"/>
+  <path fill="#FFE8B4" fill-opacity=".55" d="M72,35 L90,28 L80,40 L67,44 Z"/>
+  <path fill="#FFB347" fill-opacity=".55" d="M22,63 L74,63 L85,70 L11,70 Z"/>
+</svg>

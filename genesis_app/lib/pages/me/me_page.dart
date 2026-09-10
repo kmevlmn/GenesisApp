@@ -285,17 +285,15 @@ class _MePageState extends State<MePage> with RouteAware {
                         worldsListenable: _worldsState,
                         avatarUrlListenable: _avatarUrl,
                         displayNameListenable: _displayName,
+                        // The crown now sits bare beside the name, so the
+                        // 50x20 plate box it used to need is gone.
                         displayNameTrailing: wallet.membership?.isActive == true
-                            ? SizedBox(
-                                width: 50,
-                                height: MediaQuery.textScalerOf(
+                            ? ProMembershipBadge.beside(
+                                key: const ValueKey('me-profile-crown-icon'),
+                                // The display name renders at 20.
+                                fontSize: MediaQuery.textScalerOf(
                                   context,
                                 ).scale(20),
-                                child: const Center(
-                                  child: ProMembershipBadge(
-                                    key: ValueKey('me-profile-crown-icon'),
-                                  ),
-                                ),
                               )
                             : null,
                         isUpdatingProfileListenable: _isUpdatingProfile,

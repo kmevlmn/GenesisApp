@@ -1889,9 +1889,10 @@ class _OriginSheetHeaderContent extends StatelessWidget {
                     text: 'Originator: ${formatUidForDisplay(originator)}',
                     trailing: origin.ownerDeleted
                         ? null
-                        : const ProMembershipBadge(
+                        // The meta row renders at 12.
+                        : const ProMembershipBadge.beside(
                             key: ValueKey('originator-membership-badge'),
-                            height: 14,
+                            fontSize: 12,
                           ),
                     onTap: ownerUid.isEmpty || origin.ownerDeleted
                         ? null

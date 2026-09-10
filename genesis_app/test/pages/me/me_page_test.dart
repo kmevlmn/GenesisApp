@@ -68,11 +68,8 @@ void main() {
           find.text('Expires 2027-09-08'),
           status == 1 ? findsOneWidget : findsNothing,
         );
-        expect(
-          find.text('300.0', findRichText: true),
-          status == 1 ? findsOneWidget : findsNothing,
-        );
-        expect(find.text('5,482.4', findRichText: true), findsOneWidget);
+        expect(find.text(status == 1 ? '300.0' : '0.0'), findsOneWidget);
+        expect(find.text('5,482.4'), findsOneWidget);
       }
       state.value = const GemWalletState(
         ownerUid: 'user',
@@ -89,7 +86,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Subscribe'), findsNothing);
       expect(find.text('Expires —'), findsOneWidget);
-      expect(find.text('0.0', findRichText: true), findsOneWidget);
+      expect(find.text('0.0'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -175,20 +172,27 @@ void main() {
       find.byKey(const ValueKey('user-profile-gems-balance')),
     );
     expect(gemBalance.textSpan?.toPlainText(), '0.0');
-    expect(gemBalance.style?.fontWeight, FontWeight.w600);
+    expect(gemBalance.style?.fontWeight, FontWeight.w800);
     expect(find.text('--'), findsNothing);
     expect(
       tester.getSize(find.byKey(const ValueKey('user-profile-gem-icon'))),
-      const Size(16, 24),
+      const Size(26, 26),
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('user-profile-gems-entry')),
-        matching: find.text('Gems'),
+        matching: find.text('Red gems'),
       ),
       findsOneWidget,
     );
-    expect(find.text('Top Up'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('user-profile-gems-entry')),
+        matching: find.text('Pink gems'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Top up'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('user-profile-gems-pattern')),
       findsOneWidget,
@@ -200,12 +204,14 @@ void main() {
                 )
                 .decoration!
             as BoxDecoration;
-    expect(backgroundDecoration.color, isNull);
-    expect((backgroundDecoration.gradient! as LinearGradient).colors, const [
-      Color(0xFF7F1021),
-      Color(0xFFB8172E),
-    ]);
+    // 9k grounds the gems entry in flat ink rather than the old red sweep.
+    expect(backgroundDecoration.color, const Color(0xFF232228));
+    expect(backgroundDecoration.gradient, isNull);
     expect(backgroundDecoration.border, isNull);
+    expect(
+      backgroundDecoration.borderRadius,
+      BorderRadius.circular(16),
+    );
     final topUpDecoration =
         tester
                 .widget<Container>(
@@ -759,7 +765,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('430.0'), findsOneWidget);
-    expect(find.text('Gems'), findsOneWidget);
+    expect(find.text('Red gems'), findsOneWidget);
+    expect(find.text('Pink gems'), findsOneWidget);
 
     walletState.value = const GemWalletState(
       ownerUid: 'u_user',

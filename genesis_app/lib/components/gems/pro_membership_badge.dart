@@ -2,89 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../icons/custom_icon_assets.dart';
-import 'pro_colors.dart';
 
-/// Compact burgundy and gold membership badge for inline username labels.
+/// Membership mark for inline username labels — the 26a crown on its own,
+/// as design 9k2 sets it beside the profile name. No plate, no wordmark.
 class ProMembershipBadge extends StatelessWidget {
-  const ProMembershipBadge({super.key, this.height = 20});
+  const ProMembershipBadge({super.key, this.height = _nameHeight});
+
+  /// Sizes the crown against the text it sits beside, keeping 9k2's ratio
+  /// wherever the mark appears — a 20 name and a 12 meta row want very
+  /// different crowns.
+  const ProMembershipBadge.beside({super.key, required double fontSize})
+    : height = fontSize * _heightPerTextSize;
+
+  /// 9k2 sets a 17-high crown against a 24 name.
+  static const double _nameHeight = 17;
+  static const double _heightPerTextSize = _nameHeight / 24;
+
+  /// The crown's own proportions; width follows from it.
+  static const double _aspect = 96 / 68;
 
   final double height;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Pro membership',
+      label: 'Premium membership',
       image: true,
       excludeSemantics: true,
-      child: SizedBox(
-        width: height * 2.5,
+      child: SvgPicture.asset(
+        proCrownGoldIconAsset,
+        width: height * _aspect,
         height: height,
-        child: FittedBox(
-          child: Container(
-            width: 50,
-            height: 20,
-            padding: const EdgeInsets.all(0.65),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFE0BE7C), Color(0xFFB98943)],
-              ),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(3.35),
-                border: Border.all(color: proLightGold, width: 0.6),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF841A32),
-                    Color(0xFF590C20),
-                    Color(0xFF3C0716),
-                  ],
-                  stops: [0, 0.55, 1],
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SvgPicture.asset(
-                    proCrownFilledIconAsset,
-                    width: 18,
-                    height: 18,
-                  ),
-                  const SizedBox(width: 2),
-                  ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (bounds) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0xFFFFF2C6),
-                        Color(0xFFF5DFA3),
-                        Color(0xFFD8AF64),
-                      ],
-                      stops: [0, 0.45, 1],
-                    ).createShader(bounds),
-                    child: const Text(
-                      'Pro',
-                      textScaler: TextScaler.noScaling,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        fit: BoxFit.contain,
       ),
     );
   }

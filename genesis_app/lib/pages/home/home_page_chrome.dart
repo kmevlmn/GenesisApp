@@ -127,33 +127,15 @@ class _HomeGemWalletEntry extends StatelessWidget {
           width: 36,
           height: 36,
           child: Center(
+            // 27a carries no tile — the crown is the button.
             child: SizedBox(
               key: const ValueKey<String>('home-gem-wallet-icon'),
               width: 36,
               height: 36,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: proGold, width: 0.8),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF841A32),
-                      Color(0xFF590C20),
-                      Color(0xFF3C0716),
-                    ],
-                    stops: [0, 0.55, 1],
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: SvgPicture.asset(
-                    proCrownFilledIconAsset,
-                    key: const ValueKey<String>('home-gem-wallet-artwork'),
-                    fit: BoxFit.contain,
-                  ),
-                ),
+              child: SvgPicture.asset(
+                proCrownFlatIconAsset,
+                key: const ValueKey<String>('home-gem-wallet-artwork'),
+                fit: BoxFit.contain,
               ),
             ),
           ),

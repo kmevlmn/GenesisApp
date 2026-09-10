@@ -10,7 +10,6 @@ import '../../app/startup/app_startup_coordinator.dart';
 import '../../app/telemetry/firebase_performance_operation.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/common/list_loading_skeleton.dart';
-import '../../components/gems/pro_colors.dart';
 import '../../components/home/world_item_card.dart';
 import '../../components/page_header.dart';
 import '../../components/search_bar.dart';

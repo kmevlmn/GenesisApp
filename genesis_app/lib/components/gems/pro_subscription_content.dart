@@ -324,21 +324,15 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
               DecoratedBox(
                 key: const ValueKey('pro-subscribe-gold-surface'),
                 decoration: BoxDecoration(
-                  gradient: proPurchaseButtonGradient,
+                  // The Me page's VIP gold, swept the way its wordmark is, so
+                  // the two membership calls to action read as one family.
+                  gradient: proButtonGradient,
                   borderRadius: BorderRadius.circular(8),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x18A86A17),
-                      blurRadius: 10,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
                 ),
                 child: GenesisPrimaryButton(
                   key: const ValueKey('pro-subscribe-button'),
                   backgroundColor: Colors.transparent,
-                  foregroundColor: proPurchaseInk,
-                  side: const BorderSide(color: Color(0xFFC69A45)),
+                  foregroundColor: proSubscribeInk,
                   label:
                       selectedProduct?.canPurchase == false &&
                           selectedProduct?.purchaseBlockReason ==

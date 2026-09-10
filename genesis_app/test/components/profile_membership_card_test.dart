@@ -17,9 +17,10 @@ void main() {
         },
       ),
     );
-    expect(find.text('Monthly Blue Gems included'), findsOneWidget);
+    // 9k offers the plan; the balance itself lives in the gems entry below.
+    expect(find.byKey(const ValueKey('user-profile-membership-offer')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('user-profile-blue-gems-balance')),
+      find.byKey(const ValueKey('user-profile-membership-active-tag')),
       findsNothing,
     );
     await tester.tap(find.text('Subscribe'));
@@ -29,7 +30,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Member and gem expirations use distinct ISO dates', (
+  testWidgets('9k2 reports the membership expiry and drops the offer', (
     tester,
   ) async {
     final year = DateTime.now().year + 1;
@@ -49,9 +50,13 @@ void main() {
       ),
     );
     expect(find.text('Subscribe'), findsNothing);
+    expect(find.text('ACTIVE'), findsOneWidget);
     expect(find.text('Expires $year-10-07'), findsOneWidget);
     expect(find.text('Expires $year-09-30'), findsNothing);
-    expect(find.text('300.0', findRichText: true), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('user-profile-membership-offer')),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 }

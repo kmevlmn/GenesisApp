@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -22,7 +23,7 @@ import '../../utils/entity_deleted.dart';
 import '../../utils/stat_count_formatter.dart';
 import '../gems/gem_assets.dart';
 import '../gems/gem_balance_text.dart';
-import '../gems/gem_card_action_style.dart';
+import '../gems/pro_colors.dart';
 import '../gems/profile_membership_card.dart';
 import 'profile_collection_list.dart';
 
