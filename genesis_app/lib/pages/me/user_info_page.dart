@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../ui/theme/genesis_dark_theme.dart';
 import '../../ui/tokens/genesis_colors.dart';
-import '../../ui/system/genesis_system_ui.dart';
 
 import '../../app/blocked_user_review_return.dart';
 import '../../app/bootstrap/app_services_scope.dart';
@@ -508,11 +507,6 @@ class _UserInfoPageState extends State<UserInfoPage> {
         child: Scaffold(
           backgroundColor: GenesisColors.darkBackground,
           appBar: GenesisBackAppBar(
-            centerTitle: false,
-            titleSpacing: 12,
-            backgroundColor: GenesisColors.darkBackground,
-            foregroundColor: GenesisColors.darkTextSecondary,
-            systemOverlayStyle: kGenesisLightSystemUiOverlayStyle,
             pageName: _profileCollapsed ? _profileTitle : '',
             onBack: _handleBack,
             actions: [

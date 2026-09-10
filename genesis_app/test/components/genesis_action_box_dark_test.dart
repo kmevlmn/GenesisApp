@@ -72,9 +72,7 @@ void main() {
       expect(
         panels
             .where(
-              (panel) =>
-                  panel.color ==
-                  GenesisColors.darkRaisedBackground.withValues(alpha: 0.4),
+              (panel) => panel.color == GenesisColors.darkOverlayBackground,
             )
             .length,
         2,

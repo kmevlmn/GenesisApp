@@ -151,6 +151,7 @@ HTTP 映射层的图片规则：
 
 ## 标准页面 Header 标题
 
+- `GenesisBackAppBar` 默认使用 `darkBackground` 背景、`darkTextPrimary` 标题与返回图标及浅色状态栏图标；页面无需重复传入这些默认值，明确的颜色覆盖仍保留。
 - 标准返回 Header 统一复用 `GenesisBackAppBar`，`horizontalInset` 默认 16，无需在页面重复传入；返回图标左侧和无操作按钮时标题区域右侧均留 16。自定义右侧操作需将图标或文字的实际右侧留白对齐到 16，计入按钮内部 padding。未登录 Me、Developer 等非标准 Header 不套用此规则。
 - Settings、Account、Blocked users、About 的正文左右边距统一为 16，包括列表、空态和底部操作区；法律页使用共享 Header，WebView 内部正文间距由网页样式管理。
 
@@ -158,10 +159,14 @@ HTTP 映射层的图片规则：
 - 标准标题默认左对齐：无返回按钮时沿用左右 16px 页面边距；有返回按钮时与返回图标保持 12px 间距。深浅色只覆盖标题颜色，保留公共排版参数；长标题单行省略，不通过缩小字号适配宽度。
 - Home、Inbox、Notifications / Followers / Comments 通知内页、已登录 Me、Profile 和 Follow 页的正文左右边距统一为 16 个逻辑像素；Header 两端的内容或图标区域也对齐到 16。带返回按钮时，返回图标从 x=16 开始，标题保留其后的 12 间距；右侧按钮需计入自身内边距，使图标区域距右边为 16，不能把触摸区外边距与图标留白重复叠加。
 
+## 公共浮层底色
+
+- 公共操作弹窗和 Creating / Publishing / Progressing 等生成等待浮层统一使用 `GenesisColors.darkOverlayBackground`：`darkRaisedBackground` 的 40% 不透明度，背景模糊使用 `GenesisBlur.strong`（14），仅作用于面板圆角内。不得在组件中重复写透明度。文字保持各自 token 的不透明度；外围遮罩单独管理。普通 Sheet、浮动菜单与 Toast 不使用此半透明底色。
+
 ## 公共操作弹窗
 
 - `GenesisActionBox` 统一使用深色样式，包括从浅色页面打开的情况；主题仅作用于弹窗，不能改变调用页面的主题。
-- 主面板与独立 Cancel 面板均使用 `GenesisColors.darkRaisedBackground.withValues(alpha: 0.4)`（40% 不透明度），叠加局限于面板圆角内的背景模糊（`sigmaX / sigmaY = GenesisBlur.strong`（14））；外边框为 1px `darkFaintFill`（约 12% 白），分隔线同样使用 `darkFaintFill`。这些参数在公共组件中集中管理，不在页面重复配置；透明度只作用于面板填充，不给整个弹窗或文字增加 Opacity。
+- 主面板与独立 Cancel 面板均使用 `GenesisColors.darkOverlayBackground`（由 `darkRaisedBackground` 派生的 40% 不透明度），叠加局限于面板圆角内的背景模糊（`sigmaX / sigmaY = GenesisBlur.strong`（14））；外边框为 1px `darkFaintFill`（约 12% 白），分隔线同样使用 `darkFaintFill`。这些参数在公共组件中集中管理，不在页面重复配置；透明度只作用于面板填充，不给整个弹窗或文字增加 Opacity。
 - 标题与普通操作使用 `darkTextPrimary`，说明正文使用 `darkTextSecondary`，UID / WID / 时间等辅助信息和禁用操作使用 `darkTextTertiary`。
 - 公共弹窗的红色操作文字使用 `GenesisColors.redSecondary`；主要操作默认继承公共组件颜色，调用处不重复覆盖。Cancel、Reject 等普通操作使用一级白字；红色强调正文同样使用 `redSecondary`。
 - 自定义标题、正文和输入框也须引用公共 token；输入文字和光标使用 `darkTextPrimary`，Placeholder 使用 `darkInputPlaceholder`，输入填充使用 `darkFaintFill`，不额外描边。保留各交互所需的输入行数和布局。

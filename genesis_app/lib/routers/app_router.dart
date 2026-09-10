@@ -692,12 +692,12 @@ sealed class AppRouter {
         );
       case RouteNames.memoryModel:
         final args = _MemoryModelRouteArgs.from(settings.arguments);
-        return MaterialPageRoute<String>(
+        return GenesisDarkPageRoute<String>(
           settings: settings,
           builder: (_) => MemoryModelPage(worldId: args.worldId),
         );
       case RouteNames.pageNotFound:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const PageNotFoundPage(),
         );
@@ -707,7 +707,7 @@ sealed class AppRouter {
           builder: (_) => const AppShellPage(initialIndex: 0),
         );
       default:
-        return MaterialPageRoute<void>(
+        return GenesisDarkPageRoute<void>(
           settings: settings,
           builder: (_) => const PageNotFoundPage(),
         );

@@ -23712,12 +23712,12 @@ void main() {
     );
     expect(find.textContaining('Publishing your Worldo'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('create-worldo-wait-perspective-text')),
+      find.text('Preparing your Worldo updates.\nPlease wait for a moment.'),
       findsOneWidget,
     );
-    expect(find.text('Editable public view.'), findsOneWidget);
+    expect(find.text('Editable public view.'), findsNothing);
     expect(find.text('Editable hidden rules.'), findsNothing);
-    expect(find.text('Mira: Archivist. Patient'), findsOneWidget);
+    expect(find.text('Mira: Archivist. Patient'), findsNothing);
     expect(
       _richTextWithPlainText('Worldo #Origin o_edit_1 published!'),
       findsNothing,

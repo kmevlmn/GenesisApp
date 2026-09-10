@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
+
+import '../../ui/tokens/genesis_blur.dart';
 
 import 'package:flutter/material.dart';
 
@@ -25,22 +28,16 @@ class GenesisGenerationWaitOverlay extends StatefulWidget {
         'Please wait for a moment.',
     this.illustration,
     this.characterAvatars = const <GenesisGenerationWaitAvatar>[],
-    this.perspectiveLines,
-    this.centeredPerspectiveLineCount = 0,
     this.animateTitleDots = true,
     this.brightness = Brightness.light,
     this.onBackPressed,
     this.onBarrierTap,
   });
 
-  static const double perspectiveContentHeight = 236;
-
   final String title;
   final String message;
   final Widget? illustration;
   final List<GenesisGenerationWaitAvatar> characterAvatars;
-  final List<String>? perspectiveLines;
-  final int centeredPerspectiveLineCount;
   final bool animateTitleDots;
   final Brightness brightness;
   final VoidCallback? onBackPressed;
@@ -79,24 +76,15 @@ class _GenesisGenerationWaitOverlayState
   Widget build(BuildContext context) {
     final dark = widget.brightness == Brightness.dark;
     final dialogBackgroundColor = dark
-        ? GenesisColors.darkRaisedBackground.withValues(alpha: 0.8)
+        ? GenesisColors.darkOverlayBackground
         : const Color(0xFFFFFFFF);
     final primaryTextColor = dark ? GenesisColors.darkTextPrimary : null;
     final secondaryTextColor = dark ? GenesisColors.darkTextSecondary : null;
-    final hasPerspectiveText = widget.perspectiveLines != null;
     final title = widget.animateTitleDots
         ? '${widget.title}${List.filled(_dotCount, '.').join()}'
         : widget.title;
     final Widget waitBody;
-    if (widget.perspectiveLines case final lines?) {
-      waitBody = _PerspectiveWaitText(
-        key: const ValueKey('create-worldo-wait-perspective-text'),
-        illustration: widget.illustration,
-        lines: lines,
-        centeredLineCount: widget.centeredPerspectiveLineCount,
-        textColor: secondaryTextColor,
-      );
-    } else {
+    {
       final bodyChildren = <Widget>[];
       if (widget.characterAvatars.isNotEmpty) {
         bodyChildren.add(
@@ -162,7 +150,7 @@ class _GenesisGenerationWaitOverlayState
                           onTap: () {},
                           child: AlertDialog(
                             key: const ValueKey('world-tick1-wait-dialog'),
-                            backgroundColor: dialogBackgroundColor,
+                            backgroundColor: Colors.transparent,
                             surfaceTintColor: Colors.transparent,
                             shape: const RoundedRectangleBorder(
                               borderRadius: BorderRadius.all(
@@ -170,31 +158,47 @@ class _GenesisGenerationWaitOverlayState
                               ),
                             ),
                             titlePadding: EdgeInsets.zero,
-                            contentPadding: EdgeInsets.fromLTRB(
-                              10,
-                              16,
-                              10,
-                              hasPerspectiveText ? 0 : 16,
-                            ),
-                            content: SizedBox(
-                              width: 292,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    title,
-                                    textAlign: TextAlign.left,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      height: 1.2,
-                                      fontWeight: FontWeight.w600,
-                                      color: primaryTextColor,
+                            contentPadding: EdgeInsets.zero,
+                            content: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: dark ? GenesisBlur.strong : 0,
+                                  sigmaY: dark ? GenesisBlur.strong : 0,
+                                ),
+                                child: ColoredBox(
+                                  color: dialogBackgroundColor,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      10,
+                                      16,
+                                      10,
+                                      16,
+                                    ),
+                                    child: SizedBox(
+                                      width: 292,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Text(
+                                            title,
+                                            textAlign: TextAlign.left,
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              height: 1.2,
+                                              fontWeight: FontWeight.w600,
+                                              color: primaryTextColor,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 14),
+                                          waitBody,
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(height: 14),
-                                  waitBody,
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -374,165 +378,6 @@ class _LaunchWaitAvatar extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(GenesisAvatarRadii.character),
       child: SizedBox(width: size, height: size, child: image),
-    );
-  }
-}
-
-class _PerspectiveWaitText extends StatefulWidget {
-  const _PerspectiveWaitText({
-    super.key,
-    this.illustration,
-    required this.lines,
-    this.centeredLineCount = 0,
-    this.textColor,
-  });
-
-  final Widget? illustration;
-  final List<String> lines;
-  final int centeredLineCount;
-  final Color? textColor;
-
-  @override
-  State<_PerspectiveWaitText> createState() => _PerspectiveWaitTextState();
-}
-
-class _PerspectiveWaitTextState extends State<_PerspectiveWaitText>
-    with SingleTickerProviderStateMixin {
-  static const double _height =
-      GenesisGenerationWaitOverlay.perspectiveContentHeight;
-  static const double _filmHeight = 900;
-  static const double _scrollDistance = 960;
-
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 37000),
-    )..repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant _PerspectiveWaitText oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!_sameLines(oldWidget.lines, widget.lines) ||
-        oldWidget.centeredLineCount != widget.centeredLineCount) {
-      _controller.forward(from: 0);
-      _controller.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  bool _sameLines(List<String> a, List<String> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final lines = widget.lines.where((line) => line.trim().isNotEmpty).toList();
-    if (lines.isEmpty) return const SizedBox.shrink();
-
-    return ShaderMask(
-      shaderCallback: (bounds) {
-        return const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            Colors.black,
-            Colors.black,
-            Colors.black,
-          ],
-          stops: [0.0, 0.06, 0.94, 1.0],
-        ).createShader(bounds);
-      },
-      blendMode: BlendMode.dstIn,
-      child: SizedBox(
-        height: _height,
-        child: ClipRect(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final y = _height - (_controller.value * _scrollDistance);
-              final transform = Matrix4.identity()
-                ..setEntry(3, 2, 0.0050)
-                ..rotateX(-0.34);
-              return Transform(
-                alignment: Alignment.bottomCenter,
-                transform: transform,
-                child: SizedBox(
-                  height: _height,
-                  child: Transform.translate(
-                    offset: Offset(0, y),
-                    child: OverflowBox(
-                      minHeight: 0,
-                      maxHeight: _filmHeight,
-                      alignment: Alignment.topCenter,
-                      child: SizedBox(
-                        width: 292,
-                        height: _filmHeight,
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (widget.illustration != null) ...[
-                                Center(
-                                  child: SizedBox(
-                                    width: 152,
-                                    height: 88,
-                                    child: widget.illustration,
-                                  ),
-                                ),
-                                const SizedBox(height: 22),
-                              ],
-                              for (
-                                var index = 0;
-                                index < lines.length;
-                                index++
-                              ) ...[
-                                Text(
-                                  lines[index],
-                                  softWrap: true,
-                                  textAlign: index < widget.centeredLineCount
-                                      ? TextAlign.center
-                                      : TextAlign.justify,
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    height: 1.32,
-                                    color:
-                                        widget.textColor ??
-                                        const Color(0xFF2A2F33),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                if (index != lines.length - 1)
-                                  const SizedBox(height: 20),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
     );
   }
 }

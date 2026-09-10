@@ -24,7 +24,7 @@ import '../../components/common/genesis_modal_routes.dart';
 import '../../components/common/genesis_generation_wait_overlay.dart';
 import '../../components/gems/gem_purchase_bottom_sheet.dart';
 import '../../components/gems/daily_check_in_dialog.dart';
-import '../../components/genesis_logo.dart';
+import '../origin_editor/origin_generation_wait_content.dart';
 import '../../components/tilemap/tilemap_settings_button_visibility.dart';
 import '../../app/gems/gem_wallet_store.dart';
 import '../../app/telemetry/telemetry_runtime_controller.dart';
@@ -47,6 +47,8 @@ import '../gems/gem_wallet_page.dart';
 import '../world/world_update_push_banner.dart';
 import '../origin_editor/origin_debug_tools.dart';
 import '../../ui/genesis_ui.dart';
+import '../../app/version/force_upgrade_gate.dart';
+import '../../network/models/app_version_check.dart';
 import 'about_us_page.dart';
 
 part 'developer_endpoint_actions.dart';
@@ -63,15 +65,6 @@ const String _buildModeLabel = kReleaseMode
     : kProfileMode
     ? 'profile'
     : 'debug';
-
-const List<String> _creatingPreviewWaitLines = [
-  'Originator',
-  'Eve',
-  'A floating city where every district changes its laws at sunrise, and every resident keeps a private map of the rules they trust.',
-  'Magic behaves like public infrastructure. Promises, debts, weather, and streetlights all run through the same civic engine.',
-  'Mira: Exiled route-maker. Patient, skeptical, and protective of anyone who admits they are lost.',
-  'Jon: Archive courier. Restless, charming, and far too willing to trade secrets for a shortcut.',
-];
 
 const List<String> _developerPageCoreTabs = <String>[
   'basic',
@@ -979,6 +972,13 @@ class _DeveloperPageContentState extends State<DeveloperPageContent>
         GenesisPrimaryButton(
           label: 'Preview purchase overlay',
           onPressed: _showGemPurchaseOverlayPreview,
+          backgroundColor: const Color(0xFFE1E1E3),
+          foregroundColor: Colors.black,
+        ),
+        const SizedBox(height: _itemGap),
+        GenesisPrimaryButton(
+          label: 'Preview force upgrade',
+          onPressed: _showForceUpgradePreview,
           backgroundColor: const Color(0xFFE1E1E3),
           foregroundColor: Colors.black,
         ),

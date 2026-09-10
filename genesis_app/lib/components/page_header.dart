@@ -88,12 +88,12 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.titleKey,
     this.onTitleTap,
     this.titleStyle,
-    this.systemOverlayStyle,
+    this.systemOverlayStyle = SystemUiOverlayStyle.light,
     this.centerTitle = false,
     this.titleSpacing,
     this.horizontalInset = 16,
-    this.backgroundColor = Colors.white,
-    this.foregroundColor = Colors.black,
+    this.backgroundColor = GenesisColors.darkBackground,
+    this.foregroundColor = GenesisColors.darkTextPrimary,
   });
 
   final bool centerTitle;
@@ -147,14 +147,17 @@ class GenesisBackAppBar extends StatelessWidget implements PreferredSizeWidget {
         behavior: HitTestBehavior.translucent,
         onTap: onTitleTap,
         child: centerTitle
-            ? PageTitleText(pageName: pageName, style: titleStyle)
+            ? PageTitleText(
+                pageName: pageName,
+                style: TextStyle(color: foregroundColor).merge(titleStyle),
+              )
             : Text(
                 pageName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GenesisUiTheme.of(
-                  context,
-                ).pageTitleStyle.merge(titleStyle),
+                style: GenesisUiTheme.of(context).pageTitleStyle
+                    .copyWith(color: foregroundColor)
+                    .merge(titleStyle),
               ),
       ),
       actions: actions?.isNotEmpty == true

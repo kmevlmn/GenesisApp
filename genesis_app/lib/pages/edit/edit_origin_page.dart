@@ -11,7 +11,6 @@ import '../../ui/theme/genesis_dark_theme.dart';
 import '../../network/api_client.dart';
 import '../../network/api_exception.dart';
 import '../../network/json_utils.dart';
-import '../../utils/display_name_formatter.dart';
 import '../../utils/genesis_ugc_text.dart';
 import '../create/create_origin_draft_store.dart';
 import '../origin_editor/origin_draft_repository.dart';
@@ -44,7 +43,7 @@ class _EditOriginPageState extends State<EditOriginPage> {
   OriginDraftSubmitStatus _submitStatus = OriginDraftSubmitStatus.idle;
   int _reloadSignal = 0;
   late final VoidCallback _removePublishOutcomeListener;
-  List<String> _generationWaitLines = const <String>[];
+  List<GenesisGenerationWaitAvatar> _generationWaitAvatars = const [];
   bool _forEditIncludesSetting = false;
   bool _forEditIncludesEvents = false;
   Set<String> _forEditCharacterIds = const <String>{};
@@ -120,13 +119,9 @@ class _EditOriginPageState extends State<EditOriginPage> {
         _submitStatus = OriginDraftSubmitStatus.idle;
         _isLoading = false;
       });
-      final originatorName = await _readOriginatorName(context);
       if (!mounted) return;
       setState(() {
-        _generationWaitLines = originDraftGenerationWaitLines(
-          initialDraft,
-          originatorName: originatorName,
-        );
+        _generationWaitAvatars = originDraftGenerationWaitAvatars(initialDraft);
       });
       await _pendingCoordinator.ensurePublishingPolling(
         loadOriginInfo: (originId) => api.v1.origin.info(
@@ -253,21 +248,9 @@ class _EditOriginPageState extends State<EditOriginPage> {
       children: [
         flow,
         Positioned.fill(
-          child: GenesisGenerationWaitOverlay(
-            brightness: Brightness.dark,
-            title: 'Publishing your Worldo',
-            illustration: Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  'assets/images/app_icon.png',
-                  width: 88,
-                  height: 88,
-                ),
-              ),
-            ),
-            perspectiveLines: _generationWaitLines,
-            centeredPerspectiveLineCount: 2,
+          child: OriginGenerationWaitOverlay(
+            publishing: true,
+            avatars: _generationWaitAvatars,
             onBackPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
@@ -290,19 +273,9 @@ class _EditOriginPageState extends State<EditOriginPage> {
     final api = AppServicesScope.read(context).api;
     setState(() {
       _submitStatus = OriginDraftSubmitStatus.checkingPending;
-      _generationWaitLines = originDraftGenerationWaitLines(draft);
+      _generationWaitAvatars = originDraftGenerationWaitAvatars(draft);
     });
     try {
-      final originatorName = await _readOriginatorName(context);
-      if (!context.mounted) {
-        return const OriginSubmitResult(message: '', showMessage: false);
-      }
-      setState(
-        () => _generationWaitLines = originDraftGenerationWaitLines(
-          draft,
-          originatorName: originatorName,
-        ),
-      );
       final payload = draft.toCreateOriginPayload();
       if (payload['init_location_group'] is! Map) {
         throw StateError('A complete Opening is required to publish');
@@ -387,21 +360,5 @@ class _EditOriginPageState extends State<EditOriginPage> {
       _submitStatus = OriginDraftSubmitStatus.idle;
       _reloadSignal++;
     });
-  }
-
-  Future<String> _readOriginatorName(BuildContext context) async {
-    final services = AppServicesScope.read(context);
-    final userInfo = await services.sessionStore.readUserInfo();
-    final uid = (await services.sessionStore.readUid())?.trim() ?? '';
-    final rawName = userInfo == null
-        ? ''
-        : asString(
-            userInfo['name'] ??
-                userInfo['user_name'] ??
-                userInfo['username'] ??
-                userInfo['display_name'] ??
-                userInfo['nickname'],
-          );
-    return formatUidForDisplay(rawName, fallback: uid.isEmpty ? 'You' : uid);
   }
 }

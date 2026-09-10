@@ -304,11 +304,12 @@ class WorldDetailSection extends StatelessWidget {
                     onPressed: () => _copyInviteText(context, worldName: title),
                     height: 34,
                     width: 92,
-                    backgroundColor: const Color(0xFFFF2442),
-                    disabledBackgroundColor: const Color(
-                      0xFFFF2442,
-                    ).withValues(alpha: 0.62),
-                    foregroundColor: Colors.white,
+                    backgroundColor: GenesisColors.redPrimary,
+                    disabledBackgroundColor:
+                        GenesisColors.darkButtonDisabledBackground,
+                    disabledForegroundColor:
+                        GenesisColors.darkButtonDisabledForeground,
+                    foregroundColor: GenesisColors.darkTextPrimary,
                     fontSize: 14,
                     padding: EdgeInsets.zero,
                     minimumSize: Size.zero,

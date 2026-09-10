@@ -12,7 +12,7 @@ import 'package:genesis_flutter_android/ui/tokens/genesis_colors.dart';
 void main() {
   tearDown(GenesisTelemetry.resetForTesting);
 
-  testWidgets('initial loading indicator uses the Gem red color', (
+  testWidgets('initial loading indicator uses dark secondary text', (
     tester,
   ) async {
     final catalogCompleter = Completer<GemModelCatalog>();
@@ -28,9 +28,12 @@ void main() {
     await tester.pump();
 
     final indicator = tester.widget<CircularProgressIndicator>(
-      find.byKey(const ValueKey('gem-model-page-loading')),
+      find.descendant(
+        of: find.byKey(const ValueKey('gem-model-page-loading')),
+        matching: find.byType(CircularProgressIndicator),
+      ),
     );
-    expect(indicator.color, const Color(0xFFFF2442));
+    expect(indicator.color, GenesisColors.darkTextSecondary);
 
     catalogCompleter.complete(_catalog());
     await tester.pumpAndSettle();
@@ -58,6 +61,14 @@ void main() {
 
     expect(requestedWorldIds, ['W_000001']);
     expect(find.text('Model'), findsOneWidget);
+    expect(
+      tester.widget<AppBar>(find.byType(AppBar)).backgroundColor,
+      GenesisColors.darkBackground,
+    );
+    expect(
+      tester.widget<Icon>(find.byIcon(Icons.arrow_back_ios_new)).color,
+      GenesisColors.darkTextPrimary,
+    );
     expect(find.text('Save'), findsOneWidget);
     expectInterText(tester, find.text('Save'));
     expect(find.text('Recommended'), findsOneWidget);
@@ -70,7 +81,7 @@ void main() {
     expect(pageTitleStyle?.fontSize, 20);
     expect(pageTitleStyle?.height, 1.4);
     expect(pageTitleStyle?.fontWeight, FontWeight.w600);
-    expect(pageTitleStyle?.color, const Color(0xFF111111));
+    expect(pageTitleStyle?.color, GenesisColors.darkTextPrimary);
     expect(
       tester.getTopLeft(find.text('Recommended')).dy -
           tester.getRect(find.text('Model')).bottom,
@@ -79,12 +90,15 @@ void main() {
     expect(tester.getTopLeft(find.byIcon(Icons.arrow_back_ios_new)).dx, 16);
     expect(
       tester.getRect(find.byType(Scaffold)).right -
-          tester.getRect(find.text('Save')).right,
+          tester.getRect(find.byKey(const ValueKey('gem-model-save'))).right,
       16,
     );
 
-    final saveButton = tester.widget<TextButton>(
-      find.byKey(const ValueKey('gem-model-save')),
+    final saveButton = tester.widget<FilledButton>(
+      find.descendant(
+        of: find.byKey(const ValueKey('gem-model-save')),
+        matching: find.byType(FilledButton),
+      ),
     );
     expect(saveButton.onPressed, isNull);
     expect(
@@ -104,11 +118,10 @@ void main() {
     );
     final saveStyle = saveButton.style?.textStyle?.resolve(<WidgetState>{});
     expect(saveStyle?.fontSize, 14);
-    expect(saveStyle?.height, 18 / 14);
     expect(saveStyle?.fontWeight, FontWeight.w600);
     expect(
       saveButton.style?.foregroundColor?.resolve(<WidgetState>{}),
-      const Color(0xFF111111),
+      GenesisColors.darkTextPrimary,
     );
 
     final groupTitleStyle = tester.widget<Text>(find.text('Recommended')).style;
@@ -120,7 +133,7 @@ void main() {
     expect(modelTitleStyle?.fontSize, 14);
     expect(modelTitleStyle?.height, 16 / 14);
     expect(modelTitleStyle?.fontWeight, FontWeight.w600);
-    expect(modelTitleStyle?.color, const Color(0xFF111111));
+    expect(modelTitleStyle?.color, GenesisColors.darkTextPrimary);
 
     final estimateStyle = tester
         .widget<Text>(find.text('Estimated next message: 4.0 gems'))
@@ -128,14 +141,14 @@ void main() {
     expect(estimateStyle?.fontSize, 12);
     expect(estimateStyle?.height, 12 / 12);
     expect(estimateStyle?.fontWeight, FontWeight.w400);
-    expect(estimateStyle?.color, const Color(0xFF666666));
+    expect(estimateStyle?.color, GenesisColors.darkTextSecondary);
     final estimateText = tester.widget<Text>(
       find.byKey(const ValueKey<String>('gem-model-estimate-top_pick_v3')),
     );
     final estimateSpan = estimateText.textSpan! as TextSpan;
     final gemsSpan = estimateSpan.children!.single as TextSpan;
     expect(gemsSpan.text, '4.0 gems');
-    expect(gemsSpan.style?.color, const Color(0xFFFF2442));
+    expect(gemsSpan.style?.color, GenesisColors.redSecondary);
 
     final descriptionStyle = tester
         .widget<Text>(find.text('Balanced storytelling.'))
@@ -143,7 +156,7 @@ void main() {
     expect(descriptionStyle?.fontSize, 12);
     expect(descriptionStyle?.height, 14 / 12);
     expect(descriptionStyle?.fontWeight, FontWeight.w400);
-    expect(descriptionStyle?.color, const Color(0xFF666666));
+    expect(descriptionStyle?.color, GenesisColors.darkTextSecondary);
 
     expect(find.text('4-320 gems (memory from 2K to 156K)'), findsNothing);
 
@@ -152,9 +165,12 @@ void main() {
     expect(hotStyle?.height, 14 / 10);
     expect(hotStyle?.fontWeight, FontWeight.w600);
     expect(_tileBorder(tester, 'top_pick_v3').color, const Color(0xFFFF2442));
-    expect(_tileBorder(tester, 'sake_pro').color, const Color(0xFFE1E1E1));
-    expect(_tileColor(tester, 'top_pick_v3'), const Color(0xFFFFF4F6));
-    expect(_tileColor(tester, 'sake_pro'), Colors.white);
+    expect(_tileBorder(tester, 'sake_pro').color, GenesisColors.darkFaintFill);
+    expect(
+      _tileColor(tester, 'top_pick_v3'),
+      GenesisColors.darkRaisedBackground,
+    );
+    expect(_tileColor(tester, 'sake_pro'), GenesisColors.darkRaisedBackground);
     final selectedTileInkWell = tester.widget<InkWell>(
       find.descendant(
         of: find.byKey(const ValueKey<String>('gem-model-top_pick_v3')),
@@ -242,10 +258,16 @@ void main() {
 
     expect(selections, isEmpty);
     expect(cachedModelCodes, isEmpty);
-    expect(_tileBorder(tester, 'top_pick_v3').color, const Color(0xFFE1E1E1));
+    expect(
+      _tileBorder(tester, 'top_pick_v3').color,
+      GenesisColors.darkFaintFill,
+    );
     expect(_tileBorder(tester, 'sake_pro').color, const Color(0xFFFF2442));
-    expect(_tileColor(tester, 'top_pick_v3'), Colors.white);
-    expect(_tileColor(tester, 'sake_pro'), const Color(0xFFFFF4F6));
+    expect(
+      _tileColor(tester, 'top_pick_v3'),
+      GenesisColors.darkRaisedBackground,
+    );
+    expect(_tileColor(tester, 'sake_pro'), GenesisColors.darkRaisedBackground);
     expect(
       find.byKey(const ValueKey('gem-model-current-top_pick_v3')),
       findsOneWidget,
@@ -256,7 +278,12 @@ void main() {
     );
     expect(
       tester
-          .widget<TextButton>(find.byKey(const ValueKey('gem-model-save')))
+          .widget<FilledButton>(
+            find.descendant(
+              of: find.byKey(const ValueKey('gem-model-save')),
+              matching: find.byType(FilledButton),
+            ),
+          )
           .onPressed,
       isNotNull,
     );
@@ -276,7 +303,10 @@ void main() {
       'object2': 'sake_pro',
     });
     expect(
-      find.byKey(const ValueKey('gem-model-save-loading')),
+      find.descendant(
+        of: find.byKey(const ValueKey('gem-model-save')),
+        matching: find.byType(CircularProgressIndicator),
+      ),
       findsOneWidget,
     );
     expect(find.text('Save'), findsNothing);
@@ -288,10 +318,19 @@ void main() {
     await tester.pump();
 
     expect(cachedModelCodes, ['sake_pro']);
-    expect(_tileBorder(tester, 'top_pick_v3').color, const Color(0xFFE1E1E1));
+    expect(
+      _tileBorder(tester, 'top_pick_v3').color,
+      GenesisColors.darkFaintFill,
+    );
     expect(_tileBorder(tester, 'sake_pro').color, const Color(0xFFFF2442));
     expect(find.text('Switched successfully'), findsOneWidget);
-    expect(find.byKey(const ValueKey('gem-model-save-loading')), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('gem-model-save')),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
     await tester.pump(const Duration(seconds: 2));
   });
 
@@ -316,7 +355,7 @@ void main() {
     await tester.pump();
 
     expect(_tileBorder(tester, 'top_pick_v3').color, const Color(0xFFFF2442));
-    expect(_tileBorder(tester, 'sake_pro').color, const Color(0xFFE1E1E1));
+    expect(_tileBorder(tester, 'sake_pro').color, GenesisColors.darkFaintFill);
     expect(find.text('Switched failed'), findsOneWidget);
     expect(
       telemetry.events.where((event) => event.name == 'switch_model_save'),

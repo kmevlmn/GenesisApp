@@ -1,28 +1,51 @@
+import '../../components/common/genesis_generation_wait_overlay.dart';
+import 'package:flutter/material.dart';
 import '../create/create_origin_draft_store.dart';
 
-List<String> originDraftGenerationWaitLines(
-  CreateOriginDraft draft, {
-  String originatorName = '',
-}) {
-  final originator = originatorName.trim();
-  final lines = <String>[
-    if (originator.isNotEmpty) ...['Originator', originator],
-  ];
-  final brief = draft.basics.worldView.trim();
-  final settings = draft.basics.worldLogic.trim();
-  if (brief.isNotEmpty) lines.add(brief);
-  if (settings.isNotEmpty) lines.add(settings);
+List<GenesisGenerationWaitAvatar> originDraftGenerationWaitAvatars(
+  CreateOriginDraft draft,
+) => [
+  for (final character in draft.characters)
+    if (character.avatarUrl.trim().isNotEmpty)
+      GenesisGenerationWaitAvatar(
+        name: character.name,
+        url: character.avatarUrl,
+      ),
+];
 
-  for (final character in draft.characters) {
-    final name = character.name.trim();
-    if (name.isEmpty) continue;
-    final details = [
-      character.identity.trim(),
-      character.personality.trim(),
-    ].where((item) => item.isNotEmpty).join('. ');
-    if (details.isEmpty) continue;
-    lines.add('$name: $details');
-  }
-
-  return lines;
+class OriginGenerationWaitOverlay extends StatelessWidget {
+  const OriginGenerationWaitOverlay({
+    super.key,
+    this.publishing = false,
+    this.avatars = const [],
+    this.onBackPressed,
+    this.onBarrierTap,
+  });
+  final bool publishing;
+  final List<GenesisGenerationWaitAvatar> avatars;
+  final VoidCallback? onBackPressed;
+  final VoidCallback? onBarrierTap;
+  @override
+  Widget build(BuildContext context) => GenesisGenerationWaitOverlay(
+    brightness: Brightness.dark,
+    title: publishing ? 'Publishing your Worldo' : 'Creating your Worldo',
+    message: publishing
+        ? 'Preparing your Worldo updates.\nPlease wait for a moment.'
+        : 'Bringing your Worldo to life.\nPlease wait for a moment.',
+    characterAvatars: avatars,
+    illustration: avatars.isEmpty
+        ? Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/images/app_icon.png',
+                width: 88,
+                height: 88,
+              ),
+            ),
+          )
+        : null,
+    onBackPressed: onBackPressed,
+    onBarrierTap: onBarrierTap,
+  );
 }

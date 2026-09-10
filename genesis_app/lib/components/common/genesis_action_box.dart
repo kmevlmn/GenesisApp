@@ -244,7 +244,7 @@ class _ActionBoxSurface extends StatelessWidget {
       child: BackdropFilter(
         filter: _blur,
         child: Material(
-          color: GenesisColors.darkRaisedBackground.withValues(alpha: 0.4),
+          color: GenesisColors.darkOverlayBackground,
           surfaceTintColor: Colors.transparent,
           shape: const RoundedRectangleBorder(
             borderRadius: _borderRadius,

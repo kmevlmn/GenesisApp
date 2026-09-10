@@ -1,17 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../ui/components/genesis_refresh_indicator.dart';
 import '../../app/bootstrap/app_services_scope.dart';
 import '../../app/telemetry/genesis_telemetry.dart';
 import '../../components/common/genesis_center_toast.dart';
-import '../../components/gems/gem_colors.dart';
+import '../../ui/theme/genesis_dark_theme.dart';
+import '../../ui/components/genesis_primary_button.dart';
 import '../../components/page_header.dart';
 import '../../network/models/gem_model.dart';
 import '../../utils/gem_amount.dart';
 import '../../ui/tokens/genesis_colors.dart';
-import '../../ui/tokens/genesis_typography.dart';
 
 typedef GemModelCatalogLoader =
     Future<GemModelCatalog> Function(String worldId);
@@ -169,13 +170,17 @@ class _MemoryModelPageState extends State<MemoryModelPage> {
         _catalog = _catalog?.copyWith(selectedModelCode: selectedModelCode);
         _pendingModelCode = selectedModelCode;
       });
-      showGenesisToast(context, 'Switched successfully');
+      showGenesisToast(
+        context,
+        'Switched successfully',
+        brightness: Brightness.dark,
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _pendingModelCode = _catalog?.selectedModelCode ?? '';
       });
-      showGenesisToast(context, 'Switched failed');
+      showGenesisToast(context, 'Switched failed', brightness: Brightness.dark);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -187,25 +192,32 @@ class _MemoryModelPageState extends State<MemoryModelPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: GenesisBackAppBar(
-        pageName: 'Model',
-        titleStyle: const TextStyle(color: Color(0xFF111111)),
-        onBack: _closePage,
-        actions: [
-          _ModelSaveAction(
-            saving: _saving,
-            enabled:
-                !_loading &&
-                _pendingModelCode.trim().isNotEmpty &&
-                _pendingModelCode.trim() !=
-                    (_catalog?.selectedModelCode.trim() ?? ''),
-            onPressed: _submitSelection,
+    return GenesisDarkTheme(
+      child: Builder(
+        builder: (context) => Scaffold(
+          backgroundColor: GenesisColors.darkBackground,
+          appBar: GenesisBackAppBar(
+            backgroundColor: GenesisColors.darkBackground,
+            foregroundColor: GenesisColors.darkTextPrimary,
+            systemOverlayStyle: SystemUiOverlayStyle.light,
+            pageName: 'Model',
+            titleStyle: const TextStyle(color: GenesisColors.darkTextPrimary),
+            onBack: _closePage,
+            actions: [
+              _ModelSaveAction(
+                saving: _saving,
+                enabled:
+                    !_loading &&
+                    _pendingModelCode.trim().isNotEmpty &&
+                    _pendingModelCode.trim() !=
+                        (_catalog?.selectedModelCode.trim() ?? ''),
+                onPressed: _submitSelection,
+              ),
+            ],
           ),
-        ],
+          body: SafeArea(child: _buildBody()),
+        ),
       ),
-      body: SafeArea(child: _buildBody()),
     );
   }
 
@@ -215,10 +227,9 @@ class _MemoryModelPageState extends State<MemoryModelPage> {
       return const Center(
         child: SizedBox.square(
           dimension: 24,
-          child: CircularProgressIndicator(
+          child: GenesisLoadingIndicator(
             key: ValueKey('gem-model-page-loading'),
             strokeWidth: 2,
-            color: kGemAccentColor,
           ),
         ),
       );
@@ -236,7 +247,10 @@ class _MemoryModelPageState extends State<MemoryModelPage> {
             Center(
               child: Text(
                 'No models available',
-                style: TextStyle(fontSize: 14, color: Color(0xFF999999)),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: GenesisColors.darkTextTertiary,
+                ),
               ),
             ),
           ],
@@ -247,7 +261,7 @@ class _MemoryModelPageState extends State<MemoryModelPage> {
     return GenesisRefreshIndicator(
       onRefresh: () => _refresh(preserveContent: true),
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: catalog.groups.length,
         itemBuilder: (context, index) {
@@ -283,36 +297,22 @@ class _ModelSaveAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 64,
-      child: TextButton(
-        key: const ValueKey('gem-model-save'),
-        onPressed: enabled && !saving ? onPressed : null,
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.only(right: 16),
-          alignment: Alignment.centerRight,
-          backgroundColor: Colors.transparent,
-          overlayColor: Colors.transparent,
-          foregroundColor: const Color(0xFF111111),
-          disabledForegroundColor: const Color(0xFF999999),
-          textStyle: const TextStyle(
-            fontFamily: GenesisTypography.fontFamily,
-            fontFamilyFallback: GenesisTypography.fontFamilyFallback,
-            fontSize: 14,
-            height: 18 / 14,
-            fontWeight: FontWeight.w600,
-          ),
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Center(
+        child: GenesisPrimaryButton(
+          key: const ValueKey('gem-model-save'),
+          label: 'Save',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          width: 64,
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          backgroundColor: GenesisColors.redPrimary,
+          foregroundColor: GenesisColors.darkTextPrimary,
+          isLoading: saving,
+          onPressed: enabled && !saving ? onPressed : null,
         ),
-        child: saving
-            ? const SizedBox.square(
-                key: ValueKey('gem-model-save-loading'),
-                dimension: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: kGemAccentColor,
-                ),
-              )
-            : const Text('Save'),
       ),
     );
   }
@@ -344,7 +344,7 @@ class _GemModelGroupSection extends StatelessWidget {
             fontSize: 16,
             height: 20 / 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF333333),
+            color: GenesisColors.darkTextPrimary,
           ),
         ),
         const SizedBox(height: 12),
@@ -381,14 +381,16 @@ class _GemModelTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = selected ? kGemAccentColor : const Color(0xFFE1E1E1);
+    final borderColor = selected
+        ? GenesisColors.redPrimary
+        : GenesisColors.darkFaintFill;
     return Semantics(
       button: true,
       selected: selected,
       enabled: enabled,
       child: Material(
         key: ValueKey<String>('gem-model-${model.modelCode}'),
-        color: selected ? const Color(0xFFFFF4F6) : Colors.white,
+        color: GenesisColors.darkRaisedBackground,
         shape: RoundedRectangleBorder(
           side: BorderSide(color: borderColor, width: selected ? 1.2 : 1),
           borderRadius: BorderRadius.circular(8),
@@ -462,7 +464,7 @@ class _GemModelTileContent extends StatelessWidget {
                   fontSize: 14,
                   height: 16 / 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF111111),
+                  color: GenesisColors.darkTextPrimary,
                 ),
               ),
             ),
@@ -482,7 +484,7 @@ class _GemModelTileContent extends StatelessWidget {
                 TextSpan(
                   text:
                       '${formatGemCent(model.estimatedNextMessageGemsCent)} gems',
-                  style: const TextStyle(color: kGemAccentColor),
+                  style: const TextStyle(color: GenesisColors.redSecondary),
                 ),
               ],
             ),
@@ -491,7 +493,7 @@ class _GemModelTileContent extends StatelessWidget {
               fontSize: 12,
               height: 12 / 12,
               fontWeight: FontWeight.w400,
-              color: Color(0xFF666666),
+              color: GenesisColors.darkTextSecondary,
             ),
           ),
         ),
@@ -502,7 +504,7 @@ class _GemModelTileContent extends StatelessWidget {
             fontSize: 12,
             height: 14 / 12,
             fontWeight: FontWeight.w400,
-            color: Color(0xFF666666),
+            color: GenesisColors.darkTextSecondary,
           ),
         ),
       ],
@@ -523,7 +525,7 @@ class _GemModelTag extends StatelessWidget {
         : '${normalizedLabel[0].toUpperCase()}${normalizedLabel.substring(1)}';
     final backgroundColor = normalizedLabel == 'hot'
         ? const Color(0xFFFF7A1A)
-        : kGemAccentColor;
+        : GenesisColors.redPrimary;
     return Container(
       key: ValueKey<String>('gem-model-tag-$normalizedLabel'),
       height: 20,
@@ -539,7 +541,7 @@ class _GemModelTag extends StatelessWidget {
           fontSize: 10,
           height: 14 / 10,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: GenesisColors.darkTextPrimary,
         ),
       ),
     );
@@ -558,19 +560,20 @@ class _GemModelSelectionIndicator extends StatelessWidget {
       height: 15,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
+        color: selected ? GenesisColors.redPrimary : Colors.transparent,
         border: Border.all(
-          color: selected ? kGemAccentColor : const Color(0xFFCCCCCC),
+          color: selected
+              ? GenesisColors.redPrimary
+              : GenesisColors.darkFaintFill,
           width: 1,
         ),
       ),
       alignment: Alignment.center,
       child: selected
-          ? const DecoratedBox(
-              decoration: BoxDecoration(
-                color: kGemAccentColor,
-                shape: BoxShape.circle,
-              ),
-              child: SizedBox.square(dimension: 9),
+          ? const Icon(
+              Icons.check_rounded,
+              size: 12,
+              color: GenesisColors.darkTextPrimary,
             )
           : null,
     );
@@ -590,10 +593,13 @@ class _ModelLoadError extends StatelessWidget {
         children: [
           const Text(
             'Load failed',
-            style: TextStyle(fontSize: 14, color: Color(0xFF777777)),
+            style: TextStyle(
+              fontSize: 14,
+              color: GenesisColors.darkTextTertiary,
+            ),
           ),
           const SizedBox(height: 14),
-          FilledButton(onPressed: onRetry, child: const Text('Retry')),
+          GenesisPrimaryButton(onPressed: onRetry, label: 'Retry'),
         ],
       ),
     );
