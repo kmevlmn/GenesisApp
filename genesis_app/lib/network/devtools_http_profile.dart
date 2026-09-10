@@ -16,11 +16,11 @@ void enableGenesisDevToolsHttpProfiling() {
 }
 
 class DevToolsHttpProfile {
-  DevToolsHttpProfile._(this._profile, {required bool redactMembershipReport})
-    : _redactMembershipReport = redactMembershipReport;
+  DevToolsHttpProfile._(this._profile, {this.sanitizeBody});
 
   final HttpClientRequestProfile _profile;
-  final bool _redactMembershipReport;
+  final List<int> Function(List<int>)? sanitizeBody;
+  bool get _redactMembershipData => sanitizeBody != null;
   bool _requestClosed = false;
   bool _responseClosed = false;
 
@@ -28,17 +28,19 @@ class DevToolsHttpProfile {
     TransportRequest request, {
     GenesisHttpProfileFactory profileFactory = _createHttpProfile,
   }) {
-    final redactMembershipReport = isMembershipPurchaseReportRequest(
-      request.uri,
-    );
-    if (isPrivateMembershipRequest(request.uri) && !redactMembershipReport) {
+    final sanitizeBody = isMembershipPurchaseReportRequest(request.uri)
+        ? membershipReportProfileBody
+        : isMembershipProductRequest(request.uri)
+        ? membershipProductProfileBody
+        : null;
+    if (isPrivateMembershipRequest(request.uri) && sanitizeBody == null) {
       return null;
     }
     try {
       final profile = profileFactory(
         requestStartTime: DateTime.now(),
         requestMethod: request.method,
-        requestUri: redactMembershipReport
+        requestUri: sanitizeBody != null
             ? Uri(
                 scheme: request.uri.scheme,
                 host: request.uri.host,
@@ -49,10 +51,7 @@ class DevToolsHttpProfile {
       );
       return profile == null
           ? null
-          : DevToolsHttpProfile._(
-              profile,
-              redactMembershipReport: redactMembershipReport,
-            );
+          : DevToolsHttpProfile._(profile, sanitizeBody: sanitizeBody);
     } catch (_) {
       return null;
     }
@@ -63,7 +62,7 @@ class DevToolsHttpProfile {
     _requestClosed = true;
     try {
       final requestData = _profile.requestData;
-      requestData.headersCommaValues = _redactMembershipReport
+      requestData.headersCommaValues = _redactMembershipData
           ? membershipReportProfileHeaders(request.headers)
           : request.headers;
       requestData.contentLength = request.bodyBytes?.length ?? 0;
@@ -71,11 +70,7 @@ class DevToolsHttpProfile {
       requestData.persistentConnection = true;
       final bodyBytes = request.bodyBytes;
       if (bodyBytes != null && bodyBytes.isNotEmpty) {
-        requestData.bodySink.add(
-          _redactMembershipReport
-              ? membershipReportProfileBody(bodyBytes)
-              : bodyBytes,
-        );
+        requestData.bodySink.add(sanitizeBody?.call(bodyBytes) ?? bodyBytes);
       }
       _profile.addEvent(
         HttpProfileRequestEvent(
@@ -101,7 +96,7 @@ class DevToolsHttpProfile {
       final responseData = _profile.responseData;
       responseData.startTime = receivedAt;
       responseData.statusCode = response.statusCode;
-      responseData.headersCommaValues = _redactMembershipReport
+      responseData.headersCommaValues = _redactMembershipData
           ? membershipReportProfileHeaders(response.headers)
           : response.headers;
       responseData.contentLength =
@@ -110,9 +105,7 @@ class DevToolsHttpProfile {
       responseData.persistentConnection = true;
       if (response.bodyBytes.isNotEmpty) {
         responseData.bodySink.add(
-          _redactMembershipReport
-              ? membershipReportProfileBody(response.bodyBytes)
-              : response.bodyBytes,
+          sanitizeBody?.call(response.bodyBytes) ?? response.bodyBytes,
         );
       }
       final protocol = response.httpProtocolVersion;
@@ -141,9 +134,7 @@ class DevToolsHttpProfile {
     _responseClosed = true;
     try {
       await _profile.responseData.closeWithError(
-        _redactMembershipReport
-            ? error.runtimeType.toString()
-            : error.toString(),
+        _redactMembershipData ? error.runtimeType.toString() : error.toString(),
       );
     } catch (_) {
       // Profiling is diagnostic-only and must never mask the real error.

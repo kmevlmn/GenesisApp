@@ -10,7 +10,7 @@ extension _MembershipPurchaseRestore on MembershipPurchaseService {
   Future<void> _restoreStorePurchases({
     List<MembershipProduct>? products,
   }) async {
-    if (_disposed || restorePurchase == null || queryRestorePurchases == null) {
+    if (_disposed || queryRestorePurchases == null) {
       return;
     }
     if (products != null) {
@@ -39,14 +39,16 @@ extension _MembershipPurchaseRestore on MembershipPurchaseService {
                     _pendingRestoreIds.contains(record.requestId))
                   record.receiptKey: record.requestId,
             };
-            final pendingPurchases = _records.values
-                .where(
-                  (r) =>
-                      r.ownerUid == uid &&
-                      _pendingRequestIds.contains(r.requestId),
-                )
-                .map((r) => r.requestId)
-                .toSet();
+            final pendingPurchases =
+                _records.values
+                    .where(
+                      (r) =>
+                          r.ownerUid == uid &&
+                          _pendingRequestIds.contains(r.requestId),
+                    )
+                    .map((r) => r.requestId)
+                    .toSet()
+                  ..addAll(_pendingRestoreIds);
             await recover();
             if (_disposed ||
                 session != _session ||
@@ -74,7 +76,9 @@ extension _MembershipPurchaseRestore on MembershipPurchaseService {
                 return;
               }
               if (!ids.contains(purchase.productId) ||
-                  !seen.add(membershipReceiptKey(purchase))) {
+                  !seen.add(
+                    '${membershipReceiptKey(purchase)}:${purchase.transactionId}',
+                  )) {
                 continue;
               }
               final retried =
@@ -88,21 +92,14 @@ extension _MembershipPurchaseRestore on MembershipPurchaseService {
                       purchase.status == BillingPurchaseStatus.pending)) {
                 continue;
               }
-              if (pendingPurchases.contains(
-                _purchaseForRestore(purchase)?.requestId,
-              )) {
+              if (_alreadyRetriedReceipt(purchase, pendingPurchases)) {
                 continue;
               }
               await _serialize(() async {
                 if (!_disposed &&
                     session == _session &&
                     await readLoginUid() == uid) {
-                  await _restoreReceipt(
-                    purchase,
-                    newOperation: !retrying.containsKey(
-                      membershipReceiptKey(purchase),
-                    ),
-                  );
+                  await _restoreReceipt(purchase);
                 }
               });
             }
@@ -119,21 +116,39 @@ extension _MembershipPurchaseRestore on MembershipPurchaseService {
     await task;
   }
 
+  // Google can reuse a token for renewals. Prefer an exact transaction so a
+  // late callback cannot make an older completed order look like a new renewal.
   MembershipPurchaseRecord? _purchaseForRestore(BillingPurchase purchase) {
+    MembershipPurchaseRecord? tokenMatch;
     for (final record in _records.values.toList().reversed) {
       if (record.product.provider != provider ||
           record.product.storeProductId != purchase.productId) {
         continue;
       }
-      if (provider == MembershipProvider.google
-          ? purchase.purchaseToken.isNotEmpty &&
-                record.purchaseToken == purchase.purchaseToken
-          : purchase.transactionId.isNotEmpty &&
-                record.transactionId == purchase.transactionId) {
+      if (provider == MembershipProvider.google) {
+        if (purchase.purchaseToken.isEmpty ||
+            record.purchaseToken != purchase.purchaseToken) {
+          continue;
+        }
+        tokenMatch ??= record;
+      }
+      if (purchase.transactionId.isNotEmpty &&
+          record.transactionId == purchase.transactionId) {
         return record;
       }
     }
-    return null;
+    return tokenMatch;
+  }
+
+  bool _alreadyRetriedReceipt(
+    BillingPurchase purchase,
+    Set<String> requestIds,
+  ) {
+    final record = _purchaseForRestore(purchase);
+    return record != null &&
+        requestIds.contains(record.requestId) &&
+        record.transactionId == purchase.transactionId &&
+        (record.paid || purchase.status == BillingPurchaseStatus.pending);
   }
 
   MembershipOrderProduct? _restoreProduct(BillingPurchase purchase) {
@@ -155,15 +170,8 @@ extension _MembershipPurchaseRestore on MembershipPurchaseService {
     return null;
   }
 
-  Future<void> _restoreReceipt(
-    BillingPurchase purchase, {
-    bool newOperation = false,
-  }) async {
-    if (_disposed ||
-        restorePurchase == null ||
-        purchase.provider.apiValue != provider.name) {
-      return;
-    }
+  Future<void> _restoreReceipt(BillingPurchase purchase) async {
+    if (_disposed || purchase.provider.apiValue != provider.name) return;
     if (purchase.status != BillingPurchaseStatus.purchased &&
         purchase.status != BillingPurchaseStatus.restored &&
         purchase.status != BillingPurchaseStatus.pending) {
@@ -177,24 +185,20 @@ extension _MembershipPurchaseRestore on MembershipPurchaseService {
     final uid = await readLoginUid();
     if (uid == null || _disposed) return;
     final original = _purchaseForRestore(purchase);
-    if (original?.guest != null) {
-      // Guest receipts retain their separate report/claim ownership.
-      if (_pendingRequestIds.contains(original!.requestId)) {
+    if (original != null) {
+      // Use the original purchase pipeline, including completed-transaction
+      // deduplication, renewals and guest report/claim ownership.
+      if (original.guest != null || original.ownerUid == uid) {
         await _handle(purchase);
       }
-      return;
-    }
-    if (original != null &&
-        _pendingRequestIds.contains(original.requestId) &&
-        original.ownerUid == uid) {
-      await _handle(purchase);
       return;
     }
     MembershipRestoreRecord? record;
     for (final candidate in _restoreRecords.values.toList().reversed) {
       if (candidate.ownerUid == uid &&
-          candidate.receiptKey == membershipReceiptKey(purchase)) {
-        if (candidate.needsRetry || !newOperation) record = candidate;
+          candidate.receiptKey == membershipReceiptKey(purchase) &&
+          candidate.purchase.transactionId == purchase.transactionId) {
+        record = candidate;
         break;
       }
     }
@@ -204,7 +208,6 @@ extension _MembershipPurchaseRestore on MembershipPurchaseService {
       purchase: purchase,
       product: _restoreProduct(purchase),
     );
-    // A pending -> paid update keeps the original operation and receipt fields.
     if (!record.paid && purchase.status != BillingPurchaseStatus.pending) {
       record = record.copyWith(purchase: purchase);
     }
@@ -212,104 +215,71 @@ extension _MembershipPurchaseRestore on MembershipPurchaseService {
     await _processRestore(record);
   }
 
+  Future<void> _removeRestore(MembershipRestoreRecord record) async {
+    await store.removeRestore(record.requestId);
+    _pendingRestoreIds.remove(record.requestId);
+    _restoreRecords.remove(record.requestId);
+  }
+
   Future<void> _processRestore(MembershipRestoreRecord record) async {
     if (_disposed ||
-        restorePurchase == null ||
+        !_pendingRestoreIds.contains(record.requestId) ||
+        record.purchase.provider.apiValue != provider.name ||
         await readLoginUid() != record.ownerUid) {
       return;
     }
     final session = _session;
-    final previousResult = _restoreCatalogResult(record);
     try {
-      if (record.product == null) {
-        record = record.copyWith(product: _restoreProduct(record.purchase));
+      final original = _purchaseForRestore(record.purchase);
+      final migrated = _records[record.requestId];
+      if (migrated != null && migrated.ownerUid == record.ownerUid ||
+          original != null &&
+              (original.ownerUid == record.ownerUid ||
+                  original.guest != null) &&
+              original.transactionId == record.purchase.transactionId) {
+        // The purchase queue already owns this exact receipt (and recover()
+        // already retried it). Old duplicate restore records must not block it.
+        // Re-save pending records before removing the only durable backup.
+        final purchase = migrated ?? original!;
+        if (_pendingRequestIds.contains(purchase.requestId)) {
+          await _save(purchase);
+        }
+        await _removeRestore(record);
+        return;
       }
-      // Save even when the API cannot yet accept an unresolved plan.
-      await _saveRestore(record);
-      if (record.product == null) return;
+      final product = record.product ?? _restoreProduct(record.purchase);
+      // Google receipts with a shared product ID cannot identify plan_code.
+      // Keep the receipt safely until an exact purchase snapshot is available.
+      if (product == null) return;
       if (_disposed ||
           session != _session ||
           await readLoginUid() != record.ownerUid) {
         return;
       }
-      if (record.reportStatus == null || record.reportStatus == 'accepted') {
-        final report = await restorePurchase!(record.request);
-        record = record.copyWith(
-          reportStatus: report.status.name,
-          reportId: report.reportId,
-          reportReason: report.reason,
-          finished: report.reason == 'account_mismatch' ? true : null,
-        );
-        await _saveRestore(record);
-        if (_disposed ||
-            session != _session ||
-            await readLoginUid() != record.ownerUid) {
-          return;
-        }
-      }
-      if (record.reportStatus == 'completed') {
-        try {
-          await refreshWallet?.call();
-        } catch (_) {}
-      }
-      if (provider == MembershipProvider.apple &&
-          record.paid &&
-          !record.finished) {
-        await platform.finishAppleTransaction(record.purchase.transactionId);
-        record = record.copyWith(finished: true);
-        await _saveRestore(record);
-      }
-      if ((record.paid || record.reportStatus == 'rejected') &&
-          (record.reportStatus == 'completed' ||
-              record.reportStatus == 'rejected')) {
-        await store.removeRestore(record.requestId);
-        _pendingRestoreIds.remove(record.requestId);
-      } else if (record.reportStatus == 'accepted') {
-        _scheduleRetry();
-      }
-      if (!_busy) {
-        _setState(switch (record.reportStatus) {
-          'completed' => MembershipCheckoutState.completed,
-          'accepted' => MembershipCheckoutState.accepted,
-          'rejected' => MembershipCheckoutState.rejected,
-          _ => MembershipCheckoutState.deferred,
-        });
-      }
+      final purchase = MembershipPurchaseRecord(
+        requestId: record.requestId,
+        ownerUid: record.ownerUid,
+        accountUuid:
+            record.purchase.obfuscatedAccountId?.trim().toLowerCase() ?? '',
+        product: product,
+        transactionId: record.purchase.transactionId,
+        originalTransactionId: record.purchase.originalTransactionId,
+        purchaseToken: record.purchase.purchaseToken,
+        state: record.paid ? 'restored' : record.purchase.status.name,
+        reportStatus: record.reportStatus,
+        reportId: record.reportId,
+        reportReason: record.reportReason,
+        finished: record.finished,
+      );
+      // Crash-safe handoff: persist the normal purchase before deleting the
+      // legacy/unresolved receipt. Preserve its request key, status and owner.
+      await _save(purchase);
+      await _removeRestore(record);
+      await _report(purchase);
     } catch (error) {
       if (!_busy) _setState(MembershipCheckoutState.deferred);
       _scheduleRetry();
-      _log('restore report deferred', error);
-    } finally {
-      if (session == _session &&
-          record.reportStatus != null &&
-          previousResult != (record.reportStatus, record.reportReason)) {
-        _catalogChanged();
-      }
+      _log('receipt migration deferred', error);
     }
-  }
-
-  (String?, String?) _restoreCatalogResult(MembershipRestoreRecord record) {
-    if (record.reportStatus != null) {
-      return (record.reportStatus, record.reportReason);
-    }
-    // A new restore operation can reconfirm an already reported transaction.
-    // Compare its result with that transaction, not the new operation's null
-    // status. Keep account and renewal boundaries intact.
-    for (final previous in _restoreRecords.values.toList().reversed) {
-      if (previous.ownerUid == record.ownerUid &&
-          previous.receiptKey == record.receiptKey &&
-          previous.purchase.transactionId == record.purchase.transactionId &&
-          previous.reportStatus != null) {
-        return (previous.reportStatus, previous.reportReason);
-      }
-    }
-    final original = _purchaseForRestore(record.purchase);
-    if (original != null &&
-        original.guest == null &&
-        original.ownerUid == record.ownerUid &&
-        original.transactionId == record.purchase.transactionId) {
-      return (original.reportStatus, original.reportReason);
-    }
-    return (null, null);
   }
 }

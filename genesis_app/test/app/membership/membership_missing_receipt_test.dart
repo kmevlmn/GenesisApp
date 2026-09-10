@@ -41,7 +41,7 @@ void main() {
           expect(h.store.records[original.requestId]!.state, 'receipt_missing');
           expect(h.store.records[original.requestId]!.guest, original.guest);
           expect(h.reports, isEmpty);
-          expect(h.restoreRequests, isEmpty);
+          expect(h.reports, isEmpty);
           expect(h.platform.finishes, 0);
         },
       );

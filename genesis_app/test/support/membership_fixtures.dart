@@ -15,6 +15,8 @@ MembershipProduct membershipProduct({
   String currency = 'USD',
   int? priceAmount,
   bool hasPrice = true,
+  String? upgradeAccountUuid,
+  String? upgradePurchaseToken,
 }) => MembershipProduct.fromJson({
   'title': title,
   'benefits': [
@@ -36,6 +38,8 @@ MembershipProduct membershipProduct({
   'purchase_block_reason': purchaseBlockReason,
   'price_currency_code': hasPrice ? currency : '',
   'price_amount': hasPrice ? priceAmount ?? (yearly ? 9999 : 999) : null,
+  if (upgradeAccountUuid != null) 'account_uuid': upgradeAccountUuid,
+  if (upgradePurchaseToken != null) 'purchase_token': upgradePurchaseToken,
 });
 
 // Mirrors the pre-existing UI only for rendering regression tests.

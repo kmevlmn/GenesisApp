@@ -9,6 +9,43 @@ class _MembershipClaimRetry {
 }
 
 extension _MembershipGuestClaim on MembershipPurchaseService {
+  Future<MembershipPurchaseRequest> _guestPurchaseRequest(
+    MembershipPurchaseRecord purchase,
+  ) async {
+    final request = purchase.request;
+    if (request.guest == null || provider != MembershipProvider.apple) {
+      return request;
+    }
+    final key = '${purchase.accountUuid}:${purchase.transactionId}';
+    var signed = _signedTransactions[key];
+    if (signed == null || signed.isEmpty) {
+      signed = await loadSignedTransaction?.call(request);
+      if (signed == null || signed.isEmpty) {
+        throw const BillingPlatformException(
+          'membership_signed_transaction_missing',
+        );
+      }
+      if (!_disposed) _signedTransactions[key] = signed;
+    }
+    return request.withSignedTransaction(signed);
+  }
+
+  MembershipPurchaseRecord? _claimPurchase(MembershipGuestClaimRecord claim) {
+    bool matches(MembershipPurchaseRecord p) =>
+        p.product.provider == provider &&
+        p.guest?.accountUuid == claim.guest.accountUuid &&
+        p.paid &&
+        p.hasReceipt;
+    final saved = _records[claim.purchaseRequestId];
+    if (saved != null && matches(saved)) return saved;
+    // Legacy claims may not yet have an associated request ID. Recover the
+    // original persisted receipt, never invent a new idempotency key.
+    for (final purchase in _records.values.toList().reversed) {
+      if (matches(purchase)) return purchase;
+    }
+    return null;
+  }
+
   void _resetGuestClaimRetries() {
     for (final retry in _claimRetries.values) {
       retry.timer?.cancel();
@@ -18,9 +55,12 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
     _claimWalletRefreshSessions.clear();
   }
 
-  void _scheduleGuestClaimRetry(String guestId, _MembershipClaimRetry retry) {
+  void _scheduleGuestClaimRetry(
+    String accountUuid,
+    _MembershipClaimRetry retry,
+  ) {
     if (_disposed ||
-        !identical(_claimRetries[guestId], retry) ||
+        !identical(_claimRetries[accountUuid], retry) ||
         retry.timer != null ||
         retry.attempts >= 6) {
       return;
@@ -39,10 +79,10 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
 
   Future<void> _saveGuestClaim(MembershipGuestClaimRecord record) async {
     // Keep an in-flight login's ownership even if persistence must be retried.
-    _guestClaims[record.guest.guestId] = record;
-    _pendingGuestClaimWrites.add(record.guest.guestId);
+    _guestClaims[record.guest.accountUuid] = record;
+    _pendingGuestClaimWrites.add(record.guest.accountUuid);
     await store.saveGuestClaim(record);
-    _pendingGuestClaimWrites.remove(record.guest.guestId);
+    _pendingGuestClaimWrites.remove(record.guest.accountUuid);
   }
 
   Future<void> _prepareGuestClaim(MembershipPurchaseRecord purchase) async {
@@ -50,8 +90,13 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
     if (_disposed || guest == null || !purchase.paid || !purchase.hasReceipt) {
       return;
     }
-    final previous = _guestClaims[guest.guestId];
-    var claim = previous ?? MembershipGuestClaimRecord(guest: guest);
+    final previous = _guestClaims[guest.accountUuid];
+    var claim =
+        previous ??
+        MembershipGuestClaimRecord(
+          guest: guest,
+          purchaseRequestId: purchase.requestId,
+        );
     if (purchase.reportStatus == 'completed' && !claim.purchaseConfirmed) {
       claim = claim.copyWith(
         purchaseRequestId: purchase.requestId,
@@ -59,7 +104,7 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
       );
     }
     if (!identical(previous, claim) ||
-        _pendingGuestClaimWrites.contains(guest.guestId)) {
+        _pendingGuestClaimWrites.contains(guest.accountUuid)) {
       await _saveGuestClaim(claim);
     }
   }
@@ -71,7 +116,7 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
     String? requestId;
     if (uid == null) {
       for (final claim in _guestClaims.values) {
-        final id = claim.purchaseRequestId ?? claim.guest.guestId;
+        final id = claim.purchaseRequestId ?? claim.guest.accountUuid;
         if (claim.requiresLogin && !_presentedAttempts.contains(id)) {
           requestId = id;
           break;
@@ -83,23 +128,23 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
 
   Future<void> _completeGuestClaim(MembershipGuestClaimRecord record) async {
     if (record.status != 'completed' || record.ownerUid == null) return;
-    final guestId = record.guest.guestId;
+    final accountUuid = record.guest.accountUuid;
     final session = _session;
-    if (_claimWalletRefreshSessions[guestId] != session &&
+    if (_claimWalletRefreshSessions[accountUuid] != session &&
         !_disposed &&
         await readLoginUid() == record.ownerUid) {
       // Refresh even when a local report or cleanup is still pending. A failed
       // wallet request retries this completed claim's cleanup, never its POST.
       await refreshWallet?.call();
       if (!_disposed && session == _session) {
-        _claimWalletRefreshSessions[guestId] = session;
+        _claimWalletRefreshSessions[accountUuid] = session;
       }
     }
     // Keep the original guest report body until every receipt has a terminal
     // report result; a completed claim can arrive before a local report retry.
     if (_records.values.any(
       (purchase) =>
-          purchase.guest?.guestId == record.guest.guestId &&
+          purchase.guest?.accountUuid == record.guest.accountUuid &&
           purchase.hasReceipt &&
           (purchase.paid || purchase.state == 'pending') &&
           purchase.reportStatus != 'completed' &&
@@ -110,24 +155,27 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
     }
     await store.completeGuestClaim(record);
     for (final purchase in _records.values.toList()) {
-      if (purchase.guest?.guestId == record.guest.guestId) {
+      if (purchase.guest?.accountUuid == record.guest.accountUuid) {
         _records[purchase.requestId] = purchase.bindGuestToAccount(
           record.ownerUid!,
         );
       }
     }
-    _guestClaims.remove(record.guest.guestId);
-    _pendingGuestClaimWrites.remove(record.guest.guestId);
-    _claimRetries.remove(guestId)?.timer?.cancel();
-    _claimWalletRefreshSessions.remove(guestId);
-    _claimReportsRequeued.remove(guestId);
+    _guestClaims.remove(record.guest.accountUuid);
+    _pendingGuestClaimWrites.remove(record.guest.accountUuid);
+    _claimRetries.remove(accountUuid)?.timer?.cancel();
+    _claimWalletRefreshSessions.remove(accountUuid);
+    _claimReportsRequeued.remove(accountUuid);
+    _signedTransactions.removeWhere(
+      (key, _) => key.startsWith('$accountUuid:'),
+    );
   }
 
   Future<void> _flushGuestClaims() async {
     for (final claim in _guestClaims.values.toList()) {
       if (_disposed) return;
       try {
-        if (_pendingGuestClaimWrites.contains(claim.guest.guestId)) {
+        if (_pendingGuestClaimWrites.contains(claim.guest.accountUuid)) {
           await _saveGuestClaim(claim);
         }
         if (claim.status == 'completed') await _completeGuestClaim(claim);
@@ -153,14 +201,23 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
       }
       final session = _session;
       final previousStatus = record.status;
-      final guestId = record.guest.guestId;
+      final accountUuid = record.guest.accountUuid;
       final retry = _claimRetries.putIfAbsent(
-        guestId,
+        accountUuid,
         _MembershipClaimRetry.new,
       );
       if (!retry.canAttempt) continue;
       var requested = false;
       try {
+        final purchase = _claimPurchase(record);
+        if (purchase == null) {
+          _scheduleRetry();
+          continue;
+        }
+        final request = await _guestPurchaseRequest(purchase);
+        if (_disposed || session != _session || await readLoginUid() != uid) {
+          return;
+        }
         record = record.copyWith(ownerUid: uid);
         // Pin the first login before sending a request. A timeout must never
         // cause this receipt to be claimed by a later, different account.
@@ -170,19 +227,19 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
         }
         retry.attempts++;
         requested = true;
-        final result = await claimGuest!(record.guest);
+        final result = await claimGuest!(request);
         record = record.copyWith(status: result.status.name);
         await _saveGuestClaim(record);
         if (result.status == MembershipReportStatus.completed) {
           await _completeGuestClaim(record);
         }
         if (result.status == MembershipReportStatus.accepted &&
-            !_claimReportsRequeued.contains(guestId)) {
+            !_claimReportsRequeued.contains(accountUuid)) {
           // The response model deliberately retains only status. Reconcile
           // known guest receipts once per session so accepted cannot strand an
           // awaiting-purchase-report claim; the original report is idempotent.
           for (final purchase in _records.values.toList()) {
-            if (purchase.guest?.guestId == record.guest.guestId &&
+            if (purchase.guest?.accountUuid == record.guest.accountUuid &&
                 purchase.paid &&
                 purchase.hasReceipt &&
                 purchase.reportStatus == 'completed') {
@@ -190,12 +247,12 @@ extension _MembershipGuestClaim on MembershipPurchaseService {
               await _save(purchase.copyWith(retryReport: true));
             }
           }
-          _claimReportsRequeued.add(guestId);
+          _claimReportsRequeued.add(accountUuid);
         }
-        if (record.needsRetry) _scheduleGuestClaimRetry(guestId, retry);
+        if (record.needsRetry) _scheduleGuestClaimRetry(accountUuid, retry);
       } catch (error) {
         if (requested && record.needsRetry) {
-          _scheduleGuestClaimRetry(guestId, retry);
+          _scheduleGuestClaimRetry(accountUuid, retry);
         } else {
           _scheduleRetry();
         }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/debug/membership_guest_login_debug_settings.dart';
 import '../../app/membership/membership_purchase_service.dart';
+import '../../routers/app_router.dart';
 import '../auth/login_guard.dart';
 
 /// Keeps paid guest purchases actionable after leaving a page or restarting.
@@ -94,7 +95,19 @@ class _MembershipGuestLoginGateState extends State<MembershipGuestLoginGate> {
                   ? membershipGuestLoginDebugSettings.listenable
                   : null,
             );
-      if (loggedIn) await service.recover();
+      if (loggedIn) {
+        if (mounted && identical(service, widget.service)) {
+          // Finish the guest checkout journey immediately after login. Claim
+          // retries belong to the app service and must outlive the purchase UI.
+          unawaited(
+            widget.navigatorKey.currentState?.pushNamedAndRemoveUntil<void>(
+              RouteNames.me,
+              (_) => false,
+            ),
+          );
+        }
+        await service.recover();
+      }
     } finally {
       _showing = false;
       if (mounted && service.guestLoginRequestId.value != null) _schedule();

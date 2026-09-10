@@ -17,6 +17,94 @@ void main() {
     HttpClientRequestProfile.profilingEnabled = previousProfilingState;
   });
 
+  test(
+    'catalog profiles retain display data but redact nested upgrade credentials',
+    () async {
+      late HttpClientRequestProfile profile;
+      final request = TransportRequest(
+        method: 'GET',
+        uri: Uri.parse(
+          'https://test.invalid/api/v1/membership/products?provider=google',
+        ),
+        headers: const {
+          'authorization': 'private-login',
+          'X-Device-ID': 'private-device',
+        },
+        bodyBytes: null,
+        timeoutMs: 1000,
+      );
+      final recorder = DevToolsHttpProfile.start(
+        request,
+        profileFactory:
+            ({
+              required requestStartTime,
+              required requestMethod,
+              required requestUri,
+            }) => profile = HttpClientRequestProfile.profile(
+              requestStartTime: requestStartTime,
+              requestMethod: requestMethod,
+              requestUri: requestUri,
+            )!,
+      )!;
+      final product = {
+        'provider': 'google',
+        'plan_code': 'pro_yearly',
+        'title': 'Server title',
+        'account_uuid': 'private-uuid',
+        'purchase_token': 'private-token',
+        'price_amount': 9999,
+        'can_purchase': true,
+        'purchase_block_reason': '',
+        'benefits': [
+          {
+            'title': 'Server benefit',
+            'code': 'test',
+            'icon_key': 'blue_gem',
+            'display_type': 'included',
+            'unexpected_credential': 'private-benefit',
+          },
+        ],
+      };
+      final body = jsonEncode({
+        'err_no': 0,
+        'err_msg': 'succ',
+        'data': {
+          'list': [product],
+        },
+      });
+      await recorder.completeRequest(request);
+      await recorder.completeResponse(
+        TransportResponse(
+          statusCode: 200,
+          headers: const {
+            'cache-control': 'no-store',
+            'set-cookie': 'private-cookie',
+          },
+          body: body,
+          bodyBytes: utf8.encode(body),
+        ),
+      );
+      final recordedBody = utf8.decode(profile.responseData.bodyBytes);
+      final recorded = jsonDecode(recordedBody)['data']['list'][0];
+      expect(recorded['title'], 'Server title');
+      expect(recorded['price_amount'], 9999);
+      expect(recorded['can_purchase'], isTrue);
+      expect(recorded['benefits'][0]['title'], 'Server benefit');
+      expect(recorded['account_uuid'], '[REDACTED]');
+      expect(recorded['purchase_token'], '[REDACTED]');
+      expect(recordedBody, isNot(contains('private-')));
+      expect(
+        profile.requestData.headers.toString(),
+        isNot(contains('private-')),
+      );
+      expect(
+        profile.responseData.headers.toString(),
+        isNot(contains('private-')),
+      );
+      expect(product['purchase_token'], 'private-token');
+    },
+  );
+
   test('enables native HTTP profiling before bootstrap requests', () {
     HttpClientRequestProfile.profilingEnabled = false;
 

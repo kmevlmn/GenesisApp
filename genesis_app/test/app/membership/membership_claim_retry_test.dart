@@ -43,7 +43,13 @@ void main() {
         h.service.didChangeAppLifecycleState(AppLifecycleState.resumed);
         await h.service.recover();
         expect(h.claimRequests, hasLength(6));
-        expect(h.store.claims.values.single.guest.claimToken, guest.claimToken);
+        for (final request in h.claimRequests) {
+          expect(request.toJson(), h.reports.first.toJson());
+        }
+        expect(
+          h.store.claims.values.single.guest.accountUuid,
+          guest.accountUuid,
+        );
         expect(h.store.claims.values.single.ownerUid, 'first-login');
         expect(h.platform.launches, 1);
         expect(h.refreshes, 0);

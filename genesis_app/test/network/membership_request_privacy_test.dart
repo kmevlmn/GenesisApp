@@ -26,14 +26,15 @@ void main() {
       final controller = NetworkCaptureController(available: true);
       await controller.setEnabled(true);
       for (final path in [
+        'membership/products',
         'membership/guest/prepare',
         'membership/guest/purchase/report',
+        'membership/guest/purchase/check',
         'membership/purchase/report',
-        'membership/restore',
         'membership/claim',
       ]) {
         final request = TransportRequest(
-          method: 'POST',
+          method: path.endsWith('/products') ? 'GET' : 'POST',
           uri: Uri.parse('https://test.invalid/api/v1/$path'),
           headers: {},
           bodyBytes: utf8.encode('{invalid sensitive body'),
@@ -55,7 +56,10 @@ void main() {
               },
         );
         expect(profile, isNull);
-        expect(profileCreated, path.endsWith('/purchase/report'));
+        expect(
+          profileCreated,
+          path.endsWith('/purchase/report') || path.endsWith('/products'),
+        );
         final private = _PrivateTransport();
         final transport = PlatformHttp3Transport(
           client: MockClient(

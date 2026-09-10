@@ -1,36 +1,19 @@
 import 'membership_order_product.dart';
 
 class MembershipGuestIdentity {
-  const MembershipGuestIdentity({
-    required this.guestId,
-    required this.accountUuid,
-    required this.claimToken,
-  });
+  const MembershipGuestIdentity({required this.accountUuid});
 
   factory MembershipGuestIdentity.fromJson(Map<String, dynamic> json) {
-    final guestId = _requiredString(json, 'guest_id');
     final uuid = _requiredString(json, 'account_uuid');
-    final token = _requiredString(json, 'claim_token');
-    if (!RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(token) ||
-        !isMembershipAccountUuid(uuid)) {
+    if (!isMembershipAccountUuid(uuid)) {
       throw const FormatException('Invalid membership guest identity');
     }
-    return MembershipGuestIdentity(
-      guestId: guestId,
-      accountUuid: uuid,
-      claimToken: token,
-    );
+    return MembershipGuestIdentity(accountUuid: uuid.toLowerCase());
   }
 
-  final String guestId;
   final String accountUuid;
-  final String claimToken;
 
-  Map<String, Object?> toJson() => {
-    'guest_id': guestId,
-    'account_uuid': accountUuid,
-    'claim_token': claimToken,
-  };
+  Map<String, Object?> toJson() => {'account_uuid': accountUuid};
 }
 
 bool isMembershipAccountUuid(String value) => RegExp(
@@ -43,6 +26,7 @@ class MembershipPurchaseRequest {
     required this.requestId,
     this.transactionId = '',
     this.purchaseToken = '',
+    this.signedTransaction = '',
     this.guest,
   });
 
@@ -50,7 +34,20 @@ class MembershipPurchaseRequest {
   final String requestId;
   final String transactionId;
   final String purchaseToken;
+
+  /// Apple JWS is obtained from StoreKit and never serialized to local storage.
+  final String signedTransaction;
   final MembershipGuestIdentity? guest;
+
+  MembershipPurchaseRequest withSignedTransaction(String value) =>
+      MembershipPurchaseRequest(
+        product: product,
+        requestId: requestId,
+        transactionId: transactionId,
+        purchaseToken: purchaseToken,
+        signedTransaction: value,
+        guest: guest,
+      );
 
   Map<String, Object?> toJson() {
     final google = product.provider == MembershipProvider.google;
@@ -59,6 +56,11 @@ class MembershipPurchaseRequest {
         (google ? purchaseToken.isEmpty : transactionId.isEmpty)) {
       throw const FormatException('Incomplete membership purchase');
     }
+    if (guest != null &&
+        (!isMembershipAccountUuid(guest!.accountUuid) ||
+            !google && signedTransaction.isEmpty)) {
+      throw const FormatException('Incomplete guest membership purchase proof');
+    }
     return {
       'provider': product.provider.name,
       'plan_code': product.planCode,
@@ -66,8 +68,8 @@ class MembershipPurchaseRequest {
       'request_id': requestId,
       if (google) 'purchase_token': purchaseToken,
       if (!google) 'transaction_id': transactionId,
-      if (guest != null) 'guest_id': guest!.guestId,
-      if (guest != null) 'claim_token': guest!.claimToken,
+      if (guest != null) 'account_uuid': guest!.accountUuid,
+      if (guest != null && !google) 'signed_transaction': signedTransaction,
     };
   }
 }

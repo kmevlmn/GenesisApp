@@ -101,6 +101,7 @@ void main() {
     'accepted',
     'rejected',
     'failed',
+    'query failure',
     'deferred',
     'storage failure',
     'stream failure',
@@ -110,6 +111,12 @@ void main() {
       (tester) async {
         final h = service.Harness();
         if (outcome == 'failed') h.platform.launchResult = false;
+        if (outcome == 'query failure') {
+          h.platform.onPrepare = () async =>
+              throw const BillingPlatformException(
+                'membership_product_not_found',
+              );
+        }
         if (outcome == 'deferred') {
           h.reportHandler = (_) async => throw StateError('offline');
         }
@@ -126,7 +133,7 @@ void main() {
         if (outcome == 'storage failure') h.store.fail = true;
         if (outcome == 'stream failure') {
           h.service.handleStreamError();
-        } else if (outcome != 'failed') {
+        } else if (outcome != 'failed' && outcome != 'query failure') {
           await h.service.interceptPurchase(
             h.purchase(
               yearly: true,
@@ -151,7 +158,24 @@ void main() {
             'VIP purchase confirmation is delayed. Please check again later.',
           _ => 'VIP purchase failed.',
         };
-        expect(find.text(message), findsOneWidget);
+        final toast = find.textContaining('\n$message');
+        expect(toast, findsOneWidget);
+        final firstLine = tester.widget<Text>(toast).data!.split('\n').first;
+        expect(firstLine, startsWith('debug：vip.'));
+        final detail = switch (outcome) {
+          'cancelled' => 'store_callback; status=canceled',
+          'pending' => 'store_callback; status=pending',
+          'accepted' => 'report; status=accepted',
+          'rejected' => 'report; status=rejected; reason=invalid_receipt',
+          'failed' => 'membership_launch_rejected',
+          'query failure' => 'code=membership_product_not_found',
+          'deferred' => 'report; StateError; offline',
+          'storage failure' =>
+            'handle_callback; StateError; storage unavailable',
+          'stream failure' => 'store_stream; reason=stream_error',
+          _ => throw StateError('Unhandled outcome'),
+        };
+        expect(firstLine, contains(detail));
         await tester.pump(const Duration(seconds: 3));
         h.service.dispose();
       },

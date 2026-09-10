@@ -20,10 +20,26 @@ void main() {
       final api = GenesisApi(useMock: true);
       await expectLater(
         api.v1.membership.claimGuest(
-          const MembershipGuestIdentity(
-            guestId: 'test-guest',
-            accountUuid: '4b74ec68-7abc-4cce-a223-e997e31dc811',
-            claimToken: '1234567890123456789012345678901234567890123',
+          const MembershipPurchaseRequest(
+            product: MembershipProduct(
+              title: 'Test',
+              benefits: [],
+              planCode: 'pro_monthly',
+              provider: MembershipProvider.google,
+              storeProductId: 'test-pro',
+              basePlanId: 'test-month',
+              billingMonths: 1,
+              monthlyGemsCent: 100,
+              priceCurrencyCode: 'USD',
+              priceAmount: 999,
+              canPurchase: true,
+              purchaseBlockReason: '',
+            ),
+            requestId: 'test-claim',
+            purchaseToken: 'test-proof',
+            guest: MembershipGuestIdentity(
+              accountUuid: '4b74ec68-7abc-4cce-a223-e997e31dc811',
+            ),
           ),
         ),
         throwsA(isA<ApiException>().having((e) => e.code, 'code', 5000)),
@@ -54,16 +70,6 @@ void main() {
           MembershipPurchaseRequest(
             product: product,
             requestId: 'test-request',
-            purchaseToken: 'test-token',
-          ),
-        ),
-        throwsA(isA<ApiException>().having((e) => e.code, 'code', 5000)),
-      );
-      await expectLater(
-        api.v1.membership.restorePurchase(
-          MembershipPurchaseRequest(
-            product: product,
-            requestId: 'test-restore-request',
             purchaseToken: 'test-token',
           ),
         ),

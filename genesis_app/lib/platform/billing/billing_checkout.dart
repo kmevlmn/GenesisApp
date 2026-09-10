@@ -56,6 +56,7 @@ extension _GooglePlayBillingCheckout on GooglePlayBillingService {
         attempt.product.productId,
         attempt.id,
         'Payment service is unavailable.',
+        debugInfo: purchaseDebugInfo('gems.store_stream', error: error),
       );
     }
   }

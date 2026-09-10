@@ -22,6 +22,63 @@ void main() {
     'purchase_block_reason': '',
   };
   test(
+    'upgrade credentials are optional, platform specific and never serialized',
+    () {
+      const uuid = '8b74ec68-7abc-4cce-a223-e997e31dc811';
+      final yearly = {
+        ...product,
+        'plan_code': 'pro_yearly',
+        'billing_months': 12,
+      };
+      final google = {
+        ...yearly,
+        'provider': 'google',
+        'base_plan_id': 'yearly',
+      };
+      final appleUpgrade = MembershipProduct.fromJson({
+        ...yearly,
+        'account_uuid': uuid,
+      });
+      final googleUpgrade = MembershipProduct.fromJson({
+        ...google,
+        'account_uuid': uuid.toUpperCase(),
+        'purchase_token': 'old-token',
+      });
+      expect(appleUpgrade.upgradeAccountUuid, uuid);
+      expect(appleUpgrade.upgradePurchaseToken, isNull);
+      expect(googleUpgrade.upgradeAccountUuid, uuid);
+      expect(googleUpgrade.upgradePurchaseToken, 'old-token');
+      for (final parsed in [appleUpgrade, googleUpgrade]) {
+        expect(parsed.toJson(), isNot(contains('account_uuid')));
+        expect(parsed.toJson(), isNot(contains('purchase_token')));
+        expect(parsed.toOrderJson(), isNot(contains('account_uuid')));
+        expect(parsed.toOrderJson(), isNot(contains('purchase_token')));
+      }
+      expect(MembershipProduct.fromJson(google).upgradeAccountUuid, isNull);
+      for (final invalid in [
+        {...google, 'account_uuid': uuid},
+        {...google, 'purchase_token': 'old-token'},
+        {...google, 'account_uuid': uuid, 'purchase_token': ''},
+        {...google, 'account_uuid': uuid, 'purchase_token': null},
+        {...google, 'account_uuid': null, 'purchase_token': 'old-token'},
+        {...yearly, 'account_uuid': 'invalid'},
+        {...yearly, 'account_uuid': uuid, 'purchase_token': 'old-token'},
+        {...product, 'account_uuid': uuid},
+        {...yearly, 'account_uuid': uuid, 'can_purchase': false},
+        {
+          ...yearly,
+          'account_uuid': uuid,
+          'purchase_block_reason': 'sale_disabled',
+        },
+      ]) {
+        expect(
+          () => MembershipProduct.fromJson(invalid),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+  test(
     'Google catalog still requires and preserves the checkout base plan',
     () {
       final google = {

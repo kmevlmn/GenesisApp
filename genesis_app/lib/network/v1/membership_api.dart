@@ -2,6 +2,7 @@ import '../models/membership_product.dart';
 import '../models/membership_purchase.dart';
 import '../models/membership_claim.dart';
 import '../models/membership_manual_set.dart';
+import '../models/membership_guest_purchase_check.dart';
 import '../api_client.dart';
 import '../json_utils.dart';
 import 'v1_api_resource.dart';
@@ -40,15 +41,17 @@ class MembershipV1Api extends V1ApiResource {
     required MembershipProvider provider,
     String? deviceId,
   }) async {
+    final response = await client.get<Object?>(
+      'v1/membership/products',
+      query: v1Query({'provider': provider.name}),
+      headers: {
+        if (deviceId != null) 'X-Device-ID': deviceId,
+        'Cache-Control': 'no-store',
+      },
+      tracePolicy: ApiRequestTracePolicy.excluded,
+    );
     return MembershipProductList.fromJson(
-      await getMapWithHeaders(
-        'membership/products',
-        query: v1Query({'provider': provider.name}),
-        headers: {
-          if (deviceId != null) 'X-Device-ID': deviceId,
-          'Cache-Control': 'no-cache',
-        },
-      ),
+      asJsonMap(handleV1ResponseErrNo(response)),
     );
   }
 
@@ -77,35 +80,44 @@ class MembershipV1Api extends V1ApiResource {
     );
   }
 
-  Future<MembershipPurchaseReport> restorePurchase(
-    MembershipPurchaseRequest request,
-  ) async {
-    if (request.guest != null) {
-      throw const FormatException('Membership restore requires a login');
+  /// Read-only ownership check. A true result does not mean VIP is active.
+  Future<MembershipGuestPurchaseCheck> checkGuestPurchase({
+    required String accountUuid,
+  }) async {
+    if (!isMembershipAccountUuid(accountUuid)) {
+      throw const FormatException('Invalid membership guest account UUID');
     }
-    return MembershipPurchaseReport.fromJson(
-      await _postPrivate('membership/restore', request.toJson()),
+    return MembershipGuestPurchaseCheck.fromJson(
+      await _postPrivate(
+        'membership/guest/purchase/check',
+        {'account_uuid': accountUuid.toLowerCase()},
+        headers: const {'Cache-Control': 'no-store'},
+      ),
     );
   }
 
   Future<MembershipClaimResult> claimGuest(
-    MembershipGuestIdentity guest,
+    MembershipPurchaseRequest request,
   ) async {
+    if (request.guest == null) {
+      throw const FormatException(
+        'Membership claim requires guest purchase proof',
+      );
+    }
     return MembershipClaimResult.fromJson(
-      await _postPrivate('membership/claim', {
-        'guest_id': guest.guestId,
-        'claim_token': guest.claimToken,
-      }),
+      await _postPrivate('membership/claim', request.toJson()),
     );
   }
 
   Future<Map<String, dynamic>> _postPrivate(
     String path,
-    Map<String, Object?> body,
-  ) async {
+    Map<String, Object?> body, {
+    Map<String, String>? headers,
+  }) async {
     final response = await client.post<Object?>(
       'v1/$path',
       body: body,
+      headers: headers,
       tracePolicy: ApiRequestTracePolicy.excluded,
     );
     // A receipt is acknowledged only by a valid business envelope and status.

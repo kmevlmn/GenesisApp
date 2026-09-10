@@ -10,7 +10,8 @@ extension _MembershipReceiptReconciliation on MembershipPurchaseService {
         !_disposed && session == _session && (canContinue?.call() ?? true);
     bool belongs(MembershipPurchaseRecord record) => record.guest == null
         ? record.ownerUid == uid
-        : uid == null || _guestClaims[record.guest!.guestId]?.ownerUid == uid;
+        : uid == null ||
+              _guestClaims[record.guest!.accountUuid]?.ownerUid == uid;
     final missing = _records.values
         .where(
           (r) =>
@@ -39,6 +40,7 @@ extension _MembershipReceiptReconciliation on MembershipPurchaseService {
                 (p) =>
                     p.provider.apiValue == provider.name &&
                     p.productId == record!.product.storeProductId &&
+                    !record.replacesPurchaseToken(p.purchaseToken) &&
                     (p.status == BillingPurchaseStatus.purchased ||
                         p.status == BillingPurchaseStatus.restored ||
                         p.status == BillingPurchaseStatus.pending) &&

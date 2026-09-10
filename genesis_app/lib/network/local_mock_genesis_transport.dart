@@ -835,11 +835,11 @@ class LocalMockGenesisTransport implements HttpTransport {
 
     if (method == 'POST' &&
         (path == 'membership/purchase/report' ||
-            path == 'membership/restore' ||
             path == 'membership/guest/prepare' ||
             path == 'membership/guest/purchase/report' ||
+            path == 'membership/guest/purchase/check' ||
             path == 'membership/claim')) {
-      // Local mock cannot prepare store identities or verify real receipts.
+      // Mock cannot verify receipts or determine actual guest ownership.
       return _ok(<String, dynamic>{
         'err_no': 5000,
         'err_msg': 'membership store unavailable in mock',

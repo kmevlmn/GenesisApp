@@ -108,14 +108,14 @@ void main() {
 
         await tester.pumpWidget(page(load, service: h.service));
         await tester.pumpAndSettle();
-        expect(h.restoreRequests, hasLength(1));
+        expect(h.reports, hasLength(1));
         expect(loads, 1);
         expectOriginalContent(tester);
 
         // Re-checking the same receipt must not invalidate the displayed catalog.
         await h.service.restorePurchases();
         await tester.pumpAndSettle();
-        expect(h.restoreRequests, hasLength(2));
+        expect(h.reports, hasLength(1));
         expect(loads, 1);
         await tester.pumpWidget(const SizedBox.shrink());
         h.service.dispose();
@@ -133,7 +133,7 @@ void main() {
       h.recoverable = [
         h.purchase(yearly: true, status: BillingPurchaseStatus.pending),
       ];
-      h.restoreHandler = (_) async => const MembershipPurchaseReport(
+      h.reportHandler = (_) async => const MembershipPurchaseReport(
         status: MembershipReportStatus.accepted,
         reportId: 'accepted',
       );
@@ -151,11 +151,11 @@ void main() {
       expect(loads, 1);
       // One initial restore plus one retry during entry, not another immediate
       // report of the same receipt returned by the store query.
-      expect(h.restoreRequests, hasLength(2));
-      expect(h.store.restores.values.single.reportStatus, 'accepted');
+      expect(h.reports, hasLength(2));
+      expect(h.store.records.values.single.reportStatus, 'accepted');
 
       // A later real transition must still update purchase eligibility.
-      h.restoreHandler = null;
+      h.reportHandler = null;
       await h.service.recover();
       await tester.pumpAndSettle();
       expect(loads, 2);
@@ -280,7 +280,9 @@ void main() {
       await tester.tap(find.byKey(buttonKey));
       await tester.pump(const Duration(milliseconds: 300));
       expect(
-        find.text('debug:already_subscribed\nYou already have this VIP plan.'),
+        find.text(
+          'debug：vip.eligibility; reason=already_subscribed\nYou already have this VIP plan.',
+        ),
         findsOneWidget,
       );
       expect(purchases, 0);
@@ -293,7 +295,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(
         find.text(
-          'debug:downgrade_not_allowed\n'
+          'debug：vip.eligibility; reason=downgrade_not_allowed\n'
           'An active yearly VIP plan cannot be changed to monthly.',
         ),
         findsOneWidget,

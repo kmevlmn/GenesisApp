@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:in_app_purchase_storekit/store_kit_2_wrappers.dart';
 import 'package:genesis_flutter_android/network/models/membership_product.dart';
@@ -46,6 +47,145 @@ class _Store extends Fake implements InAppPurchase {
 }
 
 void main() {
+  const originalUuid = '8b74ec68-7abc-4cce-a223-e997e31dc811';
+  PurchaseWrapper previousPurchase({
+    String token = 'old-month-token',
+    String? uuid = originalUuid,
+    String productId = 'test_pro',
+    bool acknowledged = true,
+    PurchaseStateWrapper state = PurchaseStateWrapper.purchased,
+    PendingPurchaseUpdateWrapper? pendingUpdate,
+  }) => PurchaseWrapper(
+    orderId: 'old-order',
+    packageName: 'test.app',
+    purchaseTime: 1000,
+    purchaseToken: token,
+    signature: 'test-signature',
+    products: [productId],
+    isAutoRenewing: true,
+    originalJson: '{}',
+    isAcknowledged: acknowledged,
+    purchaseState: state,
+    obfuscatedAccountId: uuid,
+    pendingPurchaseUpdate: pendingUpdate,
+  );
+  PurchasesResultWrapper queryResult(
+    List<PurchaseWrapper> purchases, {
+    BillingResponse response = BillingResponse.ok,
+  }) => PurchasesResultWrapper(
+    responseCode: response,
+    billingResult: BillingResultWrapper(responseCode: response),
+    purchasesList: purchases,
+  );
+  MembershipProduct upgrade() => membershipProduct(
+    yearly: true,
+    upgradeAccountUuid: originalUuid,
+    upgradePurchaseToken: 'old-month-token',
+  );
+
+  test(
+    'Google upgrade replaces exactly the server token with the original UUID',
+    () async {
+      final store = _Store(
+        google.details([google.offer(), google.offer(yearly: true)]),
+      );
+      var queries = 0;
+      final checkout = StoreMembershipCheckoutPlatform(
+        store: store,
+        googleQuery: () async {
+          queries++;
+          return queryResult([
+            previousPurchase(token: 'other-token'),
+            previousPurchase(uuid: originalUuid.toUpperCase()),
+          ]);
+        },
+      );
+      final native = await checkout.prepare(upgrade());
+      var handoff = false;
+      await checkout.launch(
+        native,
+        originalUuid,
+        onStoreHandoff: () => handoff = true,
+      );
+      final param = store.param! as GooglePlayPurchaseParam;
+      expect(queries, 1);
+      expect(param.offerToken, 'test-token-annual-base');
+      expect(param.applicationUserName, originalUuid);
+      expect(
+        param.changeSubscriptionParam!.replacementMode,
+        ReplacementMode.chargeFullPrice,
+      );
+      expect(
+        param
+            .changeSubscriptionParam!
+            .oldPurchaseDetails
+            .verificationData
+            .serverVerificationData,
+        'old-month-token',
+      );
+      expect(
+        param.changeSubscriptionParam!.oldPurchaseDetails.purchaseID,
+        'old-order',
+      );
+      expect(handoff, isTrue);
+    },
+  );
+
+  test(
+    'Google upgrade refuses wrong, missing, unacknowledged or pending store orders',
+    () async {
+      for (final result in [
+        queryResult([]),
+        queryResult([previousPurchase(token: 'wrong-token')]),
+        queryResult([previousPurchase(), previousPurchase()]),
+        queryResult([previousPurchase(uuid: null)]),
+        queryResult([
+          previousPurchase(uuid: '4b74ec68-7abc-4cce-a223-e997e31dc811'),
+        ]),
+        queryResult([previousPurchase(productId: 'gems')]),
+        queryResult([previousPurchase(acknowledged: false)]),
+        queryResult([previousPurchase(state: PurchaseStateWrapper.pending)]),
+        queryResult([
+          previousPurchase(
+            pendingUpdate: const PendingPurchaseUpdateWrapper(
+              purchaseToken: 'pending-token',
+              products: ['test_pro'],
+            ),
+          ),
+        ]),
+        queryResult([previousPurchase()], response: BillingResponse.error),
+      ]) {
+        final store = _Store(google.details([google.offer(yearly: true)]));
+        final checkout = StoreMembershipCheckoutPlatform(
+          store: store,
+          googleQuery: () async => result,
+        );
+        await expectLater(
+          checkout.prepare(upgrade()),
+          throwsA(isA<BillingPlatformException>()),
+        );
+        expect(store.param, isNull);
+      }
+    },
+  );
+
+  test(
+    'Google cannot substitute the login UUID after preparing an upgrade',
+    () async {
+      final store = _Store(google.details([google.offer(yearly: true)]));
+      final checkout = StoreMembershipCheckoutPlatform(
+        store: store,
+        googleQuery: () async => queryResult([previousPurchase()]),
+      );
+      final native = await checkout.prepare(upgrade());
+      await expectLater(
+        checkout.launch(native, '4b74ec68-7abc-4cce-a223-e997e31dc811'),
+        throwsA(isA<BillingPlatformException>()),
+      );
+      expect(store.param, isNull);
+    },
+  );
+
   test(
     'Google launches exact base plan and offer token through subscription purchase',
     () async {
@@ -80,6 +220,7 @@ void main() {
       expect(param.offerToken, 'test-token-annual-test-offer');
       expect(param.applicationUserName, '4b74ec68-7abc-4cce-a223-e997e31dc811');
       expect(param.productDetails, same(native));
+      expect(param.changeSubscriptionParam, isNull);
     },
   );
   test(

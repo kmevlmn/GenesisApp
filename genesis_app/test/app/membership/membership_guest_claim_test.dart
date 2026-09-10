@@ -13,6 +13,67 @@ import 'membership_purchase_service_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'Apple guest claim after restart reloads signed proof for the original transaction',
+    () async {
+      final h = Harness(provider: MembershipProvider.apple, claimEnabled: true)
+        ..uid = null;
+      await h.service.purchase(h.product());
+      await h.service.interceptPurchase(h.purchase());
+      final report = h.reports.single;
+      expect(report.toJson()['signed_transaction'], 'test.header.signature');
+      expect(h.signedTransactionQueries, 0);
+      expect(
+        h.store.confirmed.values.single.toJson(),
+        isNot(contains('signed_transaction')),
+      );
+      final restarted = Harness(
+        provider: MembershipProvider.apple,
+        claimEnabled: true,
+        storage: h.store,
+      )..uid = 'first-login';
+      restarted.signedTransactionHandler = (request) async {
+        expect(request.requestId, report.requestId);
+        expect(request.transactionId, report.transactionId);
+        expect(request.guest!.accountUuid, guest.accountUuid);
+        return 'new.header.signature';
+      };
+      await restarted.service.recover();
+      expect(restarted.signedTransactionQueries, 1);
+      expect(restarted.claimRequests.single.toJson(), {
+        ...report.toJson(),
+        'signed_transaction': 'new.header.signature',
+      });
+      expect(restarted.refreshes, 1);
+      expect(restarted.store.claims, isEmpty);
+    },
+  );
+
+  test(
+    'missing Apple signed proof preserves guest cache and never sends UUID-only claim',
+    () async {
+      final h = Harness(provider: MembershipProvider.apple, claimEnabled: true)
+        ..uid = null;
+      await h.service.purchase(h.product());
+      await h.service.interceptPurchase(h.purchase());
+      final restarted = Harness(
+        provider: MembershipProvider.apple,
+        claimEnabled: true,
+        storage: h.store,
+      )..uid = 'first-login';
+      restarted.signedTransactionHandler = (_) async => '';
+      await restarted.service.recover();
+      expect(restarted.claimRequests, isEmpty);
+      expect(restarted.store.claims, hasLength(1));
+      expect(restarted.store.confirmed, hasLength(1));
+      restarted.signedTransactionHandler = (_) async =>
+          'fresh.header.signature';
+      await restarted.service.recover();
+      expect(restarted.claimRequests, hasLength(1));
+      expect(restarted.store.claims, isEmpty);
+    },
+  );
+
   for (final provider in MembershipProvider.values) {
     test(
       '$provider bound receipt still deduplicates callbacks and supports restore',
@@ -34,12 +95,10 @@ void main() {
         expect(h.claimRequests, hasLength(1));
         h.recoverable = [purchase];
         await h.service.restorePurchases(products: [h.product()]);
-        final restored = h.restoreRequests.single;
-        expect(restored.guest, isNull);
-        expect(restored.requestId, isNot(originalRequestId));
-        expect(restored.product.planCode, h.product().planCode);
-        expect(restored.purchaseToken, purchase.purchaseToken);
-        expect(restored.transactionId, purchase.transactionId);
+        expect(h.reports, hasLength(1));
+        expect(h.reports.single.requestId, originalRequestId);
+        expect(h.store.records, isEmpty);
+        expect(h.store.restores, isEmpty);
         expect(h.store.claims, isEmpty);
         expect(h.service.guestLoginRequestId.value, isNull);
       },
@@ -47,7 +106,7 @@ void main() {
   }
 
   test(
-    'a standalone paid guest cache survives startup and binds on login',
+    'a UUID-only paid guest cache requires login but cannot claim without proof',
     () async {
       final storage = PendingStore();
       await storage.saveGuestClaim(
@@ -64,13 +123,13 @@ void main() {
       h.uid = 'first-login';
       h.service.resetForSession();
       await h.service.recover();
-      expect(h.claimRequests.single.claimToken, guest.claimToken);
-      expect(storage.claims, isEmpty);
+      expect(h.claimRequests, isEmpty);
+      expect(storage.claims, hasLength(1));
       expect(h.service.guestLoginRequestId.value, isNull);
       final restarted = Harness(storage: storage, claimEnabled: true)
         ..uid = null;
       await restarted.service.start();
-      expect(restarted.service.guestLoginRequestId.value, isNull);
+      expect(restarted.service.guestLoginRequestId.value, 'paid-order');
       expect(restarted.claimRequests, isEmpty);
     },
   );
@@ -107,7 +166,7 @@ void main() {
       final recovery = h.service.start();
       await entered.future;
       expect(h.service.guestLoginRequestId.value, 'paid-order');
-      expect(storage.claims.values.single.guest.claimToken, guest.claimToken);
+      expect(storage.claims.values.single.guest.accountUuid, guest.accountUuid);
       response.complete(completed);
       await recovery;
     },
@@ -171,7 +230,10 @@ void main() {
       h.uid = 'first-login';
       await h.service.recover();
       expect(h.store.claims.values.single.status, 'completed');
-      expect(h.store.records.values.single.guest?.claimToken, guest.claimToken);
+      expect(
+        h.store.records.values.single.guest?.accountUuid,
+        guest.accountUuid,
+      );
       h.reportHandler = null;
       await h.service.recover();
       expect(h.reports.last.toJson(), originalRequest);
@@ -193,7 +255,7 @@ void main() {
           MembershipClaimResult(status: MembershipReportStatus.rejected);
       await h.service.recover();
       expect(h.store.claims.values.single.status, 'rejected');
-      expect(h.store.claims.values.single.guest.claimToken, guest.claimToken);
+      expect(h.store.claims.values.single.guest.accountUuid, guest.accountUuid);
       h.uid = 'other-login';
       await h.service.recover();
       expect(h.claimRequests, hasLength(1));
@@ -219,7 +281,7 @@ void main() {
       final requestId = h.store.confirmed.keys.single;
       expect(h.service.guestLoginRequestId.value, requestId);
       expect(h.service.hasAcknowledgedGuestPurchase(requestId), isFalse);
-      expect(h.store.claims.values.single.guest.claimToken, guest.claimToken);
+      expect(h.store.claims.values.single.guest.accountUuid, guest.accountUuid);
       expect(h.store.records, isEmpty);
       await h.service.confirmGuestPurchase(requestId);
       expect(h.service.hasAcknowledgedGuestPurchase(requestId), isTrue);
@@ -234,7 +296,7 @@ void main() {
     final h = Harness(claimEnabled: true)..uid = null;
     await h.service.purchase(h.product());
     expect(h.platform.uuid, guest.accountUuid);
-    expect(h.store.records.values.single.guest?.claimToken, guest.claimToken);
+    expect(h.store.records.values.single.guest?.accountUuid, guest.accountUuid);
     await h.service.interceptPurchase(h.purchase());
     expect(h.claimRequests, isEmpty);
     expect(h.refreshes, 0);
@@ -246,7 +308,7 @@ void main() {
     expect(h.store.claims.values.single.loginRequired, isTrue);
     h.uid = 'first-login';
     await h.service.recover();
-    expect(h.claimRequests.single.guestId, guest.guestId);
+    expect(h.claimRequests.single.guest!.accountUuid, guest.accountUuid);
     expect(h.store.claims, isEmpty);
     expect(h.store.confirmed.values.single.ownerUid, 'first-login');
     expect(h.store.confirmed.values.single.guest, isNull);
@@ -274,7 +336,10 @@ void main() {
       expect(restarted.claimRequests, isEmpty);
       restarted.uid = 'first-login';
       await restarted.service.recover();
-      expect(restarted.claimRequests.single.claimToken, guest.claimToken);
+      expect(
+        restarted.claimRequests.single.guest!.accountUuid,
+        guest.accountUuid,
+      );
       expect(restarted.store.claims, isEmpty);
     },
   );

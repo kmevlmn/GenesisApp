@@ -10,6 +10,7 @@ import '../../network/models/gem_purchase_report.dart';
 import 'billing_analytics.dart';
 import 'billing_contract.dart';
 import 'billing_models.dart';
+import 'purchase_toast_diagnostics.dart';
 import 'google_play_billing_platform.dart';
 import 'pending_purchase_store.dart';
 
@@ -136,6 +137,12 @@ class GooglePlayBillingService implements BillingService {
         product.productId,
         attemptId,
         'This product is unavailable.',
+        debugInfo: purchaseDebugInfo(
+          'gems.precheck',
+          reason: !product.canPurchase
+              ? 'product_not_purchasable'
+              : 'store_product_id_missing',
+        ),
       );
       return;
     }
@@ -146,6 +153,10 @@ class GooglePlayBillingService implements BillingService {
         product.productId,
         attemptId,
         'This product type is not supported.',
+        debugInfo: purchaseDebugInfo(
+          'gems.precheck',
+          reason: 'unsupported_product_type',
+        ),
       );
       return;
     }
@@ -179,7 +190,14 @@ class GooglePlayBillingService implements BillingService {
       }
       _setBusy(activeProduct.productId, false);
       if (launchRequested) {
-        _emitDeferred(activeProduct.productId, attemptId);
+        _emitDeferred(
+          activeProduct.productId,
+          attemptId,
+          debugInfo: purchaseDebugInfo(
+            'gems.launch_store',
+            reason: 'prepare_timeout',
+          ),
+        );
       } else {
         _emitUiEvent(
           BillingUiEvent(
@@ -187,6 +205,10 @@ class GooglePlayBillingService implements BillingService {
             productId: activeProduct.productId,
             attemptId: attemptId,
             message: 'Purchase timed out. Please try again.',
+            debugInfo: purchaseDebugInfo(
+              'gems.prepare',
+              reason: 'prepare_timeout',
+            ),
           ),
         );
       }
@@ -235,6 +257,10 @@ class GooglePlayBillingService implements BillingService {
               product.productId,
               attemptId,
               _storeUnavailableMessage(),
+              debugInfo: purchaseDebugInfo(
+                'gems.precheck',
+                reason: 'store_unavailable',
+              ),
             );
             return;
           }
@@ -243,16 +269,32 @@ class GooglePlayBillingService implements BillingService {
         late final String billingAccountId;
         try {
           billingAccountId = await _resolveBillingAccountId();
-        } catch (_) {
+        } catch (error) {
           if (!canContinue()) return;
           _trackPrecheckFailure(product, attemptId, 'uuid_unavailable');
-          _emitFailure(product.productId, attemptId, 'Purchase failed.');
+          _emitFailure(
+            product.productId,
+            attemptId,
+            'Purchase failed.',
+            debugInfo: purchaseDebugInfo(
+              'gems.load_account_uuid',
+              error: error,
+            ),
+          );
           return;
         }
         if (!canContinue()) return;
         if (billingAccountId.isEmpty) {
           _trackPrecheckFailure(product, attemptId, 'uuid_unavailable');
-          _emitFailure(product.productId, attemptId, 'Purchase failed.');
+          _emitFailure(
+            product.productId,
+            attemptId,
+            'Purchase failed.',
+            debugInfo: purchaseDebugInfo(
+              'gems.load_account_uuid',
+              reason: 'uuid_unavailable',
+            ),
+          );
           return;
         }
         var attempt = BillingPurchaseAttempt(
@@ -313,6 +355,10 @@ class GooglePlayBillingService implements BillingService {
             activeProduct.productId,
             attemptId,
             _purchaseFailureMessage(error),
+            debugInfo: purchaseDebugInfo(
+              'gems.query_store_product',
+              error: error,
+            ),
           );
           _trackFlowResult(
             activeProduct,
@@ -331,6 +377,10 @@ class GooglePlayBillingService implements BillingService {
             activeProduct.productId,
             attemptId,
             _productQueryFailureMessage(queryResult.errorCode),
+            debugInfo: purchaseDebugInfo(
+              'gems.query_store_product',
+              errorCode: errorCode,
+            ),
           );
           _trackFlowResult(
             activeProduct,
@@ -358,6 +408,10 @@ class GooglePlayBillingService implements BillingService {
               activeProduct.productId,
               attemptId,
               'Purchase failed.',
+              debugInfo: purchaseDebugInfo(
+                'gems.launch_store',
+                reason: 'launch_rejected',
+              ),
             );
             _trackFlowResult(activeProduct, attemptId, 'launch_rejected');
           }
@@ -372,6 +426,7 @@ class GooglePlayBillingService implements BillingService {
             activeProduct.productId,
             attemptId,
             _purchaseFailureMessage(error),
+            debugInfo: purchaseDebugInfo('gems.launch_store', error: error),
           );
           _trackFlowResult(
             activeProduct,
