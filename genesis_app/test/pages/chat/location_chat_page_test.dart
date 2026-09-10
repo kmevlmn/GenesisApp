@@ -2003,10 +2003,27 @@ void main() {
             502,
       );
       harness.socket.serverCandidateStream(streamType: 'start');
+      await tester.pump();
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('location-chat-loading-bubble')),
+        findsOneWidget,
+      );
+      harness.socket.serverCandidateStream(
+        streamType: 'chunk',
+        content: '',
+        seq: 1,
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('location-chat-loading-bubble')),
+        findsNothing,
+      );
       harness.socket.serverCandidateStream(
         streamType: 'chunk',
         content: 'Private candidate.',
-        seq: 1,
+        seq: 2,
       );
       await _pumpUntilLocationChatTest(
         tester,
@@ -2417,6 +2434,66 @@ void main() {
       await tester.pump();
     },
   );
+
+  testWidgets('inspiration timeout shows useful copy and unlocks retry', (
+    tester,
+  ) async {
+    final backend = _LocationChatReplyHttpTransport()
+      ..inspirationTimeout = true;
+    final harness = await _mountCompletedReplyActionPanel(
+      tester,
+      backend: backend,
+    );
+
+    await tester.tap(find.bySemanticsLabel('Inspiration'));
+    await _pumpUntilLocationChatTest(
+      tester,
+      () => backend.inspirationRequests.isNotEmpty,
+    );
+    await _pumpUntilLocationChatTest(
+      tester,
+      () => !tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .inspirationFeature
+          .loading,
+    );
+
+    expect(find.text('Request timed out. Please try again.'), findsOneWidget);
+    var list = tester.widget<LocationChatAnchoredMessageList>(
+      find.byType(LocationChatAnchoredMessageList),
+    );
+    expect(list.inspirationFeature.enabled, isTrue);
+    expect(list.inspirationFeature.loading, isFalse);
+
+    backend.inspirationTimeout = false;
+    list.inspirationFeature.onExpandedChanged!(true);
+    await _pumpUntilLocationChatTest(
+      tester,
+      () => backend.inspirationRequests.length == 2,
+    );
+    await _pumpUntilLocationChatTest(
+      tester,
+      () => tester
+          .widget<LocationChatAnchoredMessageList>(
+            find.byType(LocationChatAnchoredMessageList),
+          )
+          .inspirationFeature
+          .messages
+          .isNotEmpty,
+    );
+    list = tester.widget<LocationChatAnchoredMessageList>(
+      find.byType(LocationChatAnchoredMessageList),
+    );
+    expect(list.inspirationFeature.loading, isFalse);
+    expect(list.inspirationFeature.messages, isNotEmpty);
+
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpWidget(const SizedBox.shrink());
+    unawaited(harness.service.dispose());
+    await tester.pump();
+  });
 
   for (final outcome in ['success', 'failure', 'new-round']) {
     testWidgets('inspiration confirms its card before sending: $outcome', (
@@ -6480,6 +6557,7 @@ class _LocationChatReplyHttpTransport implements HttpTransport {
   Completer<void>? batchBarrier;
   Completer<void>? selectionBarrier;
   bool selectionFails = false;
+  bool inspirationTimeout = false;
   int selectedCardId = 0;
   final inspirationRequests = <Map<String, dynamic>>[];
   final selectionRequests = <Map<String, dynamic>>[];
@@ -6585,6 +6663,7 @@ class _LocationChatReplyHttpTransport implements HttpTransport {
       final body =
           jsonDecode(utf8.decode(request.bodyBytes!)) as Map<String, dynamic>;
       inspirationRequests.add(body);
+      if (inspirationTimeout) throw TimeoutException('inspiration timeout');
       final card = body['card_id'] as int? ?? selectedCardId;
       return _ok({
         'conversation_round_id': body['conversation_round_id'],

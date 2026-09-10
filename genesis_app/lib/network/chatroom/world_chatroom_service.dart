@@ -257,6 +257,10 @@ class WorldChatroomService {
         locationId: location,
         conversationRoundId: '$round',
       ),
+      onGoOnFinished: (location, round) => _completeConversationRound(
+        locationId: location,
+        conversationRoundId: '$round',
+      ),
       refreshLatestHistory: (location) =>
           refreshLocationHistory(locationId: location),
       refreshWallet: () async {

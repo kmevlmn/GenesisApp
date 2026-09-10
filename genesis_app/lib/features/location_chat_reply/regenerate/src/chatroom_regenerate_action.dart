@@ -99,20 +99,38 @@ extension ChatroomRegenerateFeatureImplementation
       state._generating = state._cards.any(
         (card) => !_terminal(card.generationState),
       );
+      if (state._generating) {
+        _watchRegeneration(state, receipt.cardId);
+      } else {
+        _cancelRegenerationWatchdog(state);
+      }
       await _persist(state);
     } catch (error) {
       if (!_disposed) {
         state._error = error;
-        // Unknown acceptance retains the request metadata and is resolved by
-        // GET cards on reconnect; never send a fresh request automatically.
-        if (candidatePrepared && (!dispatched || _definiteRejection(error))) {
-          state._cards.removeWhere((card) => card.cardId <= 0);
-          state._regenerationRequestId = null;
-          state._viewedCardId = state._lastCompleteCardId;
+        // Unknown acceptance is checked with GET cards. Keep a server-visible
+        // candidate, otherwise release the local placeholder; never resend.
+        if (candidatePrepared) {
+          if (!dispatched || _definiteRejection(error)) {
+            state._cards.removeWhere((card) => card.cardId <= 0);
+            state._regenerationRequestId = null;
+            state._viewedCardId = state._lastCompleteCardId;
+          } else {
+            try {
+              await _loadCards(state, force: true);
+            } catch (_) {
+              // The original WS error remains the useful user-facing cause.
+            }
+            if (state._regenerationRequestId != null &&
+                state._card(-1) != null) {
+              await _failRegenerationLocally(state, -1, error);
+            }
+          }
         }
         state._generating = state._cards.any(
           (card) => !_terminal(card.generationState),
         );
+        if (!state._generating) _cancelRegenerationWatchdog(state);
         await _persist(state);
       }
       rethrow;

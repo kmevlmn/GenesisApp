@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genesis_flutter_android/features/location_chat_reply/edit/edit.dart';
+import 'package:genesis_flutter_android/features/location_chat_reply/go_on/go_on.dart';
+import 'package:genesis_flutter_android/features/location_chat_reply/inspiration/inspiration.dart';
+import 'package:genesis_flutter_android/features/location_chat_reply/regenerate/regenerate.dart';
+import 'package:genesis_flutter_android/pages/chat/location_chat_reply_actions.dart';
 import 'package:genesis_flutter_android/pages/chat/location_chat_reply_card_switcher.dart';
 import 'package:genesis_flutter_android/pages/chat/location_chat_scroll_coordinator.dart';
 import 'package:genesis_flutter_android/components/chat/shared/chat_ui.dart';
@@ -194,6 +199,118 @@ void main() {
     expect(commits, [2]);
     expect(find.byKey(const ValueKey('body-1')), findsNothing);
   });
+
+  testWidgets(
+    'card transition preserves action visuals while blocking repeated taps',
+    (tester) async {
+      final coordinator = LocationChatScrollCoordinator();
+      addTearDown(coordinator.dispose);
+      var current = 1;
+      var revision = 0;
+      var regenerateCalls = 0;
+      final cards = [
+        LocationChatReplyCard(id: 1, messages: [_message('one', 2)]),
+        LocationChatReplyCard(id: 2, messages: [_message('two', 2)]),
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 390,
+              height: 500,
+              child: StatefulBuilder(
+                builder: (context, update) {
+                  final selected = cards.firstWhere(
+                    (card) => card.id == current,
+                  );
+                  return LocationChatAnchoredMessageList(
+                    coordinator: coordinator,
+                    topTitle: '',
+                    messages: selected.messages,
+                    replyCards: cards,
+                    replyCurrentCardId: current,
+                    replyActionsIdentity: 'round',
+                    replyActionsAnchorIndex: selected.messages.length,
+                    replyPresentationRevision: revision,
+                    replyCardCount: 2,
+                    replyCardIndex: current - 1,
+                    regenerateFeature: LocationChatRegenerateFeature(
+                      onInvoke: () => regenerateCalls++,
+                      enabled: true,
+                      busy: false,
+                    ),
+                    goOnFeature: const LocationChatGoOnFeature(
+                      onInvoke: null,
+                      enabled: true,
+                      busy: false,
+                    ),
+                    editFeature: const LocationChatEditFeature(
+                      onInvoke: null,
+                      enabled: true,
+                      busy: false,
+                    ),
+                    inspirationFeature: const LocationChatInspirationFeature(
+                      messages: [],
+                      loading: false,
+                      enabled: true,
+                    ),
+                    onReplyCardSelected: (id) {
+                      update(() {
+                        current = id;
+                        revision++;
+                      });
+                      return true;
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('location-chat-reply-next-card')),
+      );
+      await tester.pump(const Duration(milliseconds: 80));
+
+      final actions = tester.widget<LocationChatReplyActions>(
+        find.byType(LocationChatReplyActions),
+      );
+      expect(actions.regenerateFeature.enabled, isTrue);
+      expect(actions.goOnFeature.enabled, isTrue);
+      expect(actions.editFeature.enabled, isTrue);
+      expect(actions.inspirationFeature.enabled, isTrue);
+      expect(actions.onPreviousCard, isNotNull);
+      expect(actions.onNextCard, isNotNull);
+      expect(
+        tester
+            .widget<IgnorePointer>(
+              find.byKey(const ValueKey('reply-actions-input-blocker-round')),
+            )
+            .ignoring,
+        isTrue,
+      );
+      await tester.tap(
+        find.bySemanticsLabel('Regenerate'),
+        warnIfMissed: false,
+      );
+      expect(regenerateCalls, 0);
+
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<IgnorePointer>(
+              find.byKey(const ValueKey('reply-actions-input-blocker-round')),
+            )
+            .ignoring,
+        isFalse,
+      );
+      await tester.tap(find.bySemanticsLabel('Regenerate'));
+      expect(regenerateCalls, 1);
+    },
+  );
 
   for (final secondScroll in [false, true]) {
     testWidgets(

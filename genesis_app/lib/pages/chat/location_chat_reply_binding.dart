@@ -168,7 +168,8 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
           ),
           status:
               card.generationState == ChatroomCardGenerationState.generating &&
-                  state.messagesForCard(card.cardId).isEmpty
+                  state.error == null &&
+                  !state.hasCandidateChunk(card.cardId)
               ? LocationChatLoadingBubble(style: style)
               : null,
         ),
@@ -251,7 +252,7 @@ extension _LocationChatReplyBinding on _LocationChatPanelState {
       _replyStreamStarted =
           _replyController
               ?.stateForRound(widget.locationId, round)
-              ?.hasNewCandidateContent(_replyLoadingPreviousCardIds) ??
+              ?.hasNewCandidateChunk(_replyLoadingPreviousCardIds) ??
           false;
     } else {
       final messages =

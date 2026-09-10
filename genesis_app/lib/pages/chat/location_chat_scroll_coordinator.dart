@@ -1376,89 +1376,52 @@ class _LocationChatAnchoredMessageListState
         Padding(
           key: _replyControlLayoutKey,
           padding: EdgeInsets.only(bottom: style.rowBottomPadding),
-          child: LocationChatReplyActions(
-            key: ValueKey('reply-actions-$_replyIdentity'),
-            inspirationFeature: _effectiveInspirationFeature,
-            editFeature: _effectiveEditFeature,
-            isMember: widget.isMember,
-            regenerateFeature: _effectiveRegenerateFeature,
-            goOnFeature: _effectiveGoOnFeature,
-            cardIndex: widget.replyCardIndex,
-            cardCount: widget.replyCardCount,
-            cardsConfirmed: widget.replyCardsConfirmed,
-            onPreviousCard: _cardTransitionBusy
-                ? null
-                : () => _switchReplyCard(-1),
-            onNextCard: _cardTransitionBusy ? null : () => _switchReplyCard(1),
-            editPromptExpanded: _editPromptExpanded,
-            onEditPromptExpandedChanged: (expanded) {
-              setState(() => _editPromptExpanded = expanded);
-              if (expanded) {
-                widget.coordinator.requestBottom(
-                  reason: LocationChatBottomReason.editPromptExpanded,
-                  behavior: LocationChatBottomBehavior.animate,
-                );
-              }
-            },
-            inspirationExpanded: _inspirationExpanded,
-            inspirationPage: _inspirationPage,
-            onInspirationPageChanged: (page) => _inspirationPage = page,
-            onInspirationExpandedChanged: (expanded) {
-              setState(() => _inspirationExpanded = expanded);
-              _effectiveInspirationFeature.onExpandedChanged?.call(expanded);
-              if (expanded) {
-                widget.coordinator.requestBottom(
-                  reason: LocationChatBottomReason.inspirationExpanded,
-                  behavior: LocationChatBottomBehavior.animate,
-                );
-              }
-            },
-            style: style,
-            selfMessageBubbleMaxWidthCap: widget.selfMessageBubbleMaxWidthCap,
+          child: IgnorePointer(
+            key: ValueKey('reply-actions-input-blocker-$_replyIdentity'),
+            ignoring: _cardTransitionBusy,
+            child: LocationChatReplyActions(
+              key: ValueKey('reply-actions-$_replyIdentity'),
+              inspirationFeature: widget.inspirationFeature,
+              editFeature: widget.editFeature,
+              isMember: widget.isMember,
+              regenerateFeature: widget.regenerateFeature,
+              goOnFeature: widget.goOnFeature,
+              cardIndex: widget.replyCardIndex,
+              cardCount: widget.replyCardCount,
+              cardsConfirmed: widget.replyCardsConfirmed,
+              onPreviousCard: () => _switchReplyCard(-1),
+              onNextCard: () => _switchReplyCard(1),
+              editPromptExpanded: _editPromptExpanded,
+              onEditPromptExpandedChanged: (expanded) {
+                setState(() => _editPromptExpanded = expanded);
+                if (expanded) {
+                  widget.coordinator.requestBottom(
+                    reason: LocationChatBottomReason.editPromptExpanded,
+                    behavior: LocationChatBottomBehavior.animate,
+                  );
+                }
+              },
+              inspirationExpanded: _inspirationExpanded,
+              inspirationPage: _inspirationPage,
+              onInspirationPageChanged: (page) => _inspirationPage = page,
+              onInspirationExpandedChanged: (expanded) {
+                setState(() => _inspirationExpanded = expanded);
+                widget.inspirationFeature.onExpandedChanged?.call(expanded);
+                if (expanded) {
+                  widget.coordinator.requestBottom(
+                    reason: LocationChatBottomReason.inspirationExpanded,
+                    behavior: LocationChatBottomBehavior.animate,
+                  );
+                }
+              },
+              style: style,
+              selfMessageBubbleMaxWidthCap: widget.selfMessageBubbleMaxWidthCap,
+            ),
           ),
         ),
       ],
     ),
   );
-
-  LocationChatRegenerateFeature get _effectiveRegenerateFeature {
-    final feature = widget.regenerateFeature;
-    return LocationChatRegenerateFeature(
-      onInvoke: feature.onInvoke,
-      enabled: feature.enabled && !_cardTransitionBusy,
-      busy: feature.busy,
-    );
-  }
-
-  LocationChatGoOnFeature get _effectiveGoOnFeature {
-    final feature = widget.goOnFeature;
-    return LocationChatGoOnFeature(
-      onInvoke: feature.onInvoke,
-      enabled: feature.enabled && !_cardTransitionBusy,
-      busy: feature.busy,
-    );
-  }
-
-  LocationChatEditFeature get _effectiveEditFeature {
-    final feature = widget.editFeature;
-    return LocationChatEditFeature(
-      onInvoke: feature.onInvoke,
-      enabled: feature.enabled && !_cardTransitionBusy,
-      busy: feature.busy,
-    );
-  }
-
-  LocationChatInspirationFeature get _effectiveInspirationFeature {
-    final feature = widget.inspirationFeature;
-    return LocationChatInspirationFeature(
-      messages: feature.messages,
-      loading: feature.loading,
-      enabled: feature.enabled && !_cardTransitionBusy,
-      onExpandedChanged: feature.onExpandedChanged,
-      onSend: _cardTransitionBusy ? null : feature.onSend,
-      onEdit: _cardTransitionBusy ? null : feature.onEdit,
-    );
-  }
 }
 
 class LocationChatBottomAnchoringScrollPhysics extends ClampingScrollPhysics {

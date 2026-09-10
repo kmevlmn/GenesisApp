@@ -37,7 +37,16 @@ extension ChatroomGoOnFeatureImplementation on ChatroomReplyActionsController {
         _latest[locationId] = receipt.conversationRoundId;
       }
       await _persist(state);
-      if (next._ended) await _recoverGoOn(state);
+      if (next._ended) {
+        await _recoverGoOn(state);
+      } else {
+        _watchGoOn(
+          state,
+          streamStarted:
+              next._formal.any((message) => message.streaming) ||
+              next._formal.any(_isReply),
+        );
+      }
       return receipt;
     } catch (error) {
       if (!_disposed) {
@@ -55,6 +64,18 @@ extension ChatroomGoOnFeatureImplementation on ChatroomReplyActionsController {
             await _refreshLatestHistory?.call(locationId);
           } catch (_) {
             /* Preserve the original server rejection. */
+          }
+        }
+        if (state._goOn case final pending?
+            when pending.uncertain && !pending.finished) {
+          try {
+            await _refreshLatestHistory?.call(locationId);
+          } catch (_) {
+            // The original request error remains the useful user-facing cause.
+          }
+          if (!_disposed && identical(state._goOn, pending)) {
+            pending.finished = true;
+            await _persist(state);
           }
         }
       }

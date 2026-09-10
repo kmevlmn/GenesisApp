@@ -43,6 +43,11 @@ bool isChatroomErrorPresentedGlobally(Object? error) => switch (error) {
 };
 
 String chatroomOperationErrorMessage(Object error) => switch (error) {
+  TimeoutException() => 'Request timed out. Please try again.',
+  ApiException e when e.kind == ApiExceptionKind.timeout =>
+    'Request timed out. Please try again.',
+  ApiException e when e.kind == ApiExceptionKind.transport =>
+    'Network unavailable. Check your connection and try again.',
   ApiException e => e.message,
   ChatroomFailureEvent e => e.message,
   ChatroomErrorEvent e => e.message,
@@ -98,6 +103,10 @@ bool shouldShowChatroomFailureToast(ChatroomFailureEvent failure) {
 
 String chatroomFailureToastMessage(ChatroomFailureEvent failure) {
   final code = failure.code.trim();
+  final requestType = failure.requestType.trim();
+  if (code == 'ack_timeout' && requestType == 'go_on') {
+    return 'Could not confirm Go on. Please try again.';
+  }
   if (code != '10001' &&
       _isReplyActionBusinessFailure(failure) &&
       failure.message.trim().isNotEmpty) {
@@ -120,7 +129,6 @@ String chatroomFailureToastMessage(ChatroomFailureEvent failure) {
   }
 
   final message = failure.message.trim();
-  final requestType = failure.requestType.trim();
   if (!_isGenericChatroomFailureMessage(message) &&
       !_isInternalChatroomFailureMessage(message)) {
     if (message.isNotEmpty) return message;
