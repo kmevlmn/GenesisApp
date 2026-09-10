@@ -1,25 +1,36 @@
 part of 'google_play_billing_service.dart';
 
 extension _GooglePlayBillingTracking on GooglePlayBillingService {
-  void _emitFailure(String productId, String attemptId, String message) {
+  void _emitFailure(
+    String productId,
+    String attemptId,
+    String message, {
+    required String debugInfo,
+  }) {
     _emitUiEvent(
       BillingUiEvent(
         kind: BillingUiEventKind.failure,
         productId: productId,
         attemptId: attemptId,
         message: message,
+        debugInfo: debugInfo,
       ),
     );
     _setBusy(productId, false);
   }
 
-  void _emitDeferred(String productId, String attemptId) {
+  void _emitDeferred(
+    String productId,
+    String attemptId, {
+    required String debugInfo,
+  }) {
     _emitUiEvent(
       BillingUiEvent(
         kind: BillingUiEventKind.deferred,
         productId: productId,
         attemptId: attemptId,
         message: 'Payment is being confirmed.',
+        debugInfo: debugInfo,
       ),
     );
   }

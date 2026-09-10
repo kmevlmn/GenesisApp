@@ -17,20 +17,20 @@ void main() {
         restoreEnabled: true,
       );
       h.recoverable = [h.purchase(status: BillingPurchaseStatus.pending)];
-      h.restoreHandler = (_) async => const MembershipPurchaseReport(
+      h.reportHandler = (_) async => const MembershipPurchaseReport(
         status: MembershipReportStatus.accepted,
         reportId: 'accepted',
       );
       await h.service.restorePurchases(products: [h.product()]);
       final revision = h.service.catalogRevision.value;
-      final requestId = h.restoreRequests.single.requestId;
+      final requestId = h.reports.single.requestId;
       await h.service.restorePurchases();
-      expect(h.restoreRequests, hasLength(2));
-      expect(h.restoreRequests.last.requestId, requestId);
+      expect(h.reports, hasLength(2));
+      expect(h.reports.last.requestId, requestId);
       expect(h.service.catalogRevision.value, revision);
-      expect(h.store.restores.values.single.needsRetry, isTrue);
+      expect(h.store.records.values.single.reportStatus, 'accepted');
 
-      h.restoreHandler = null;
+      h.reportHandler = null;
       await h.service.recover();
       expect(h.service.catalogRevision.value, revision + 1);
       expect(h.store.restores, isEmpty);
@@ -45,20 +45,20 @@ void main() {
         restoreEnabled: true,
       );
       h.recoverable = [h.purchase(status: BillingPurchaseStatus.pending)];
-      h.restoreHandler = (_) async => const MembershipPurchaseReport(
+      h.reportHandler = (_) async => const MembershipPurchaseReport(
         status: MembershipReportStatus.accepted,
         reportId: 'accepted',
       );
       await h.service.restorePurchases(products: [h.product()]);
       final revision = h.service.catalogRevision.value;
-      final requestId = h.restoreRequests.single.requestId;
+      final requestId = h.reports.single.requestId;
       h.storeQuery = () async {
-        h.restoreHandler = null;
+        h.reportHandler = null;
         return [h.purchase()];
       };
       await h.service.restorePurchases();
-      expect(h.restoreRequests, hasLength(3));
-      expect(h.restoreRequests.every((r) => r.requestId == requestId), isTrue);
+      expect(h.reports, hasLength(3));
+      expect(h.reports.every((r) => r.requestId == requestId), isTrue);
       expect(h.service.catalogRevision.value, revision + 1);
       expect(h.store.restores, isEmpty);
       expect(h.platform.finishes, 1);
@@ -78,7 +78,7 @@ void main() {
       h.recoverable = [h.purchase(yearly: true, transaction: 'renewal')];
       await h.service.restorePurchases();
       expect(h.service.catalogRevision.value, revision + 1);
-      expect(h.restoreRequests.last.transactionId, 'renewal');
+      expect(h.reports.last.transactionId, 'renewal');
     },
   );
 
@@ -92,21 +92,21 @@ void main() {
       h.recoverable = [
         h.purchase(yearly: true, status: BillingPurchaseStatus.pending),
       ];
-      h.restoreHandler = (_) async => const MembershipPurchaseReport(
+      h.reportHandler = (_) async => const MembershipPurchaseReport(
         status: MembershipReportStatus.accepted,
         reportId: 'accepted',
       );
       await h.service.restorePurchases(
         products: [h.product(), h.product(yearly: true)],
       );
-      expect(h.store.restores.values.single.reportStatus, 'accepted');
+      expect(h.store.records.values.single.reportStatus, 'accepted');
       expect(h.platform.finishes, 0);
       expect(h.service.catalogRevision.value, 1);
       await h.service.purchase(h.product());
       expect(h.platform.launches, 0);
-      h.restoreHandler = null;
+      h.reportHandler = null;
       await h.service.recover();
-      expect(h.restoreRequests.last.toJson(), h.restoreRequests.first.toJson());
+      expect(h.reports.last.toJson(), h.reports.first.toJson());
       expect(h.store.restores, isEmpty);
       expect(h.platform.finishes, 1);
       expect(h.refreshes, 1);
@@ -123,17 +123,17 @@ void main() {
       );
       h.recoverable = [h.purchase(status: BillingPurchaseStatus.pending)];
       h.store.failComplete = true;
-      h.restoreHandler = (_) async => const MembershipPurchaseReport(
+      h.reportHandler = (_) async => const MembershipPurchaseReport(
         status: MembershipReportStatus.rejected,
         reportId: 'rejected',
         reason: 'purchase_canceled',
       );
       await h.service.restorePurchases(products: [h.product()]);
-      expect(h.store.restores.values.single.reportReason, 'purchase_canceled');
+      expect(h.store.records.values.single.reportReason, 'purchase_canceled');
       h.store.failComplete = false;
       await h.service.recover();
       expect(h.store.restores, isEmpty);
-      expect(h.restoreRequests, hasLength(1));
+      expect(h.reports, hasLength(1));
       expect(h.platform.finishes, 0);
       expect(h.refreshes, 0);
     },
@@ -149,17 +149,17 @@ void main() {
       h.store.failComplete = true;
       h.recoverable = [h.purchase()];
       await h.service.restorePurchases(products: [h.product()]);
-      expect(h.store.restores.values.single.reportStatus, 'completed');
+      expect(h.store.records.values.single.reportStatus, 'completed');
       h.store.failComplete = false;
       await h.service.recover();
-      expect(h.restoreRequests, hasLength(1));
+      expect(h.reports, hasLength(1));
       expect(h.platform.finishes, 1);
       expect(h.store.restores, isEmpty);
     },
   );
 
   test(
-    'restore has separate keys, deduplicates a batch, and can sync the same Google token again',
+    'completed purchases stay deduplicated across repeated store queries',
     () async {
       final h = support.Harness(restoreEnabled: true);
       await h.service.purchase(h.product(yearly: true));
@@ -169,31 +169,26 @@ void main() {
       await h.service.restorePurchases(
         products: [h.product(), h.product(yearly: true)],
       );
-      expect(h.restoreRequests, hasLength(1));
-      expect(h.restoreRequests.single.requestId, isNot(originalKey));
-      expect(h.restoreRequests.single.product.isYearly, isTrue);
-      expect(h.platform.launches, 1);
-      expect(h.platform.finishes, 0);
       await h.service.restorePurchases();
-      expect(h.restoreRequests, hasLength(2));
-      expect(
-        h.restoreRequests.first.requestId,
-        isNot(h.restoreRequests.last.requestId),
-      );
+      expect(h.reports, hasLength(1));
+      expect(h.reports.single.requestId, originalKey);
+      expect(h.platform.launches, 1);
+      expect(h.store.records, isEmpty);
+      expect(h.store.restores, isEmpty);
     },
   );
 
   test(
-    'failed restore survives restart and reuses its key without another purchase report',
+    'recovered receipt survives restart and retries report with its original key',
     () async {
       final h = support.Harness(
         provider: MembershipProvider.apple,
         restoreEnabled: true,
       );
       h.recoverable = [h.purchase()];
-      h.restoreHandler = (_) async => throw StateError('offline');
+      h.reportHandler = (_) async => throw StateError('offline');
       await h.service.restorePurchases(products: [h.product()]);
-      final key = h.restoreRequests.single.requestId;
+      final key = h.reports.single.requestId;
       expect(h.platform.finishes, 0);
       final restored = support.Harness(
         provider: MembershipProvider.apple,
@@ -201,8 +196,8 @@ void main() {
         storage: h.store,
       );
       await restored.service.recover();
-      expect(restored.restoreRequests.single.requestId, key);
-      expect(restored.reports, isEmpty);
+      expect(restored.reports.single.requestId, key);
+      expect(restored.reports, hasLength(1));
       expect(restored.platform.finishes, 1);
       expect(restored.refreshes, 1);
     },
@@ -216,15 +211,12 @@ void main() {
         restoreEnabled: true,
       );
       h.recoverable = [h.purchase()];
-      h.restoreHandler = (_) async => throw StateError('offline');
+      h.reportHandler = (_) async => throw StateError('offline');
       await h.service.restorePurchases(products: [h.product()]);
-      h.restoreHandler = null;
+      h.reportHandler = null;
       await h.service.restorePurchases();
-      expect(h.restoreRequests, hasLength(2));
-      expect(
-        h.restoreRequests.first.requestId,
-        h.restoreRequests.last.requestId,
-      );
+      expect(h.reports, hasLength(2));
+      expect(h.reports.first.requestId, h.reports.last.requestId);
     },
   );
 
@@ -236,14 +228,14 @@ void main() {
       await h.service.restorePurchases(
         products: [h.product(), h.product(yearly: true)],
       );
-      expect(h.restoreRequests, isEmpty);
+      expect(h.reports, isEmpty);
       expect(
         h.store.restores.values.single.purchase.purchaseToken,
         'test-token',
       );
       expect(h.store.restores.values.single.product, isNull);
       await h.service.recover();
-      expect(h.restoreRequests, isEmpty);
+      expect(h.reports, isEmpty);
       expect(h.platform.launches, 0);
     },
   );
@@ -260,17 +252,17 @@ void main() {
       await h.service.restorePurchases(
         products: [h.product(), h.product(yearly: true)],
       );
-      expect(h.restoreRequests.single.product.isYearly, isTrue);
+      expect(h.reports.single.product.isYearly, isTrue);
       h.platform.finishFails = false;
       await h.service.recover();
-      expect(h.restoreRequests, hasLength(1));
+      expect(h.reports, hasLength(1));
       expect(h.platform.finishes, 2);
       expect(h.store.restores, isEmpty);
     },
   );
 
   test(
-    'accepted and account mismatch do not grant Gems and guest never invokes restore API',
+    'accepted and account mismatch do not grant Gems and guest never reports a store query under a logged-in account',
     () async {
       for (final result in [
         const MembershipPurchaseReport(
@@ -288,11 +280,11 @@ void main() {
           restoreEnabled: true,
         );
         h.recoverable = [h.purchase()];
-        h.restoreHandler = (_) async => result;
+        h.reportHandler = (_) async => result;
         await h.service.restorePurchases(products: [h.product()]);
         await h.service.recover();
         expect(
-          h.restoreRequests,
+          h.reports,
           hasLength(result.status == MembershipReportStatus.accepted ? 2 : 1),
         );
         expect(h.refreshes, 0);
@@ -302,7 +294,7 @@ void main() {
       h.recoverable = [h.purchase()];
       await h.service.restorePurchases(products: [h.product()]);
       expect(h.restoreQueries, 0);
-      expect(h.restoreRequests, isEmpty);
+      expect(h.reports, isEmpty);
     },
   );
 
@@ -323,7 +315,7 @@ void main() {
       expect(h.restoreQueries, 1);
       gate.complete([h.purchase()]);
       await Future.wait([first, second]);
-      expect(h.restoreRequests, hasLength(1));
+      expect(h.reports, hasLength(1));
     },
   );
 
@@ -341,7 +333,7 @@ void main() {
       h.uid = 'another-user';
       gate.complete([h.purchase()]);
       await first;
-      expect(h.restoreRequests, isEmpty);
+      expect(h.reports, isEmpty);
     },
   );
 }

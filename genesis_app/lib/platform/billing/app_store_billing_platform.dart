@@ -54,6 +54,7 @@ class AppStoreBillingPlatform implements BillingPlatform {
               purchaseToken: transaction.id,
               transactionId: transaction.id,
               originalTransactionId: transaction.originalId,
+              signedTransaction: transaction.receiptData ?? '',
               originalJson:
                   transaction.receiptData ??
                   transaction.jsonRepresentation ??
@@ -182,6 +183,9 @@ BillingPurchase _toBillingPurchase(PurchaseDetails purchase) {
     transactionId: transactionId,
     originalTransactionId: '',
     originalJson: purchase.verificationData.localVerificationData,
+    signedTransaction: purchase is SK2PurchaseDetails
+        ? purchase.verificationData.serverVerificationData
+        : '',
     purchaseTime: purchase.transactionDate ?? '',
     status: status,
     obfuscatedAccountId: purchase is SK2PurchaseDetails

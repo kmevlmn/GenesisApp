@@ -16,6 +16,65 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'legacy guest credentials migrate without losing receipt or binding progress',
+    () async {
+      final purchase = MembershipPurchaseRecord(
+        requestId: 'legacy-request',
+        product: membershipProduct(),
+        accountUuid: support.guest.accountUuid,
+        ownerUid: null,
+        guest: support.guest,
+        purchaseToken: 'saved-paid-receipt',
+        state: 'purchased',
+        reportStatus: 'completed',
+        reportId: 'saved-report',
+        finished: true,
+      );
+      final claim = MembershipGuestClaimRecord(
+        guest: support.guest,
+        ownerUid: 'first-login',
+        status: 'accepted',
+        purchaseConfirmed: true,
+        loginRequired: true,
+        purchaseRequestId: purchase.requestId,
+      );
+      final oldGuest = {
+        ...support.guest.toJson(),
+        'guest_id': 'legacy-guest',
+        'claim_token': 'legacy-secret',
+      };
+      final keys = {
+        'membership_purchase_records_v1': [
+          {...purchase.toJson(), 'guest': oldGuest},
+        ],
+        'membership_confirmed_receipts_v1': [
+          {...purchase.toJson(), 'guest': oldGuest},
+        ],
+        'membership_guest_claims_v1': [
+          {...claim.toJson(), 'guest': oldGuest},
+        ],
+      };
+      FlutterSecureStorage.setMockInitialValues({
+        for (final entry in keys.entries) entry.key: jsonEncode(entry.value),
+      });
+      final store = SecureMembershipPendingStore();
+      final restored = (await store.loadGuestClaims()).single;
+      expect(restored.toJson(), claim.toJson());
+      expect((await store.loadAll()).single.toJson(), purchase.toJson());
+      expect(
+        (await store.loadConfirmedReceipts()).single.toJson(),
+        purchase.toJson(),
+      );
+      for (final key in keys.keys) {
+        final saved = (await const FlutterSecureStorage().read(key: key))!;
+        expect(saved, isNot(contains('guest_id')));
+        expect(saved, isNot(contains('claim_token')));
+        expect(saved, isNot(contains('signed_transaction')));
+      }
+    },
+  );
+
+  test(
     'known-plan receipt without base plan survives restart and can be reported',
     () async {
       FlutterSecureStorage.setMockInitialValues({});
@@ -125,11 +184,7 @@ void main() {
         purchaseConfirmed: true,
       );
       const other = MembershipGuestClaimRecord(
-        guest: MembershipGuestIdentity(
-          guestId: 'another-guest',
-          accountUuid: support.accountUuid,
-          claimToken: '1234567890123456789012345678901234567890123',
-        ),
+        guest: MembershipGuestIdentity(accountUuid: support.accountUuid),
         purchaseConfirmed: true,
       );
       await store.saveGuestClaim(claim);
@@ -144,8 +199,8 @@ void main() {
       await store.saveGuestClaim(completedClaim);
       await store.completeGuestClaim(completedClaim);
       expect(
-        (await store.loadGuestClaims()).single.guest.guestId,
-        other.guest.guestId,
+        (await store.loadGuestClaims()).single.guest.accountUuid,
+        other.guest.accountUuid,
       );
     },
   );
@@ -173,7 +228,7 @@ void main() {
       );
       final claimed =
           (await SecureMembershipPendingStore().loadGuestClaims()).single;
-      expect(claimed.guest.claimToken, support.guest.claimToken);
+      expect(claimed.guest.accountUuid, support.guest.accountUuid);
       expect(claimed.ownerUid, 'first-login');
       expect(claimed.needsRetry, isTrue);
       expect(await store.loadAll(), isEmpty);
@@ -288,7 +343,7 @@ void main() {
       ]);
       final saved = (await restarted.loadConfirmedReceipts()).single;
       expect(saved.product.basePlanId, 'test-annual');
-      expect(saved.guest?.claimToken, support.guest.claimToken);
+      expect(saved.guest?.accountUuid, support.guest.accountUuid);
       expect(saved.requestId, record.requestId);
       expect(saved.purchaseToken, record.purchaseToken);
       expect((saved.toJson()['product'] as Map).keys.toSet(), {

@@ -38,7 +38,16 @@ extension _GemWalletBillingFlow on _GemWalletPageState {
         widget.billingService ??
         AppServicesScope.maybeRead(context)?.billing;
     if (service == null) {
-      showGenesisToast(context, 'Google Play is unavailable.');
+      showGenesisToast(
+        context,
+        purchaseToastMessage(
+          'Google Play is unavailable.',
+          debugInfo: purchaseDebugInfo(
+            'gems.precheck',
+            reason: 'service_unavailable',
+          ),
+        ),
+      );
       return;
     }
     _bindBillingService(service);
@@ -50,10 +59,16 @@ extension _GemWalletBillingFlow on _GemWalletPageState {
         source: BillingPurchaseSource.buyGemsPage,
         payTrackId: billingPurchaseTrackId(_payTrackPageId),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       _dismissBillingPurchaseDialog();
-      showGenesisToast(context, 'Purchase failed.');
+      showGenesisToast(
+        context,
+        purchaseToastMessage(
+          'Purchase failed.',
+          debugInfo: purchaseDebugInfo('gems.checkout_exception', error: error),
+        ),
+      );
       return;
     }
     if (!mounted) return;
@@ -79,7 +94,15 @@ extension _GemWalletBillingFlow on _GemWalletPageState {
       case BillingUiEventKind.pending:
       case BillingUiEventKind.deferred:
         _dismissBillingPurchaseDialog();
-        showGenesisToast(context, event.message);
+        showGenesisToast(
+          context,
+          purchaseToastMessage(
+            event.message,
+            debugInfo:
+                event.debugInfo ??
+                purchaseDebugInfo('gems.checkout', status: event.kind.name),
+          ),
+        );
     }
   }
 

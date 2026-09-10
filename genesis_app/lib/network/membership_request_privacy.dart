@@ -1,13 +1,17 @@
 import 'dart:convert';
 
-/// These bodies contain purchase credentials or one-time guest claim secrets.
+/// These requests or responses contain private purchase credentials.
 bool isPrivateMembershipRequest(Uri uri) => const [
+  '/membership/products',
   '/membership/purchase/report',
-  '/membership/restore',
   '/membership/guest/prepare',
   '/membership/guest/purchase/report',
+  '/membership/guest/purchase/check',
   '/membership/claim',
 ].any(uri.path.endsWith);
+
+bool isMembershipProductRequest(Uri uri) =>
+    uri.path.endsWith('/membership/products');
 
 /// Purchase reports can be inspected in DevTools using a sanitized copy.
 /// Keep their real payloads out of native profiling and persistent capture.
@@ -66,6 +70,55 @@ Object? _membershipReportProfileJson(Object? value) {
           }.contains(entry.key)
           ? entry.value is Map || entry.value is List
                 ? _membershipReportProfileJson(entry.value)
+                : entry.value
+          : '[REDACTED]',
+  };
+}
+
+/// Keep catalog display data inspectable without exposing upgrade credentials.
+List<int> membershipProductProfileBody(List<int> bytes) {
+  if (bytes.isEmpty) return bytes;
+  try {
+    return utf8.encode(
+      jsonEncode(_membershipProductProfileJson(jsonDecode(utf8.decode(bytes)))),
+    );
+  } catch (_) {
+    return utf8.encode(jsonEncode('[REDACTED]'));
+  }
+}
+
+Object? _membershipProductProfileJson(Object? value) {
+  if (value is List) {
+    return value.map(_membershipProductProfileJson).toList();
+  }
+  if (value is! Map) return '[REDACTED]';
+  return {
+    for (final entry in value.entries)
+      entry.key:
+          const {
+            'err_no',
+            'err_msg',
+            'data',
+            'list',
+            'title',
+            'benefits',
+            'code',
+            'icon_key',
+            'display_type',
+            'provider',
+            'plan_code',
+            'store_product_id',
+            'base_plan_id',
+            'offer_id',
+            'billing_months',
+            'monthly_gems_cent',
+            'price_currency_code',
+            'price_amount',
+            'can_purchase',
+            'purchase_block_reason',
+          }.contains(entry.key)
+          ? entry.value is Map || entry.value is List
+                ? _membershipProductProfileJson(entry.value)
                 : entry.value
           : '[REDACTED]',
   };

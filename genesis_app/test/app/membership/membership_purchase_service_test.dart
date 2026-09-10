@@ -15,9 +15,7 @@ import '../../support/membership_fixtures.dart';
 
 const accountUuid = '4b74ec68-7abc-4cce-a223-e997e31dc811';
 const guest = MembershipGuestIdentity(
-  guestId: 'test-guest',
   accountUuid: '8b74ec68-7abc-4cce-a223-e997e31dc811',
-  claimToken: '1234567890123456789012345678901234567890123',
 );
 const completed = MembershipPurchaseReport(
   status: MembershipReportStatus.completed,
@@ -32,6 +30,7 @@ class PendingStore implements MembershipPendingStore {
   final claims = <String, MembershipGuestClaimRecord>{};
   bool fail = false;
   bool failComplete = false;
+  bool failRestoreCleanup = false;
   bool failClaim = false;
   bool failClaimCleanup = false;
   Future<void> Function(MembershipPurchaseRecord)? onSave;
@@ -45,7 +44,7 @@ class PendingStore implements MembershipPendingStore {
   @override
   Future<void> saveGuestClaim(MembershipGuestClaimRecord record) async {
     if (fail || failClaim) throw StateError('claim storage unavailable');
-    claims[record.guest.guestId] = record;
+    claims[record.guest.accountUuid] = record;
   }
 
   @override
@@ -56,14 +55,14 @@ class PendingStore implements MembershipPendingStore {
     }
     for (final purchases in [confirmed, records]) {
       for (final purchase in purchases.values.toList()) {
-        if (purchase.guest?.guestId == record.guest.guestId) {
+        if (purchase.guest?.accountUuid == record.guest.accountUuid) {
           purchases[purchase.requestId] = purchase.bindGuestToAccount(
             record.ownerUid!,
           );
         }
       }
     }
-    claims.remove(record.guest.guestId);
+    claims.remove(record.guest.accountUuid);
   }
 
   @override
@@ -78,7 +77,7 @@ class PendingStore implements MembershipPendingStore {
 
   @override
   Future<void> removeRestore(String requestId) async {
-    if (fail || failComplete) throw StateError('storage unavailable');
+    if (fail || failRestoreCleanup) throw StateError('storage unavailable');
     restores.remove(requestId);
   }
 
@@ -184,28 +183,25 @@ class Harness {
             : await reportHandler!(request);
       },
       claimGuest: claimEnabled
-          ? (identity) async {
-              claimRequests.add(identity);
-              expectSync(store.claims[identity.guestId]?.ownerUid, uid);
+          ? (request) async {
+              claimRequests.add(request);
+              expectSync(
+                store.claims[request.guest!.accountUuid]?.ownerUid,
+                uid,
+              );
               return claimHandler == null
                   ? MembershipClaimResult(
                       status: MembershipReportStatus.completed,
                     )
-                  : await claimHandler!(identity);
+                  : await claimHandler!(request);
             }
           : null,
-      restorePurchase: restoreEnabled
-          ? (request) async {
-              restoreRequests.add(request);
-              expectSync(
-                store.restores[request.requestId]?.request.purchaseToken,
-                request.purchaseToken,
-              );
-              return restoreHandler == null
-                  ? completed
-                  : await restoreHandler!(request);
-            }
-          : null,
+      loadSignedTransaction: (request) async {
+        signedTransactionQueries++;
+        return signedTransactionHandler == null
+            ? 'test.header.signature'
+            : await signedTransactionHandler!(request);
+      },
       queryRestorePurchases: restoreEnabled
           ? (ids) async {
               restoreQueries++;
@@ -242,12 +238,12 @@ class Harness {
   Future<void> Function()? walletRefreshHandler;
   int recoverQueries = 0;
   int restoreQueries = 0;
-  final claimRequests = <MembershipGuestIdentity>[];
-  Future<MembershipClaimResult> Function(MembershipGuestIdentity)? claimHandler;
+  final claimRequests = <MembershipPurchaseRequest>[];
+  Future<MembershipClaimResult> Function(MembershipPurchaseRequest)?
+  claimHandler;
+  int signedTransactionQueries = 0;
+  Future<String> Function(MembershipPurchaseRequest)? signedTransactionHandler;
   Future<List<BillingPurchase>> Function()? storeQuery;
-  final restoreRequests = <MembershipPurchaseRequest>[];
-  Future<MembershipPurchaseReport> Function(MembershipPurchaseRequest)?
-  restoreHandler;
   List<BillingPurchase> recoverable = [];
   final reports = <MembershipPurchaseRequest>[];
   Future<MembershipPurchaseReport> Function(MembershipPurchaseRequest)?
@@ -269,6 +265,9 @@ class Harness {
     transactionId: transaction,
     originalTransactionId: 'original-test',
     originalJson: '',
+    signedTransaction: provider == MembershipProvider.apple
+        ? 'test.header.signature'
+        : '',
     purchaseTime: '',
     status: status,
     obfuscatedAccountId:
@@ -292,7 +291,7 @@ void main() {
       );
       expect(restarted.reports, isEmpty);
       expect(
-        restarted.restoreRequests.single.product.basePlanId,
+        restarted.store.confirmed.values.single.product.basePlanId,
         'test-annual',
       );
       expect(restarted.store.restores, isEmpty);
@@ -394,20 +393,20 @@ void main() {
       final h = Harness()..uid = null;
       h.platform.onLaunch = () async {
         expect(
-          h.store.records.values.single.guest?.claimToken,
-          guest.claimToken,
+          h.store.records.values.single.guest?.accountUuid,
+          guest.accountUuid,
         );
       };
       await h.service.purchase(h.product());
       expect(h.guestPrepares, 1);
       expect(h.platform.uuid, guest.accountUuid);
       await h.service.interceptPurchase(h.purchase());
-      expect(h.reports.single.guest?.guestId, guest.guestId);
+      expect(h.reports.single.guest?.accountUuid, guest.accountUuid);
       expect(h.refreshes, 0);
       expect(h.store.records, isEmpty);
       expect(
-        h.store.confirmed.values.single.guest?.claimToken,
-        guest.claimToken,
+        h.store.confirmed.values.single.guest?.accountUuid,
+        guest.accountUuid,
       );
     },
   );

@@ -4,6 +4,7 @@ import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_storekit/store_kit_2_wrappers.dart';
 
 import '../../network/models/membership_product.dart';
+import '../../network/models/membership_purchase.dart';
 import 'billing_models.dart';
 
 /// Read-only store recovery. It does not emit into the shared Gems stream.
@@ -22,6 +23,27 @@ class MembershipStoreRestorer {
   static Future<PurchasesResultWrapper> _queryGoogle() => InAppPurchase.instance
       .getPlatformAddition<InAppPurchaseAndroidPlatformAddition>()
       .querySubscriptionPurchases();
+
+  /// Look up the exact transaction, including finished purchases after restart.
+  /// Do not replace a receipt with the latest renewal's different transaction.
+  Future<String> signedTransaction(MembershipPurchaseRequest request) async {
+    final uuid = request.guest?.accountUuid;
+    if (provider != MembershipProvider.apple || uuid == null) {
+      throw const BillingPlatformException('invalid_guest_apple_request');
+    }
+    for (final transaction in await _appleQuery()) {
+      if (transaction.id == request.transactionId &&
+          transaction.productId == request.product.storeProductId &&
+          transaction.appAccountToken?.toLowerCase() == uuid.toLowerCase() &&
+          transaction.error == null &&
+          transaction.receiptData?.isNotEmpty == true) {
+        return transaction.receiptData!;
+      }
+    }
+    throw const BillingPlatformException(
+      'membership_signed_transaction_missing',
+    );
+  }
 
   Future<List<BillingPurchase>> query(Set<String> productIds) async {
     if (productIds.isEmpty) return [];
@@ -74,6 +96,7 @@ class MembershipStoreRestorer {
             purchaseToken: transaction.id,
             transactionId: transaction.id,
             originalTransactionId: transaction.originalId,
+            signedTransaction: transaction.receiptData ?? '',
             originalJson: '',
             purchaseTime: transaction.purchaseDate,
             status: BillingPurchaseStatus.restored,

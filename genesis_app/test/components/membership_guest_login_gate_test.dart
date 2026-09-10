@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +8,8 @@ import 'package:genesis_flutter_android/components/gems/membership_guest_login_g
 import 'package:genesis_flutter_android/components/gems/pro_subscription_content.dart';
 import 'package:genesis_flutter_android/components/login_sheet.dart';
 import 'package:genesis_flutter_android/platform/auth/auth_cancelled_exception.dart';
+import 'package:genesis_flutter_android/network/models/membership_claim.dart';
+import 'package:genesis_flutter_android/routers/app_router.dart';
 
 import '../app/membership/membership_purchase_service_test.dart';
 import '../support/membership_fixtures.dart';
@@ -15,6 +19,7 @@ Future<void> openGuestApp(
   Harness h, {
   Future<bool> Function()? signIn,
   bool inPurchaseSheet = false,
+  bool inPurchasePage = false,
   bool homeOnly = false,
 }) async {
   final navigator = GlobalKey<NavigatorState>();
@@ -30,6 +35,7 @@ Future<void> openGuestApp(
   await tester.pumpWidget(
     MaterialApp(
       navigatorKey: navigator,
+      routes: {RouteNames.me: (_) => const Scaffold(body: Text('Me'))},
       builder: (context, child) => MembershipGuestLoginGate(
         service: h.service,
         navigatorKey: navigator,
@@ -48,15 +54,24 @@ Future<void> openGuestApp(
       home: Scaffold(
         body: homeOnly
             ? const Text('Home')
-            : inPurchaseSheet
+            : inPurchaseSheet || inPurchasePage
             ? Builder(
                 builder: (context) => TextButton(
-                  onPressed: () => showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) =>
-                        SizedBox(height: 740, child: subscription()),
-                  ),
+                  onPressed: () => inPurchasePage
+                      ? Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            settings: const RouteSettings(
+                              name: RouteNames.gemWallet,
+                            ),
+                            builder: (_) => Scaffold(body: subscription()),
+                          ),
+                        )
+                      : showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (_) =>
+                              SizedBox(height: 740, child: subscription()),
+                        ),
                   child: const Text('Open purchases'),
                 ),
               )
@@ -74,6 +89,56 @@ void main() {
   });
 
   testWidgets(
+    'successful forced login removes purchase routes before claim completes',
+    (tester) async {
+      final h = Harness(
+        claimEnabled: true,
+        retryDelay: const Duration(seconds: 15),
+      )..uid = null;
+      final binding = Completer<MembershipClaimResult>();
+      h.claimHandler = (_) => binding.future;
+      await openGuestApp(tester, h, inPurchasePage: true);
+      await tester.tap(find.text('Open purchases'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('pro-subscribe-button')));
+      await tester.pump(const Duration(milliseconds: 250));
+      await h.service.interceptPurchase(h.purchase(yearly: true));
+      await tester.pumpAndSettle();
+      expect(find.text('VIP purchase successful!'), findsOneWidget);
+      expect(find.text('Me'), findsNothing);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginSheet), findsOneWidget);
+      await tester.tap(find.text('Continue with Google'));
+      await tester.pumpAndSettle();
+
+      expect(binding.isCompleted, isFalse);
+      expect(find.text('Me'), findsOneWidget);
+      expect(find.byType(LoginSheet, skipOffstage: false), findsNothing);
+      expect(
+        find.byType(ProSubscriptionContent, skipOffstage: false),
+        findsNothing,
+      );
+      expect(find.text('Open purchases', skipOffstage: false), findsNothing);
+      expect(Navigator.of(tester.element(find.text('Me'))).canPop(), isFalse);
+      expect(h.claimRequests, hasLength(1));
+      expect(h.store.claims, isNotEmpty);
+
+      binding.completeError(StateError('temporary binding failure'));
+      await tester.pumpAndSettle();
+      expect(find.text('Me'), findsOneWidget);
+      expect(h.store.claims, isNotEmpty);
+      h.claimHandler = null;
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(h.claimRequests, hasLength(2));
+      expect(h.store.claims, isEmpty);
+      expect(find.text('Me'), findsOneWidget);
+      expect(h.refreshes, greaterThan(0));
+    },
+  );
+
+  testWidgets(
     'debug bypass keeps purchase success and later manual login can claim',
     (tester) async {
       await membershipGuestLoginDebugSettings.setForceLogin(false);
@@ -88,6 +153,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(LoginSheet), findsNothing);
       expect(h.store.claims.values.single.purchaseConfirmed, isTrue);
+      expect(find.text('Me'), findsNothing);
+      expect(find.byType(ProSubscriptionContent), findsOneWidget);
       expect(h.claimRequests, isEmpty);
       h.uid = 'first-login';
       h.service.resetForSession();
@@ -195,7 +262,9 @@ void main() {
     await tester.tap(find.text('Continue with Google'));
     await tester.pumpAndSettle();
     expect(find.byType(LoginSheet), findsNothing);
-    expect(find.text('Open purchases'), findsOneWidget);
+    expect(find.text('Me'), findsOneWidget);
+    expect(find.text('Open purchases', skipOffstage: false), findsNothing);
+    expect(Navigator.of(tester.element(find.text('Me'))).canPop(), isFalse);
     expect(h.claimRequests, hasLength(1));
   });
 
@@ -247,6 +316,11 @@ void main() {
       expect(find.byType(LoginSheet), findsNothing);
       expect(h.claimRequests, hasLength(1));
       expect(h.uid, 'first-login');
+      expect(find.text('Me'), findsOneWidget);
+      expect(
+        find.byType(ProSubscriptionContent, skipOffstage: false),
+        findsNothing,
+      );
       await tester.pump(const Duration(seconds: 3));
     },
   );
@@ -275,6 +349,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(LoginSheet), findsNothing);
       expect(h.store.claims, isEmpty);
+      expect(find.text('Me'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
       final afterBinding = Harness(storage: h.store, claimEnabled: true)

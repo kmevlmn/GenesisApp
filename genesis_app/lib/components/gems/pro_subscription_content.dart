@@ -9,6 +9,7 @@ import '../../app/bootstrap/service_registry.dart';
 import '../../app/membership/membership_catalog.dart';
 import '../../app/membership/membership_purchase_service.dart';
 import '../../app/membership/membership_purchase_eligibility.dart';
+import '../../platform/billing/purchase_toast_diagnostics.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../routers/app_router.dart';
 import '../../ui/components/genesis_primary_button.dart';
@@ -177,7 +178,16 @@ class _ProSubscriptionContentState extends State<ProSubscriptionContent> {
     }
     final service = widget.purchaseService ?? _services?.membershipPurchases;
     if (service == null) {
-      showGenesisToast(context, 'VIP purchase is unavailable.');
+      showGenesisToast(
+        context,
+        purchaseToastMessage(
+          'VIP purchase is unavailable.',
+          debugInfo: purchaseDebugInfo(
+            'vip.precheck',
+            reason: 'service_unavailable',
+          ),
+        ),
+      );
       return;
     }
     if (!identical(service, _presentationService)) {

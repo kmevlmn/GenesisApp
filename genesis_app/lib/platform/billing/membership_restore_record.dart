@@ -2,8 +2,8 @@ import '../../network/models/membership_order_product.dart';
 import '../../network/models/membership_purchase.dart';
 import 'billing_models.dart';
 
-/// A restore operation has its own idempotency key, even for a known purchase.
-/// An unresolved Google plan retains its receipt without inventing a base plan.
+/// A legacy restore record or a store receipt awaiting an exact plan.
+/// Resolved receipts move into the normal purchase/report queue.
 class MembershipRestoreRecord {
   const MembershipRestoreRecord({
     required this.requestId,

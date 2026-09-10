@@ -1365,7 +1365,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.textContaining('Purchasing Gems'), findsNothing);
-    expect(find.text('Purchase failed.'), findsOneWidget);
+    expect(
+      find.text('debug：gems.checkout; status=failure\nPurchase failed.'),
+      findsOneWidget,
+    );
     await tester.pump(const Duration(seconds: 2));
   });
 
@@ -1559,6 +1562,7 @@ void main() {
 
     expect(
       find.text(
+        'debug：gems.checkout; status=accepted\n'
         'Payment received.\nYour Gems will be added shortly. Please check your balance again in a moment.',
       ),
       findsOneWidget,
@@ -1692,6 +1696,74 @@ void main() {
     expect(find.text('Task description'), findsNothing);
   });
 
+  for (final status in ['in_progress', 'claimable']) {
+    testWidgets(
+      'daily check-in $status can dismiss and reopen without claiming',
+      (tester) async {
+        var reports = 0;
+        var claims = 0;
+        final walletStore = GemWalletStore(
+          loadWallet: () async => const GemWallet(balanceCent: 43000),
+          readUid: () async => 'u_user',
+        );
+        addTearDown(walletStore.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GemWalletPage(
+              walletStore: walletStore,
+              productsLoader: (_) async => const [],
+              tasksLoader: (_) async => [
+                _taskGroup(
+                  _task(
+                    taskCode: 'daily_checkin',
+                    status: status,
+                    actionText: 'Collect',
+                  ),
+                ),
+              ],
+              taskReporter: (_) async {
+                reports++;
+                return const GemTaskActionResult(status: 'claimable');
+              },
+              taskClaimer: (_) async {
+                claims++;
+                return const GemTaskActionResult(status: 'claimed');
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final button = find.byKey(
+          const ValueKey<String>('gem-task-action-daily_checkin'),
+        );
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(find.text('Daily Check-in'), findsOneWidget);
+        expect(reports, 0);
+        expect(claims, 0);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.text('Daily Check-in'), findsNothing);
+        expect(reports, 0);
+        expect(claims, 0);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(find.text('Daily Check-in'), findsOneWidget);
+        await tester.tap(
+          find.descendant(
+            of: find.byWidgetPredicate((widget) => widget is GenesisActionBox),
+            matching: find.text(status == 'claimable' ? 'Claim' : 'Check in'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(reports, status == 'in_progress' ? 1 : 0);
+        expect(claims, 1);
+        expect(find.text('Check in successful!'), findsOneWidget);
+        await tester.pump(const Duration(seconds: 3));
+      },
+    );
+  }
+
   testWidgets('daily check-in reports once and refreshes task and wallet', (
     tester,
   ) async {
@@ -1752,7 +1824,18 @@ void main() {
       const ValueKey<String>('gem-task-action-daily_checkin'),
     );
     await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(find.text('Daily Check-in'), findsOneWidget);
+    expect(reportCalls, 0);
+    expect(claimCalls, 0);
+    await tester.tap(
+      find.descendant(
+        of: find.byWidgetPredicate((widget) => widget is GenesisActionBox),
+        matching: find.text('Check in'),
+      ),
+    );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(button);
     await tester.pump();
     expect(reportCalls, 1);
@@ -1819,6 +1902,15 @@ void main() {
     );
     await tester.pump();
 
+    expect(claimCalls, 0);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byWidgetPredicate((widget) => widget is GenesisActionBox),
+        matching: find.text('Check in'),
+      ),
+    );
+    await tester.pump();
     expect(claimCalls, 1);
     expect(find.text('Claim'), findsNothing);
 
@@ -1878,6 +1970,15 @@ void main() {
       await tester.tap(
         find.byKey(ValueKey<String>('gem-task-action-${entry.key}')),
       );
+      if (entry.key == 'daily_checkin') {
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: find.byWidgetPredicate((widget) => widget is GenesisActionBox),
+            matching: find.text('Check in'),
+          ),
+        );
+      }
       await tester.pump();
       expect(find.text(entry.value), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
@@ -1917,6 +2018,16 @@ void main() {
     );
     await tester.pump();
 
+    await tester.pumpAndSettle();
+    expect(find.text('Daily Check-in'), findsOneWidget);
+    expect(find.text('Claim failed.'), findsNothing);
+    await tester.tap(
+      find.descendant(
+        of: find.byWidgetPredicate((widget) => widget is GenesisActionBox),
+        matching: find.text('Claim'),
+      ),
+    );
+    await tester.pump();
     expect(find.text('Claim failed.'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
   });

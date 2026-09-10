@@ -7,6 +7,7 @@ import '../../app/membership/membership_purchase_eligibility.dart';
 import '../../icons/custom_icon_assets.dart';
 import '../../network/models/membership_product.dart';
 import '../../platform/billing/billing_models.dart';
+import '../../platform/billing/purchase_toast_diagnostics.dart';
 import '../common/genesis_center_toast.dart';
 import '../common/genesis_modal_routes.dart';
 import 'gem_billing_purchase_dialog.dart';
@@ -80,22 +81,48 @@ class MembershipPurchasePresentation {
           _resolved = true;
           _close(false);
           if (context.mounted) {
+            final debugInfo =
+                event.debugInfo ??
+                purchaseDebugInfo(
+                  'vip.checkout',
+                  status: event.state.name,
+                  reason: event.reason,
+                );
             showGenesisToast(
               context,
               event.reason == null
-                  ? _message(event.state)
-                  : membershipPurchaseFailureMessage(event.reason!),
+                  ? purchaseToastMessage(
+                      _message(event.state),
+                      debugInfo: debugInfo,
+                    )
+                  : membershipPurchaseFailureMessage(
+                      event.reason!,
+                      debugInfo: debugInfo,
+                    ),
             );
           }
       }
     }, onDone: () => _close(false));
     final result = navigator.push(route);
     unawaited(
-      service.purchase(product, attemptId: attemptId).catchError((Object _) {
+      service.purchase(product, attemptId: attemptId).catchError((
+        Object error,
+      ) {
         if (_disposed || _resolved) return;
         _resolved = true;
         _close(false);
-        if (context.mounted) showGenesisToast(context, 'VIP purchase failed.');
+        if (context.mounted) {
+          showGenesisToast(
+            context,
+            purchaseToastMessage(
+              'VIP purchase failed.',
+              debugInfo: purchaseDebugInfo(
+                'vip.checkout_exception',
+                error: error,
+              ),
+            ),
+          );
+        }
       }),
     );
     try {

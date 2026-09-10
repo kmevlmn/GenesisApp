@@ -105,6 +105,7 @@ class BillingPurchase {
     required this.status,
     this.obfuscatedAccountId,
     this.errorCode,
+    this.signedTransaction = '',
     this.errorMessage,
   });
 
@@ -118,6 +119,9 @@ class BillingPurchase {
   final BillingPurchaseStatus status;
   final String? obfuscatedAccountId;
   final String? errorCode;
+
+  /// In-memory StoreKit JWS for VIP guest reporting/claiming; never persisted.
+  final String signedTransaction;
   final String? errorMessage;
 }
 
@@ -232,6 +236,7 @@ class BillingUiEvent {
     required this.attemptId,
     required this.message,
     this.grantedGemsCent = 0,
+    this.debugInfo,
   });
 
   final BillingUiEventKind kind;
@@ -239,6 +244,7 @@ class BillingUiEvent {
   final String attemptId;
   final String message;
   final int grantedGemsCent;
+  final String? debugInfo;
 }
 
 class BillingPlatformException implements Exception {

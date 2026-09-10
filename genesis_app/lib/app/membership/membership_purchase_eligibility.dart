@@ -1,6 +1,5 @@
-import 'package:flutter/foundation.dart';
-
 import '../../network/models/membership_product.dart';
+import '../../platform/billing/purchase_toast_diagnostics.dart';
 
 class MembershipPurchaseBlocked implements Exception {
   const MembershipPurchaseBlocked(this.reason);
@@ -16,7 +15,7 @@ String? membershipPurchaseBlockReason(MembershipProduct product) {
   return null;
 }
 
-String membershipPurchaseFailureMessage(String reason) {
+String membershipPurchaseFailureMessage(String reason, {String? debugInfo}) {
   final message = switch (reason) {
     'already_subscribed' => 'You already have this VIP plan.',
     'downgrade_not_allowed' =>
@@ -37,17 +36,9 @@ String membershipPurchaseFailureMessage(String reason) {
     'purchase_revoked' => 'This VIP purchase was revoked.',
     _ => 'VIP purchase failed.',
   };
-  final isPurchaseBlockReason = const {
-    'device_id_required',
-    'already_subscribed',
-    'downgrade_not_allowed',
-    'cross_platform_upgrade_not_allowed',
-    'subscription_requires_action',
-    'purchase_processing',
-    'sale_disabled',
-    'eligibility_unavailable',
-  }.contains(reason);
-  return kDebugMode && isPurchaseBlockReason
-      ? 'debug:$reason\n$message'
-      : message;
+  return purchaseToastMessage(
+    message,
+    debugInfo:
+        debugInfo ?? purchaseDebugInfo('vip.eligibility', reason: reason),
+  );
 }

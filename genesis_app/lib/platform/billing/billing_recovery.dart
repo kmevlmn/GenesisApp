@@ -277,7 +277,14 @@ extension _GooglePlayBillingRecovery on GooglePlayBillingService {
     if (!persistedRecordLookupSucceeded &&
         (purchase.status == BillingPurchaseStatus.purchased ||
             purchase.status == BillingPurchaseStatus.restored)) {
-      _emitDeferred(productId, attemptId);
+      _emitDeferred(
+        productId,
+        attemptId,
+        debugInfo: purchaseDebugInfo(
+          'gems.load_local_orders',
+          reason: 'receipt_lookup_failed',
+        ),
+      );
       return;
     }
 
@@ -313,6 +320,10 @@ extension _GooglePlayBillingRecovery on GooglePlayBillingService {
             productId: productId,
             attemptId: attemptId,
             message: 'Payment is pending.',
+            debugInfo: purchaseDebugInfo(
+              'gems.store_callback',
+              status: purchase.status.name,
+            ),
           ),
         );
         BillingPendingPurchase? pendingRecord = persistedRecord;
@@ -345,6 +356,10 @@ extension _GooglePlayBillingRecovery on GooglePlayBillingService {
             productId: productId,
             attemptId: attemptId,
             message: 'Purchase cancelled.',
+            debugInfo: purchaseDebugInfo(
+              'gems.store_callback',
+              status: purchase.status.name,
+            ),
           ),
         );
         _trackFlowResultById(
@@ -362,6 +377,12 @@ extension _GooglePlayBillingRecovery on GooglePlayBillingService {
           productId,
           attemptId,
           _purchaseDetailsFailureMessage(purchase),
+          debugInfo: purchaseDebugInfo(
+            'gems.store_callback',
+            status: purchase.status.name,
+            errorCode: purchase.errorCode,
+            errorMessage: purchase.errorMessage,
+          ),
         );
         _trackFlowResultById(
           attemptId: attemptId,
@@ -381,7 +402,15 @@ extension _GooglePlayBillingRecovery on GooglePlayBillingService {
 
     if (token.isEmpty) {
       _clearAttempt(purchase, attempt);
-      _emitFailure(productId, attemptId, 'Purchase failed.');
+      _emitFailure(
+        productId,
+        attemptId,
+        'Purchase failed.',
+        debugInfo: purchaseDebugInfo(
+          'gems.store_callback',
+          reason: 'receipt_missing',
+        ),
+      );
       _trackFlowResultById(
         attemptId: attemptId,
         productId: productId,
@@ -433,7 +462,14 @@ extension _GooglePlayBillingRecovery on GooglePlayBillingService {
         try {
           await _pendingPurchaseStore.upsert(record);
         } catch (_) {
-          _emitDeferred(resolvedAttempt.product.productId, resolvedAttempt.id);
+          _emitDeferred(
+            resolvedAttempt.product.productId,
+            resolvedAttempt.id,
+            debugInfo: purchaseDebugInfo(
+              'gems.save_order',
+              reason: 'receipt_persistence_failed',
+            ),
+          );
           return;
         }
       } else if (record.status != BillingPendingPurchaseStatus.received) {
@@ -453,7 +489,14 @@ extension _GooglePlayBillingRecovery on GooglePlayBillingService {
         try {
           await _pendingPurchaseStore.upsert(record);
         } catch (_) {
-          _emitDeferred(record.productId, record.attemptId);
+          _emitDeferred(
+            record.productId,
+            record.attemptId,
+            debugInfo: purchaseDebugInfo(
+              'gems.save_order',
+              reason: 'receipt_persistence_failed',
+            ),
+          );
           return;
         }
       }

@@ -2,6 +2,7 @@ import '../../utils/gem_amount.dart';
 import '../json_utils.dart';
 import 'membership_benefit.dart';
 import 'membership_order_product.dart';
+import 'membership_purchase.dart';
 
 export 'membership_order_product.dart';
 
@@ -36,6 +37,8 @@ class MembershipProduct extends MembershipOrderProduct {
     required this.priceAmount,
     required this.canPurchase,
     required this.purchaseBlockReason,
+    this.upgradeAccountUuid,
+    this.upgradePurchaseToken,
     super.basePlanId,
     super.offerId,
   });
@@ -102,6 +105,24 @@ class MembershipProduct extends MembershipOrderProduct {
         gems < 0) {
       throw const FormatException('Invalid membership product configuration');
     }
+    final upgradeUuid = json['account_uuid'];
+    final upgradeToken = json['purchase_token'];
+    final hasUpgrade = json.containsKey('account_uuid');
+    final hasToken = json.containsKey('purchase_token');
+    if ((hasUpgrade &&
+            (upgradeUuid is! String ||
+                !isMembershipAccountUuid(upgradeUuid) ||
+                planCode != 'pro_yearly' ||
+                !canPurchase ||
+                blockReason.isNotEmpty)) ||
+        (provider == MembershipProvider.google &&
+            (hasUpgrade != hasToken ||
+                hasToken &&
+                    (upgradeToken is! String ||
+                        upgradeToken.trim().isEmpty))) ||
+        (provider == MembershipProvider.apple && hasToken)) {
+      throw const FormatException('Invalid membership upgrade credentials');
+    }
     return MembershipProduct(
       title: title,
       benefits: List.unmodifiable(benefits),
@@ -116,6 +137,8 @@ class MembershipProduct extends MembershipOrderProduct {
       priceAmount: amount as int?,
       canPurchase: canPurchase,
       purchaseBlockReason: blockReason,
+      upgradeAccountUuid: (upgradeUuid as String?)?.toLowerCase(),
+      upgradePurchaseToken: upgradeToken as String?,
     );
   }
 
@@ -127,9 +150,15 @@ class MembershipProduct extends MembershipOrderProduct {
   final bool canPurchase;
   final String purchaseBlockReason;
 
+  /// Original subscription identity, supplied only for an authenticated upgrade.
+  /// Kept in memory; never include these credentials in catalog/order snapshots.
+  final String? upgradeAccountUuid;
+  final String? upgradePurchaseToken;
+
   /// Full billing cycle price, in hundredths of the currency's main unit.
   final int? priceAmount;
 
+  /// Display metadata only; upgrade credentials must be fetched again at checkout.
   Map<String, Object?> toJson() => {
     'title': title,
     'benefits': [for (final benefit in benefits) benefit.toJson()],

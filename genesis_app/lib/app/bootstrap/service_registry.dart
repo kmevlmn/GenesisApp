@@ -303,6 +303,9 @@ class ServiceRegistry {
 
     BillingService? billing;
     final membershipProvider = MembershipCatalog.currentProvider;
+    final membershipRestorer = membershipProvider == null
+        ? null
+        : MembershipStoreRestorer(provider: membershipProvider);
     final membershipPurchases =
         billingPlatform == null || membershipProvider == null
         ? null
@@ -322,10 +325,8 @@ class ServiceRegistry {
             ),
             reportPurchase: api.v1.membership.reportPurchase,
             claimGuest: api.v1.membership.claimGuest,
-            restorePurchase: api.v1.membership.restorePurchase,
-            queryRestorePurchases: MembershipStoreRestorer(
-              provider: membershipProvider,
-            ).query,
+            queryRestorePurchases: membershipRestorer!.query,
+            loadSignedTransaction: membershipRestorer.signedTransaction,
             queryPurchases: billingPlatform.queryRecoverablePurchases,
             otherPurchaseBusy: () =>
                 billing?.state.value.hasBusyPurchase ?? false,

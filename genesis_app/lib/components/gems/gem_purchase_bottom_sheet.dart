@@ -9,6 +9,7 @@ import '../../network/chatroom/world_chatroom_service.dart';
 import '../../network/models/gem_product.dart';
 import '../../platform/billing/billing_models.dart';
 import '../../platform/billing/billing_service.dart';
+import '../../platform/billing/purchase_toast_diagnostics.dart';
 import '../../utils/gem_amount.dart';
 import '../common/genesis_center_toast.dart';
 import '../common/genesis_bottom_sheet_panel.dart';
@@ -41,7 +42,16 @@ Future<void> showGemPurchaseBottomSheet(
       resolvedWalletStore == null ||
       resolvedBillingService == null) {
     if (context.mounted) {
-      showGenesisToast(context, 'Unable to load gem packs.');
+      showGenesisToast(
+        context,
+        purchaseToastMessage(
+          'Unable to load gem packs.',
+          debugInfo: purchaseDebugInfo(
+            'gems.precheck',
+            reason: 'service_unavailable',
+          ),
+        ),
+      );
     }
     return;
   }
@@ -202,11 +212,17 @@ class _GemPurchaseBottomSheetState extends State<GemPurchaseBottomSheet> {
         source: BillingPurchaseSource.buyGemsSheet,
         payTrackId: billingPurchaseTrackId(widget.payTrackPageId),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       _startedProductIds.remove(product.productId);
       _dismissPurchaseDialog();
-      showGenesisToast(context, 'Purchase failed.');
+      showGenesisToast(
+        context,
+        purchaseToastMessage(
+          'Purchase failed.',
+          debugInfo: purchaseDebugInfo('gems.checkout_exception', error: error),
+        ),
+      );
       return;
     }
     if (!mounted) return;
@@ -232,7 +248,15 @@ class _GemPurchaseBottomSheetState extends State<GemPurchaseBottomSheet> {
       case BillingUiEventKind.deferred:
         _startedProductIds.remove(event.productId);
         _dismissPurchaseDialog();
-        showGenesisToast(context, event.message);
+        showGenesisToast(
+          context,
+          purchaseToastMessage(
+            event.message,
+            debugInfo:
+                event.debugInfo ??
+                purchaseDebugInfo('gems.checkout', status: event.kind.name),
+          ),
+        );
     }
   }
 

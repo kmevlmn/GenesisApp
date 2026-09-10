@@ -244,7 +244,13 @@ extension _GooglePlayBillingAttemptRegistry on GooglePlayBillingService {
           errorCode: _reportFailureReason(error),
         );
       }
-      if (!silent) _emitDeferred(record.productId, record.attemptId);
+      if (!silent) {
+        _emitDeferred(
+          record.productId,
+          record.attemptId,
+          debugInfo: purchaseDebugInfo('gems.report', error: error),
+        );
+      }
       _setBusy(record.productId, false);
       return;
     }
@@ -299,6 +305,11 @@ extension _GooglePlayBillingAttemptRegistry on GooglePlayBillingService {
         _emitUiEvent(
           BillingUiEvent(
             kind: BillingUiEventKind.accepted,
+            debugInfo: purchaseDebugInfo(
+              'gems.report',
+              status: report.status.name,
+              reason: report.reason,
+            ),
             productId: record.productId,
             attemptId: record.attemptId,
             message:
@@ -317,6 +328,11 @@ extension _GooglePlayBillingAttemptRegistry on GooglePlayBillingService {
           record.productId,
           record.attemptId,
           'Purchase was refunded.',
+          debugInfo: purchaseDebugInfo(
+            'gems.report',
+            status: report.status.name,
+            reason: report.reason,
+          ),
         );
       }
     }
@@ -383,7 +399,11 @@ extension _GooglePlayBillingAttemptRegistry on GooglePlayBillingService {
           reason: 'report_failed',
           errorCode: _reportFailureReason(error),
         );
-        _emitDeferred(record.productId, record.attemptId);
+        _emitDeferred(
+          record.productId,
+          record.attemptId,
+          debugInfo: purchaseDebugInfo('gems.restore_report', error: error),
+        );
         _setBusy(record.productId, false);
       }
       return;
@@ -418,6 +438,11 @@ extension _GooglePlayBillingAttemptRegistry on GooglePlayBillingService {
       _emitUiEvent(
         BillingUiEvent(
           kind: BillingUiEventKind.accepted,
+          debugInfo: purchaseDebugInfo(
+            'gems.restore_report',
+            status: report.status.name,
+            reason: report.reason,
+          ),
           productId: record.productId,
           attemptId: record.attemptId,
           message:
@@ -429,6 +454,11 @@ extension _GooglePlayBillingAttemptRegistry on GooglePlayBillingService {
         record.productId,
         record.attemptId,
         'Purchase was refunded.',
+        debugInfo: purchaseDebugInfo(
+          'gems.restore_report',
+          status: report.status.name,
+          reason: report.reason,
+        ),
       );
     }
     _setBusy(record.productId, false);
@@ -470,7 +500,16 @@ extension _GooglePlayBillingAttemptRegistry on GooglePlayBillingService {
     try {
       await _pendingPurchaseStore.upsert(next);
     } catch (_) {}
-    if (!silent) _emitDeferred(record.productId, record.attemptId);
+    if (!silent) {
+      _emitDeferred(
+        record.productId,
+        record.attemptId,
+        debugInfo: purchaseDebugInfo(
+          'gems.update_order',
+          reason: 'local_order_mutation_failed',
+        ),
+      );
+    }
     _setBusy(record.productId, false);
   }
 

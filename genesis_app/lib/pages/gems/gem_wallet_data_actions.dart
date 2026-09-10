@@ -108,7 +108,25 @@ extension _GemWalletDataActions on _GemWalletPageState {
     final taskCode = task.taskCode.trim();
     if (taskCode.isEmpty || _loadingTaskCodes.contains(taskCode)) return;
 
-    final status = _taskStatus(task);
+    var status = _taskStatus(task);
+    if (taskCode == dailyCheckInTaskCode &&
+        (status == 'in_progress' || status == 'claimable')) {
+      if (!_beginTaskAction(taskCode)) return;
+      final bool confirmed;
+      try {
+        confirmed = await showDailyCheckInDialog(
+          context,
+          status: status == 'claimable'
+              ? DailyCheckInDialogStatus.claim
+              : DailyCheckInDialogStatus.checkIn,
+          rewardGemsCent: task.rewardGemsCent,
+        );
+      } finally {
+        _endTaskAction(taskCode);
+      }
+      if (!mounted || !confirmed) return;
+      status = _taskStatus(task);
+    }
     if (status == 'claimed') return;
     if (status == 'claimable') {
       await _claimTaskReward(taskCode, rewardGemsCent: task.rewardGemsCent);
