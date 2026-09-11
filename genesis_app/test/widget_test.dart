@@ -29235,22 +29235,35 @@ void main() {
       of: find.byKey(const ValueKey<String>('world-bottom-tags-overlay')),
       matching: find.text('Detail'),
     );
-    final tagFills = tester
-        .widgetList<Container>(
-          find.descendant(
-            of: find.byKey(const ValueKey<String>('world-bottom-tags-overlay')),
-            matching: find.byType(Container),
-          ),
-        )
-        .where((widget) => widget.decoration is BoxDecoration)
-        .toList();
-    expect(tagFills, hasLength(4));
-    for (final tag in tagFills) {
+    // Info plus the four sections, with Info resting selected.
+    final bubbleOverlay = find.byKey(
+      const ValueKey<String>('world-bottom-tags-overlay'),
+    );
+    for (final label in const [
+      'info',
+      'detail',
+      'locations',
+      'events',
+      'status',
+    ]) {
       expect(
-        (tag.decoration as BoxDecoration).color,
-        GenesisColors.darkFaintFill,
+        find.descendant(
+          of: bubbleOverlay,
+          matching: find.byKey(ValueKey<String>('world-bubble-$label')),
+        ),
+        findsOneWidget,
       );
     }
+    final infoFill = tester.widget<AnimatedContainer>(
+      find.descendant(
+        of: find.byKey(const ValueKey<String>('world-bubble-info')),
+        matching: find.byType(AnimatedContainer),
+      ),
+    );
+    expect(
+      (infoFill.decoration! as BoxDecoration).color,
+      const Color(0x1FFFFFFF),
+    );
     await tester.tap(detailTag);
     await tester.pumpAndSettle();
     expect(currentTilemap().animationsPaused, isTrue);
@@ -29288,7 +29301,8 @@ void main() {
       const ValueKey<String>('world-sheet-page-indicator'),
     );
     expect(sheetIndicator, findsOneWidget);
-    expect(tester.getSize(sheetIndicator), const Size(53, 4));
+    // Info plus four sections.
+    expect(tester.getSize(sheetIndicator), const Size(62, 4));
     expect(
       tester.getTopLeft(sheetIndicator).dy - tester.getTopLeft(openedSheet).dy,
       closeTo(8.5, 0.001),
@@ -29300,16 +29314,17 @@ void main() {
       ),
       findsOneWidget,
     );
-    for (var index = 0; index < 4; index++) {
+    // Detail opens on page 1, after Info.
+    for (var index = 0; index < 5; index++) {
       final segment = find.byKey(
         ValueKey<String>('world-sheet-page-segment-$index'),
       );
       expect(segment, findsOneWidget);
       expect(tester.getSize(segment).height, 4);
-      expect(tester.getSize(segment).width, index == 0 ? 26 : 4);
+      expect(tester.getSize(segment).width, index == 1 ? 26 : 4);
       expect(
         (tester.widget<Container>(segment).decoration as BoxDecoration).color,
-        index == 0
+        index == 1
             ? GenesisColors.darkHandleActive
             : GenesisColors.darkHandleInactive,
       );
@@ -29324,7 +29339,7 @@ void main() {
     expect(sheetPages, findsOneWidget);
     final sheetPageController = tester.widget<PageView>(sheetPages).controller!;
     final pageAnimation = sheetPageController.animateToPage(
-      1,
+      2,
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
     );
@@ -29333,7 +29348,7 @@ void main() {
     expect(
       tester
           .getSize(
-            find.byKey(const ValueKey<String>('world-sheet-page-segment-0')),
+            find.byKey(const ValueKey<String>('world-sheet-page-segment-1')),
           )
           .width,
       4,
@@ -29341,14 +29356,14 @@ void main() {
     expect(
       tester
           .getSize(
-            find.byKey(const ValueKey<String>('world-sheet-page-segment-1')),
+            find.byKey(const ValueKey<String>('world-sheet-page-segment-2')),
           )
           .width,
       26,
     );
 
     final returnToDetail = sheetPageController.animateToPage(
-      0,
+      1,
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
     );
@@ -29822,7 +29837,7 @@ void main() {
     final loadingInfoRect = tester.getRect(panelInfoRow);
     final loadingBottomTagsRect = tester.getRect(bottomTagsOverlay);
     expect(loadingInfoRect.height, worldLaunchedInfoHeaderHeight);
-    expect(loadingBottomTagsRect.height, worldMainTabsHeight);
+    expect(loadingBottomTagsRect.height, worldBubbleHeight);
     expect(tester.widget<IgnorePointer>(bottomTagsOverlay).ignoring, isTrue);
     expect(
       tester.getSize(
@@ -29844,7 +29859,7 @@ void main() {
     expect(find.byType(WorldMap), findsOneWidget);
     expect(transport.requestsFor('/api/v1/world/detail'), isEmpty);
     expect(tester.getRect(panelInfoRow).height, worldInfoHeaderHeight);
-    expect(tester.getRect(bottomTagsOverlay).height, worldMainTabsHeight);
+    expect(tester.getRect(bottomTagsOverlay).height, worldBubbleHeight);
     expect(tester.widget<IgnorePointer>(bottomTagsOverlay).ignoring, isFalse);
     expect(find.byType(WorldInfoHeader), findsOneWidget);
     expect(

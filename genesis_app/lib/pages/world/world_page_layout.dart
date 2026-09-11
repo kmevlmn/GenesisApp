@@ -26,19 +26,13 @@ extension _WorldPageLayout on _WorldPageState {
     WorldDetail? world,
     bool assumeLaunched = false,
   }) {
-    final collapsedPanelHeight = worldCollapsedPanelHeightFor(
-      context,
-      world: world,
-      assumeLaunched: true,
-    );
     const infoHeaderHeight = worldLaunchedInfoHeaderHeight;
     return Stack(
       children: [
         WorldDetailsPageScaffold(
           backgroundColor: _tilemapLoadingBackgroundColor,
           panelBackgroundColor: GenesisColors.darkBackground,
-          panelTopGap: 50,
-          panelCollapsedHeightOffset: 120,
+          panelTopGap: 0,
           scrollPhysics: const NeverScrollableScrollPhysics(),
           persistentTopOverlay: _buildPersistentMapOverlay(
             topPadding,
@@ -54,18 +48,16 @@ extension _WorldPageLayout on _WorldPageState {
                 key: const ValueKey<String>('world-map-loading-background'),
                 color: _tilemapLoadingBackgroundColor,
               ),
-          fixedCollapsedPanelHeight: collapsedPanelHeight,
+          fixedCollapsedPanelHeight: 0,
           fixedCollapsedPanelHeightIncludesBottomSafeArea: true,
           contentBottomPaddingOverride: 0,
-          slivers: [
-            WorldDetailsLoadingContent(
-              infoHeaderHeight: infoHeaderHeight,
-              useCompactAction: true,
-            ),
-          ],
+          slivers: const <Widget>[],
         ),
-        _buildWorldBottomTagsOverlay(
-          collapsedPanelHeight: collapsedPanelHeight,
+        _buildWorldFloatingOverlay(
+          card: const WorldInfoHeaderLoadingSkeleton(
+            height: infoHeaderHeight,
+            useCompactAction: true,
+          ),
           interactive: false,
         ),
       ],
@@ -97,23 +89,36 @@ extension _WorldPageLayout on _WorldPageState {
     );
   }
 
-  Widget _buildWorldBottomTagsOverlay({
-    required double collapsedPanelHeight,
+  /// Info at rest: a glass card around the section bar, floating over the foot
+  /// of the map. Pulling it up raises the opaque sheet on the Info page; the
+  /// bar's sections raise it on their own pages.
+  Widget _buildWorldFloatingOverlay({
+    required Widget card,
     required bool interactive,
   }) {
     return Positioned(
-      left: 0,
-      right: 0,
-      bottom: collapsedPanelHeight - worldMainTabsHeight,
-      height: worldMainTabsHeight,
-      child: IgnorePointer(
-        key: const ValueKey<String>('world-bottom-tags-overlay'),
-        ignoring: !interactive,
-        child: WorldBottomTags(
-          eventsUnread: _eventsUnread,
-          showDetailUnreadDot: _hasUnreadNewUserJoin,
-          onTap: _openWorldBottomSheet,
+      left: worldRestingCardInset,
+      right: worldRestingCardInset,
+      bottom: worldBottomSafeAreaOf(context) + worldRestingCardBottomLift,
+      child: WorldInfoRestingSheet(
+        onPullUp: interactive
+            ? () => _openWorldBottomSheet(WorldBottomSheetKind.info)
+            : null,
+        bubble: IgnorePointer(
+          key: const ValueKey<String>('world-bottom-tags-overlay'),
+          ignoring: !interactive,
+          child: WorldFloatingBubble(
+            selected: WorldBottomSheetKind.info,
+            eventsUnread: _eventsUnread,
+            showDetailUnreadDot: _hasUnreadNewUserJoin,
+            onSelected: (kind) {
+              // At rest Info only pulls up; its button is just the label.
+              if (kind == WorldBottomSheetKind.info) return;
+              _openWorldBottomSheet(kind);
+            },
+          ),
         ),
+        child: card,
       ),
     );
   }

@@ -52,6 +52,7 @@ class LegacyWorldMap extends StatefulWidget {
   Set<String> get recentChatLocationIds => config.recentChatLocationIds;
   Set<String> get recentChatMapLocationIds => config.recentChatMapLocationIds;
   Set<String> get eventMapLocationIds => config.eventMapLocationIds;
+  double? get zoomControlBottom => config.zoomControlBottom;
 
   @override
   State<LegacyWorldMap> createState() => _LegacyWorldMapState();
@@ -359,7 +360,9 @@ class _LegacyWorldMapState extends State<LegacyWorldMap> {
             if (!widget.showPointsList)
               Positioned(
                 right: legacyWorldMapZoomControlRightGap,
-                bottom: legacyWorldMapZoomControlBottomGap,
+                bottom:
+                    widget.zoomControlBottom ??
+                    legacyWorldMapZoomControlBottomGap,
                 child: LegacyWorldMapZoomControl(
                   value: _mapZoomScale,
                   min: LegacyWorldMapZoomableContent.minScale,

@@ -35,6 +35,7 @@ class WorldMapTilemapOptions {
     this.showVisualModeToggle = true,
     this.visualModeToggleTop,
     this.visualModeToggleRight = 9.5,
+    this.zoomControlBottom,
     this.recentChatLocationIds = const <String>{},
     this.eventLocationIds = const <String>{},
     this.animationsPaused = false,
@@ -58,6 +59,7 @@ class WorldMapTilemapOptions {
   final bool showVisualModeToggle;
   final double? visualModeToggleTop;
   final double visualModeToggleRight;
+  final double? zoomControlBottom;
   final Set<String> recentChatLocationIds;
   final Set<String> eventLocationIds;
   final bool animationsPaused;
@@ -124,6 +126,7 @@ class WorldMap extends StatelessWidget {
         showVisualModeToggle: tilemap.showVisualModeToggle,
         visualModeToggleTop: tilemap.visualModeToggleTop,
         visualModeToggleRight: tilemap.visualModeToggleRight,
+        zoomControlBottom: tilemap.zoomControlBottom,
         recentChatLocationIds: tilemap.recentChatLocationIds,
         eventLocationIds: tilemap.eventLocationIds,
         animationsPaused: tilemap.animationsPaused,
@@ -152,6 +155,7 @@ class WorldMap extends StatelessWidget {
         showVisualModeToggle: tilemap.showVisualModeToggle,
         visualModeToggleTop: tilemap.visualModeToggleTop,
         visualModeToggleRight: tilemap.visualModeToggleRight,
+        zoomControlBottom: tilemap.zoomControlBottom,
         recentChatLocationIds: tilemap.recentChatLocationIds,
         eventLocationIds: tilemap.eventLocationIds,
         animationsPaused: tilemap.animationsPaused,

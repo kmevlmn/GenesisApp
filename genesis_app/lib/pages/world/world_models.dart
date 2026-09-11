@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'world_constants.dart';
 import 'world_value_helpers.dart';
 
-enum WorldBottomSheetKind { detail, locations, events, status, cast }
+enum WorldBottomSheetKind { info, detail, locations, events, status, cast }
 
 String worldBottomSheetPageName(WorldBottomSheetKind kind) {
   return switch (kind) {
+    WorldBottomSheetKind.info => 'world_info',
     WorldBottomSheetKind.detail => 'world_detail_shell',
     WorldBottomSheetKind.locations => 'world_locations',
     WorldBottomSheetKind.events => 'world_events',
@@ -102,7 +103,14 @@ WorldNewUserJoinNotice? worldLatestPlayerJoinNotice(
   return WorldNewUserJoinNotice.fromCharacter(latestCharacter);
 }
 
+/// Info first, then the sections: the sheet's pages and the bubble's buttons
+/// share this order.
 const worldBottomTagItems = <WorldBottomTagItem>[
+  WorldBottomTagItem(
+    label: 'Info',
+    kind: WorldBottomSheetKind.info,
+    asset: worldInfoIconAsset,
+  ),
   WorldBottomTagItem(
     label: 'Detail',
     kind: WorldBottomSheetKind.detail,

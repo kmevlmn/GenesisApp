@@ -49,7 +49,10 @@ void main() {
               body: SingleChildScrollView(
                 child: Column(
                   children: [
-                    WorldBottomTags(onTap: (_) {}),
+                    WorldFloatingBubble(
+                      selected: WorldBottomSheetKind.info,
+                      onSelected: (_) {},
+                    ),
                     WorldDetailSection(
                       world: WorldDetail.fromJson({'name': 'Font audit world'}),
                       currentUid: '',
@@ -71,7 +74,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expectInterText(tester, find.byType(WorldBottomTags));
+      expectInterText(tester, find.byType(WorldFloatingBubble));
       final notice = find.byWidgetPredicate(
         (widget) =>
             widget is RichText &&

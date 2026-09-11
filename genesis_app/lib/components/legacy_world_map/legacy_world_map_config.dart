@@ -27,6 +27,7 @@ class LegacyWorldMapConfig {
     this.recentChatLocationIds = const <String>{},
     this.recentChatMapLocationIds = const <String>{},
     this.eventMapLocationIds = const <String>{},
+    this.zoomControlBottom,
   });
 
   final Key? implementationKey;
@@ -50,4 +51,7 @@ class LegacyWorldMapConfig {
   final Set<String> recentChatLocationIds;
   final Set<String> recentChatMapLocationIds;
   final Set<String> eventMapLocationIds;
+
+  /// Gap from the map bottom to the zoom control; null keeps the legacy gap.
+  final double? zoomControlBottom;
 }

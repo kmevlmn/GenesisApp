@@ -262,24 +262,18 @@ class WorldFeedContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final infoHeaderHeight = worldInfoHeaderHeightFor(world);
-    return SliverMainAxisGroup(
-      slivers: [
-        SliverToBoxAdapter(
-          child: WorldSectionSheetPullGesture(
-            onPullUp: onPullUp,
-            child: SizedBox(
-              key: const ValueKey<String>('world-panel-info-row'),
-              height: infoHeaderHeight,
-              child: WorldInfoHeader(
-                world: world,
-                currentUid: currentUid,
-                worldActionRunning: worldActionRunning,
-                onWorldAction: onWorldAction,
-              ),
-            ),
-          ),
+    return WorldSectionSheetPullGesture(
+      onPullUp: onPullUp,
+      child: SizedBox(
+        key: const ValueKey<String>('world-panel-info-row'),
+        height: infoHeaderHeight,
+        child: WorldInfoHeader(
+          world: world,
+          currentUid: currentUid,
+          worldActionRunning: worldActionRunning,
+          onWorldAction: onWorldAction,
         ),
-      ],
+      ),
     );
   }
 }
@@ -481,7 +475,8 @@ class _WorldLaunchedCharacterSummary extends StatelessWidget {
 
     return Row(
       key: const ValueKey<String>('world-launched-character-summary'),
-      crossAxisAlignment: CrossAxisAlignment.start,
+      // Name and tick line centre on the avatar, level with the action button.
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         DecoratedBox(
           key: const ValueKey<String>(
@@ -591,6 +586,8 @@ double worldInfoHeaderHeightFor(
   return worldInfoHeaderHeight;
 }
 
+/// What the floating chrome — Info card, gap, bubble — takes from the bottom
+/// of the screen, safe area included. Sheets settle to this before closing.
 double worldCollapsedPanelHeightFor(
   BuildContext context, {
   WorldDetail? world,
@@ -600,7 +597,7 @@ double worldCollapsedPanelHeightFor(
   final infoHeaderHeightDelta =
       worldInfoHeaderHeightFor(world, assumeLaunched: assumeLaunched) -
       worldInfoHeaderHeight;
-  return worldCollapsedPanelBaseHeight + infoHeaderHeightDelta + bottomSafeArea;
+  return worldFloatingChromeBaseHeight + infoHeaderHeightDelta + bottomSafeArea;
 }
 
 String worldOwnerDisplayName(WorldDetail world) {

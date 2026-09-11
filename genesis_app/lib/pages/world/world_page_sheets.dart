@@ -51,20 +51,59 @@ extension _WorldPageSheets on _WorldPageState {
         // use the same DraggableScrollableSheet gesture chain as Origin.
         enableDrag: false,
         backgroundColor: Colors.transparent,
-        barrierColor: Colors.black.withValues(alpha: 0.18),
+        // The sheet rises in place from Info's resting card and draws its
+        // own scrim, so the route itself neither slides nor dims.
+        barrierColor: Colors.transparent,
+        isDismissible: false,
+        sheetAnimationStyle: const AnimationStyle(
+          duration: Duration.zero,
+          reverseDuration: Duration.zero,
+        ),
         builder: (context) {
           _worldBottomSheetContext = context;
-          return WorldSingleSectionBottomSheet(
-            selectionListenable: _worldBottomSheetSelection,
-            services: services,
-            initialWorld: world,
-            worldListenable: _sectionsWorldNotifier,
-            newUserJoinNoticesListenable: _newUserJoinNoticesNotifier,
-            eventsCache: _sectionsEventsCache,
-            currentUid: _currentUid,
-            recentChatLocationIds: _recentChatLocationIds,
-            onLocationTap: _handleBottomSheetLocationTap,
-            onDeleteWorld: _confirmAndDeleteWorldFromDetail,
+          final bottomSafeArea = worldBottomSafeAreaOf(context);
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: WorldSingleSectionBottomSheet(
+                  selectionListenable: _worldBottomSheetSelection,
+                  services: services,
+                  initialWorld: world,
+                  worldListenable: _sectionsWorldNotifier,
+                  newUserJoinNoticesListenable: _newUserJoinNoticesNotifier,
+                  eventsCache: _sectionsEventsCache,
+                  currentUid: _currentUid,
+                  recentChatLocationIds: _recentChatLocationIds,
+                  onLocationTap: _handleBottomSheetLocationTap,
+                  onDeleteWorld: _confirmAndDeleteWorldFromDetail,
+                  bottomReservedHeight:
+                      worldBubbleReservedHeight + bottomSafeArea,
+                  infoBuilder: (context, world) => WorldInfoHeader(
+                    world: world,
+                    currentUid: _currentUid,
+                    worldActionRunning: _worldActionRunning,
+                    onWorldAction: _runWorldAction,
+                  ),
+                ),
+              ),
+              // The bubble stays reachable over the sheet: sections switch in
+              // place, Info included.
+              Positioned(
+                left: worldFloatingSideInset,
+                right: worldFloatingSideInset,
+                bottom: bottomSafeArea + worldFloatingBottomGap,
+                child: ValueListenableBuilder<WorldBottomSheetSelection>(
+                  valueListenable: _worldBottomSheetSelection,
+                  builder: (context, selection, _) => WorldFloatingBubble(
+                    key: const ValueKey<String>('world-sheet-bubble'),
+                    selected: selection.kind,
+                    eventsUnread: _eventsUnread,
+                    showDetailUnreadDot: _hasUnreadNewUserJoin,
+                    onSelected: (kind) => _openWorldBottomSheet(kind),
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ).whenComplete(() {

@@ -184,22 +184,24 @@ void main() {
         ),
         const Size.square(worldCharacterAvatarLogicalSize),
       );
+      // The name and tick line centre on the avatar as one block.
+      final nameRect = tester.getRect(
+        find.byKey(const ValueKey<String>('world-current-character-name')),
+      );
+      final messagesRect = tester.getRect(
+        find.byKey(const ValueKey<String>('world-header-messages')),
+      );
       expect(
-        tester
-            .getTopLeft(
-              find.byKey(
-                const ValueKey<String>('world-current-character-name'),
-              ),
-            )
-            .dy,
+        (nameRect.top + messagesRect.bottom) / 2,
         moreOrLessEquals(
           tester
-              .getTopLeft(
+              .getCenter(
                 find.byKey(
                   const ValueKey<String>('world-current-character-avatar'),
                 ),
               )
               .dy,
+          epsilon: 0.5,
         ),
       );
       final button = tester.widget<FilledButton>(

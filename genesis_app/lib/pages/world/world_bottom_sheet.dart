@@ -3,6 +3,7 @@ import '../../ui/components/genesis_dark_close_button.dart';
 
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -20,63 +21,58 @@ import '../../network/models/location_tree.dart';
 import '../../network/models/world.dart';
 import '../../ui/components/genesis_edge_swipe_back.dart';
 import '../../ui/tokens/genesis_radii.dart';
+import '../../ui/components/genesis_map_top_glass_bar.dart';
 import 'world_constants.dart';
 import 'world_header.dart';
 import 'world_map_data.dart';
 import 'world_models.dart';
 import 'world_sections.dart';
 
-class WorldBottomTags extends StatelessWidget {
-  const WorldBottomTags({
-    required this.onTap,
+/// The section bar, one button per sheet page. At rest it sits inside Info's
+/// glass card; once a sheet is raised it rides on top of it.
+class WorldFloatingBubble extends StatelessWidget {
+  const WorldFloatingBubble({
+    super.key,
+    required this.selected,
+    required this.onSelected,
     this.eventsUnread = false,
     this.showDetailUnreadDot = false,
   });
 
-  final ValueChanged<WorldBottomSheetKind> onTap;
+  final WorldBottomSheetKind selected;
+  final ValueChanged<WorldBottomSheetKind> onSelected;
   final bool eventsUnread;
   final bool showDetailUnreadDot;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: worldMainTabsHeight,
-      color: GenesisColors.darkBackground,
-      alignment: Alignment.centerLeft,
-      child: DefaultTextStyle(
-        style: const TextStyle(
-          fontFamily: GenesisTypography.fontFamily,
-          fontFamilyFallback: GenesisTypography.fontFamilyFallback,
-          color: GenesisColors.darkTextPrimary,
-          fontSize: 12,
-          height: 1,
-          fontWeight: FontWeight.w600,
-          decoration: TextDecoration.none,
-        ),
-        child: ScrollConfiguration(
-          behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final entry in worldBottomTagItems.indexed) ...[
-                  WorldBottomTagContent(
-                    item: entry.$2,
+    // No glass of its own: the card or the sheet under it provides the surface.
+    return DecoratedBox(
+      key: const ValueKey<String>('world-bubble-surface'),
+      decoration: BoxDecoration(
+        color: worldBubbleFillColor,
+        borderRadius: BorderRadius.circular(worldBubbleRadius),
+      ),
+      child: SizedBox(
+        height: worldBubbleHeight,
+        child: Padding(
+          padding: const EdgeInsets.all(worldBubbleInnerPadding),
+          child: Row(
+            children: [
+              for (final item in worldBottomTagItems)
+                Expanded(
+                  child: WorldBubbleButton(
+                    item: item,
+                    selected: item.kind == selected,
                     showUnreadDot:
                         eventsUnread &&
-                            entry.$2.kind == WorldBottomSheetKind.events ||
+                            item.kind == WorldBottomSheetKind.events ||
                         showDetailUnreadDot &&
-                            entry.$2.kind == WorldBottomSheetKind.detail,
-                    onTap: () => onTap(entry.$2.kind),
+                            item.kind == WorldBottomSheetKind.detail,
+                    onTap: () => onSelected(item.kind),
                   ),
-                  if (entry.$1 != worldBottomTagItems.length - 1)
-                    const SizedBox(width: 8),
-                ],
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),
@@ -84,91 +80,109 @@ class WorldBottomTags extends StatelessWidget {
   }
 }
 
-class WorldBottomTagContent extends StatelessWidget {
-  const WorldBottomTagContent({
+class WorldBubbleButton extends StatelessWidget {
+  const WorldBubbleButton({
+    super.key,
     required this.item,
+    required this.selected,
     required this.onTap,
     this.showUnreadDot = false,
   });
 
   final WorldBottomTagItem item;
+  final bool selected;
   final VoidCallback onTap;
   final bool showUnreadDot;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            height: worldBottomTagHeight,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: GenesisColors.darkFaintFill,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (item.asset != null)
-                  SvgPicture.asset(
-                    item.asset!,
-                    width: 17,
-                    height: 17,
-                    colorFilter: const ColorFilter.mode(
-                      GenesisColors.darkTextSecondary,
-                      BlendMode.srcIn,
-                    ),
-                  )
-                else
-                  Icon(
-                    item.icon,
-                    size: 17,
-                    color: GenesisColors.darkTextSecondary,
-                  ),
-                const SizedBox(width: 5),
-                Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: GenesisColors.darkTextPrimary,
-                    fontSize: 12,
-                    height: 1,
-                    fontWeight: FontWeight.w600,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ],
+    final color = selected
+        ? GenesisColors.darkTextPrimary
+        : GenesisColors.darkTextSecondary;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: item.label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: ValueKey<String>('world-bubble-${item.label.toLowerCase()}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: selected ? const Color(0x1FFFFFFF) : const Color(0x00FFFFFF),
+            // Concentric with the bar: its radius less the inner padding.
+            borderRadius: BorderRadius.circular(
+              worldBubbleRadius - worldBubbleInnerPadding,
             ),
           ),
-          if (showUnreadDot)
-            Positioned(
-              key: item.kind == WorldBottomSheetKind.events
-                  ? const ValueKey('world-events-unread-dot')
-                  : null,
-              top: 2,
-              right: 2,
-              child: Container(
-                width: 7,
-                height: 7,
-                decoration: const BoxDecoration(
-                  color: GenesisColors.redPrimary,
-                  shape: BoxShape.circle,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  _buildIcon(color),
+                  if (showUnreadDot)
+                    Positioned(
+                      key: item.kind == WorldBottomSheetKind.events
+                          ? const ValueKey('world-events-unread-dot')
+                          : null,
+                      top: -1,
+                      right: -3,
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: GenesisColors.redPrimary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: GenesisTypography.fontFamily,
+                  fontFamilyFallback: GenesisTypography.fontFamilyFallback,
+                  color: color,
+                  fontSize: 12,
+                  height: 1,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.none,
                 ),
               ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _buildIcon(Color color) {
+    final asset = item.asset;
+    if (asset != null) {
+      return SvgPicture.asset(
+        asset,
+        width: 20,
+        height: 20,
+        fit: BoxFit.contain,
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      );
+    }
+    return Icon(item.icon, size: 20, color: color);
   }
 }
 
 class WorldSingleSectionBottomSheet extends StatefulWidget {
   const WorldSingleSectionBottomSheet({
+    super.key,
     required this.selectionListenable,
     required this.services,
     required this.initialWorld,
@@ -179,6 +193,8 @@ class WorldSingleSectionBottomSheet extends StatefulWidget {
     required this.recentChatLocationIds,
     required this.onLocationTap,
     this.onDeleteWorld,
+    this.bottomReservedHeight = 0,
+    required this.infoBuilder,
   });
 
   final ValueNotifier<WorldBottomSheetSelection> selectionListenable;
@@ -193,6 +209,12 @@ class WorldSingleSectionBottomSheet extends StatefulWidget {
   final ValueChanged<WorldPoint> onLocationTap;
   final Future<void> Function(BuildContext context, WorldDetail world)?
   onDeleteWorld;
+
+  /// Space kept clear under the pages for chrome floating over the sheet.
+  final double bottomReservedHeight;
+
+  /// Builds the Info row; the page owns its live action state.
+  final Widget Function(BuildContext context, WorldDetail world) infoBuilder;
 
   @override
   State<WorldSingleSectionBottomSheet> createState() =>
@@ -213,6 +235,10 @@ class WorldSingleSectionBottomSheetState
   late final PageController _pageController;
   late final List<ScrollController> _previewScrollControllers;
   var _changingPageFromSelection = false;
+
+  /// 0 while the sheet sits at Info's resting card, 1 fully raised.
+  final ValueNotifier<double> _raise = ValueNotifier<double>(0);
+  var _closing = false;
   var _sheetHostHeight = 1.0;
   var _sheetMinChildSize = 0.08;
   var _sheetMaxChildSize = 1.0;
@@ -237,6 +263,7 @@ class WorldSingleSectionBottomSheetState
   void initState() {
     super.initState();
     _sheetController = DraggableScrollableController();
+    _sheetController.addListener(_syncRaise);
     _pageController = PageController(
       initialPage: _pageForKind(_selection.kind),
     );
@@ -252,6 +279,7 @@ class WorldSingleSectionBottomSheetState
     worldNewContentDebugSettings.listenable.addListener(
       _handleWorldNewContentDebugSettingsChanged,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _riseToFull());
   }
 
   @override
@@ -299,7 +327,10 @@ class WorldSingleSectionBottomSheetState
     worldNewContentDebugSettings.listenable.removeListener(
       _handleWorldNewContentDebugSettingsChanged,
     );
-    _sheetController.dispose();
+    _sheetController
+      ..removeListener(_syncRaise)
+      ..dispose();
+    _raise.dispose();
     _pageController.dispose();
     for (final controller in _previewScrollControllers) {
       controller.dispose();
@@ -346,7 +377,7 @@ class WorldSingleSectionBottomSheetState
 
   WorldBottomSheetKind _kindForPage(int page) {
     if (page < 0 || page >= worldBottomTagItems.length) {
-      return WorldBottomSheetKind.detail;
+      return WorldBottomSheetKind.info;
     }
     return worldBottomTagItems[page].kind;
   }
@@ -368,6 +399,14 @@ class WorldSingleSectionBottomSheetState
           .whenComplete(() => _changingPageFromSelection = false),
     );
   }
+
+  /// Every opening starts from Info's resting card and grows to full height.
+  Future<void> _riseToFull() async {
+    if (!mounted || _closing) return;
+    await _animateSheetTo(_sheetMaxChildSize);
+  }
+
+  void _syncRaise() => _raise.value = _raisedFraction;
 
   void _handleSheetPageChanged(int page) {
     if (_changingPageFromSelection) return;
@@ -616,11 +655,33 @@ class WorldSingleSectionBottomSheetState
     return latestDetailJoinNotice;
   }
 
+  Widget _buildInfoSectionPage(ScrollController scrollController) {
+    return ListView(
+      controller: scrollController,
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        worldInfoPageHorizontalPadding,
+        0,
+        worldInfoPageHorizontalPadding,
+        24,
+      ),
+      children: [
+        SizedBox(
+          height: worldInfoHeaderHeightFor(_currentWorld),
+          child: widget.infoBuilder(context, _currentWorld),
+        ),
+        const SizedBox(height: 18),
+        const _WorldMoreModulesPreview(),
+      ],
+    );
+  }
+
   Widget _buildSheetPage(
     WorldBottomSheetKind kind,
     ScrollController scrollController,
   ) {
     return switch (kind) {
+      WorldBottomSheetKind.info => _buildInfoSectionPage(scrollController),
       WorldBottomSheetKind.detail => _buildDetailSectionPage(scrollController),
       WorldBottomSheetKind.locations => _buildLocationsSectionPage(
         scrollController,
@@ -629,12 +690,6 @@ class WorldSingleSectionBottomSheetState
       WorldBottomSheetKind.status => _buildStatusSectionPage(scrollController),
       WorldBottomSheetKind.cast => _buildCastSectionPage(scrollController),
     };
-  }
-
-  WorldBottomTagItem get _headerItem {
-    return worldBottomTagItems.firstWhere(
-      (item) => item.kind == _selection.kind,
-    );
   }
 
   Widget _buildSheetContent(ScrollController sheetScrollController) {
@@ -649,7 +704,22 @@ class WorldSingleSectionBottomSheetState
           final scrollController = kind == _selection.kind
               ? sheetScrollController
               : _previewScrollControllers[index];
-          return _buildSheetPage(kind, scrollController);
+          final page = _buildSheetPage(kind, scrollController);
+          if (kind == WorldBottomSheetKind.info) return page;
+          // Section titles ride on their pages; Info keeps its row on top.
+          return Column(
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragUpdate: _handleHeaderDragUpdate,
+                child: WorldSingleSectionSheetHeader(
+                  item: worldBottomTagItems[index],
+                  onClose: _collapseSheet,
+                ),
+              ),
+              Expanded(child: page),
+            ],
+          );
         },
       ),
     );
@@ -725,6 +795,10 @@ class WorldSingleSectionBottomSheetState
   }
 
   void _collapseSheet({Curve curve = Curves.easeOutCubic}) {
+    // The scrim, back swipe, settling on Info and the bubble can all ask at
+    // once; lay the sheet down and pop only once.
+    if (_closing) return;
+    _closing = true;
     if (!_sheetController.isAttached) {
       Navigator.of(context).pop();
       return;
@@ -734,6 +808,8 @@ class WorldSingleSectionBottomSheetState
       final completed = await _animateSheetTo(_sheetMinChildSize, curve: curve);
       if (completed && mounted && navigator.mounted) {
         navigator.pop();
+      } else {
+        _closing = false;
       }
     }());
   }
@@ -788,39 +864,38 @@ class WorldSingleSectionBottomSheetState
         _sheetMinChildSize = minChildSize;
         _sheetMaxChildSize = maxChildSize;
         return GenesisEdgeSwipeBack(
-          onBack: () => Navigator.of(context).pop(),
-          child: Listener(
-            onPointerDown: _handleSheetPointerDown,
-            onPointerMove: _handleSheetPointerMove,
-            onPointerUp: _handleSheetPointerUp,
-            onPointerCancel: _handleSheetPointerCancel,
-            child: DraggableScrollableSheet(
-              controller: _sheetController,
-              initialChildSize: maxChildSize,
-              minChildSize: minChildSize,
-              maxChildSize: maxChildSize,
-              snap: false,
-              shouldCloseOnMinExtent: false,
-              builder: (context, scrollController) {
-                return Theme(
-                  data: Theme.of(context).copyWith(
-                    brightness: Brightness.dark,
-                    colorScheme: Theme.of(context).colorScheme.copyWith(
-                      brightness: Brightness.dark,
-                      surface: GenesisColors.darkBackground,
-                      onSurface: GenesisColors.darkTextPrimary,
+          onBack: _collapseSheet,
+          child: Stack(
+            children: [
+              // The route brings no barrier: this scrim darkens the map only as
+              // far as the sheet has risen off its rest, and taps lay it down.
+              Positioned.fill(
+                child: GestureDetector(
+                  key: const ValueKey<String>('world-sheet-scrim'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _collapseSheet,
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: _raise,
+                    builder: (context, raise, _) => ColoredBox(
+                      color: Colors.black.withValues(alpha: 0.18 * raise),
                     ),
-                    dividerColor: GenesisColors.darkFaintFill,
                   ),
-                  child: DecoratedBox(
-                    key: const ValueKey<String>(
-                      'world-single-section-bottom-sheet',
-                    ),
-                    decoration: const BoxDecoration(
-                      color: GenesisColors.darkBackground,
-                      borderRadius: GenesisRadii.sheet,
-                    ),
-                    child: Column(
+                ),
+              ),
+              Listener(
+                onPointerDown: _handleSheetPointerDown,
+                onPointerMove: _handleSheetPointerMove,
+                onPointerUp: _handleSheetPointerUp,
+                onPointerCancel: _handleSheetPointerCancel,
+                child: DraggableScrollableSheet(
+                  controller: _sheetController,
+                  initialChildSize: minChildSize,
+                  minChildSize: minChildSize,
+                  maxChildSize: maxChildSize,
+                  snap: false,
+                  shouldCloseOnMinExtent: false,
+                  builder: (context, scrollController) {
+                    final content = Column(
                       children: [
                         GestureDetector(
                           key: const ValueKey<String>(
@@ -828,86 +903,386 @@ class WorldSingleSectionBottomSheetState
                           ),
                           behavior: HitTestBehavior.opaque,
                           onVerticalDragUpdate: _handleHeaderDragUpdate,
-                          child: WorldSingleSectionSheetHeader(
-                            item: _headerItem,
+                          child: WorldSheetIndicatorStrip(
                             pageController: _pageController,
                             pageCount: worldBottomTagItems.length,
-                            onClose: _collapseSheet,
+                            raise: _raise,
                           ),
                         ),
                         Expanded(child: _buildSheetContent(scrollController)),
                       ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                    );
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        brightness: Brightness.dark,
+                        colorScheme: Theme.of(context).colorScheme.copyWith(
+                          brightness: Brightness.dark,
+                          surface: GenesisColors.darkBackground,
+                          onSurface: GenesisColors.darkTextPrimary,
+                        ),
+                        dividerColor: GenesisColors.darkFaintFill,
+                      ),
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: _raise,
+                        child: content,
+                        builder: (context, raise, child) =>
+                            _buildMorphingSurface(raise, child!),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
     );
   }
+
+  /// From Info's glass resting card (0) to the opaque full-width sheet (1): the
+  /// insets, the lift and the lower corners close up, the glass fills in, and
+  /// the room kept for the section bar settles to its raised size.
+  Widget _buildMorphingSurface(double raise, Widget child) {
+    double lerp(double from, double to) => from + (to - from) * raise;
+    final bottomSafeArea =
+        widget.bottomReservedHeight - worldBubbleReservedHeight;
+    final inset = lerp(worldRestingCardInset, 0);
+    final upperRadius = Radius.circular(
+      lerp(worldRestingCardRadius, GenesisRadii.sheetTopRadiusValue),
+    );
+    final lowerRadius = Radius.circular(lerp(worldRestingCardRadius, 0));
+    final borderRadius = BorderRadius.only(
+      topLeft: upperRadius,
+      topRight: upperRadius,
+      bottomLeft: lowerRadius,
+      bottomRight: lowerRadius,
+    );
+    final sigma = genesisMapTopGlassBarBlurSigma * (1 - raise);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        inset,
+        0,
+        inset,
+        lerp(bottomSafeArea + worldRestingCardBottomLift, 0),
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          enabled: raise < 1,
+          filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+          child: DecoratedBox(
+            key: const ValueKey<String>('world-single-section-bottom-sheet'),
+            decoration: BoxDecoration(
+              color: raise >= 1
+                  ? GenesisColors.darkBackground
+                  : Color.lerp(
+                      worldRestingCardGlassColor,
+                      GenesisColors.darkBackground,
+                      raise,
+                    ),
+              borderRadius: borderRadius,
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: lerp(
+                  worldRestingCardBubbleArea,
+                  widget.bottomReservedHeight,
+                ),
+              ),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  double get _raisedFraction {
+    if (!_sheetController.isAttached) return 0;
+    final span = _sheetMaxChildSize - _sheetMinChildSize;
+    if (span <= 0) return 1;
+    return ((_sheetController.size - _sheetMinChildSize) / span)
+        .clamp(0.0, 1.0)
+        .toDouble();
+  }
 }
 
+/// A section page's title row: icon, name and close. Info has none.
 class WorldSingleSectionSheetHeader extends StatelessWidget {
   const WorldSingleSectionSheetHeader({
     required this.item,
-    required this.pageController,
-    required this.pageCount,
     required this.onClose,
   });
 
   final WorldBottomTagItem item;
-  final PageController pageController;
-  final int pageCount;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Stack(
-        children: [
-          Positioned(
-            top: worldSheetPageIndicatorTopOffset,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: WorldSheetPageIndicator(
-                pageController: pageController,
-                pageCount: pageCount,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        24,
+        0,
+        24,
+        worldSheetTitleToContentGap,
+      ),
+      child: SizedBox(
+        height: worldSheetTitleRowHeight,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            WorldSheetHeaderIcon(item: item),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: GenesisColors.darkTextPrimary,
+                  fontSize: 16,
+                  height: 1,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.none,
+                ),
               ),
             ),
-          ),
-          Positioned(
-            left: 24,
-            right: 24,
-            top: 15,
-            child: SizedBox(
-              height: 28,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  WorldSheetHeaderIcon(item: item),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: GenesisColors.darkTextPrimary,
-                        fontSize: 16,
-                        height: 1,
-                        fontWeight: FontWeight.w600,
-                        decoration: TextDecoration.none,
-                      ),
+            const SizedBox(width: 12),
+            GenesisDarkCloseButton(onPressed: onClose),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The sheet's top strip: the page indicator alone.
+class WorldSheetIndicatorStrip extends StatelessWidget {
+  const WorldSheetIndicatorStrip({
+    super.key,
+    this.pageController,
+    required this.pageCount,
+    this.raise,
+  });
+
+  final PageController? pageController;
+  final int pageCount;
+
+  /// 0 at rest, 1 fully raised: the grab handle hands over to the page
+  /// indicator as the sheet rises. Null keeps the strip at rest.
+  final ValueListenable<double>? raise;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: worldSheetStripHeight,
+      child: ValueListenableBuilder<double>(
+        valueListenable: raise ?? const AlwaysStoppedAnimation<double>(0),
+        builder: (context, raised, _) => Stack(
+          children: [
+            Positioned(
+              top: worldSheetPageIndicatorTopOffset,
+              left: 0,
+              right: 0,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Opacity(
+                  opacity: 1 - raised,
+                  child: const _WorldSheetGrabHandle(),
+                ),
+              ),
+            ),
+            // At rest only the handle shows, so the resting card builds no
+            // indicator at all.
+            if (raise != null)
+              Positioned(
+                top: worldSheetPageIndicatorTopOffset,
+                left: 0,
+                right: 0,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Opacity(
+                    opacity: raised,
+                    child: WorldSheetPageIndicator(
+                      pageController: pageController,
+                      pageCount: pageCount,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  GenesisDarkCloseButton(onPressed: onClose),
-                ],
+                ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorldSheetGrabHandle extends StatelessWidget {
+  const _WorldSheetGrabHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey<String>('world-sheet-grab-handle'),
+      width: 36,
+      height: 4,
+      decoration: BoxDecoration(
+        color: GenesisColors.darkHandleInactive,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
+}
+
+/// Info at rest: a glass card holding the grab handle, the Info row and the
+/// section bar. It only pulls up; raised, it turns into the opaque full-width
+/// sheet on the Info page.
+class WorldInfoRestingSheet extends StatelessWidget {
+  const WorldInfoRestingSheet({
+    super.key,
+    required this.child,
+    required this.bubble,
+    this.onPullUp,
+  });
+
+  final Widget child;
+  final Widget bubble;
+  final VoidCallback? onPullUp;
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = BorderRadius.all(Radius.circular(worldRestingCardRadius));
+    final card = ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: genesisMapTopGlassBarBlurSigma,
+          sigmaY: genesisMapTopGlassBarBlurSigma,
+        ),
+        child: DecoratedBox(
+          key: const ValueKey<String>('world-info-resting-sheet'),
+          decoration: const BoxDecoration(
+            color: worldRestingCardGlassColor,
+            borderRadius: radius,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              WorldSheetIndicatorStrip(pageCount: worldBottomTagItems.length),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: worldInfoPageHorizontalPadding,
+                ),
+                child: child,
+              ),
+              const SizedBox(height: worldInfoToBubbleGap),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: worldRestingCardBubblePadding,
+                ),
+                child: bubble,
+              ),
+              const SizedBox(height: worldRestingCardBubblePadding),
+            ],
+          ),
+        ),
+      ),
+    );
+    final pullUp = onPullUp;
+    if (pullUp == null) return card;
+    return WorldSectionSheetPullGesture(onPullUp: pullUp, child: card);
+  }
+}
+
+/// Static stand-in for design 9e's module grid under Info when it is raised,
+/// until the real modules land.
+class _WorldMoreModulesPreview extends StatelessWidget {
+  const _WorldMoreModulesPreview();
+
+  static const _tiles = <(IconData, String, String)>[
+    (Icons.article_outlined, 'Log', '42 ticks'),
+    (Icons.hub_outlined, 'Ties', '5 characters'),
+    (Icons.place_outlined, 'Places', '6 total'),
+    (Icons.inventory_2_outlined, 'Items', '3 held'),
+    (Icons.shield_outlined, 'Rules', 'Tick 2h'),
+    (Icons.ios_share, 'Invite', '2 seats left'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey<String>('world-info-more-preview'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'More',
+          style: TextStyle(
+            color: GenesisColors.darkTextPrimary,
+            fontSize: 16,
+            height: 1,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (var row = 0; row < 2; row++) ...[
+          if (row > 0) const SizedBox(height: 10),
+          Row(
+            children: [
+              for (var column = 0; column < 3; column++) ...[
+                if (column > 0) const SizedBox(width: 10),
+                Expanded(child: _buildTile(_tiles[row * 3 + column])),
+              ],
+            ],
+          ),
+        ],
+        const SizedBox(height: 14),
+        const Text(
+          'Anything a world switches on lands here first.',
+          style: TextStyle(
+            color: GenesisColors.darkTextSecondary,
+            fontSize: 12,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTile((IconData, String, String) tile) {
+    final (icon, title, meta) = tile;
+    return Container(
+      height: 96,
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+      decoration: BoxDecoration(
+        color: GenesisColors.darkFaintFill,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: GenesisColors.darkTextPrimary),
+          const Spacer(),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: GenesisColors.darkTextPrimary,
+              fontSize: 14,
+              height: 1,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            meta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: GenesisColors.darkTextSecondary,
+              fontSize: 12,
+              height: 1,
             ),
           ),
         ],
@@ -917,10 +1292,7 @@ class WorldSingleSectionSheetHeader extends StatelessWidget {
 }
 
 class WorldSheetPageIndicator extends StatelessWidget {
-  const WorldSheetPageIndicator({
-    required this.pageController,
-    required this.pageCount,
-  });
+  const WorldSheetPageIndicator({this.pageController, required this.pageCount});
 
   static const double _activeWidth = 26;
   static const double _inactiveWidth = 4;
@@ -929,17 +1301,22 @@ class WorldSheetPageIndicator extends StatelessWidget {
   static const Color _activeColor = GenesisColors.darkHandleActive;
   static const Color _inactiveColor = GenesisColors.darkHandleInactive;
 
-  final PageController pageController;
+  /// Without a controller the indicator rests on the first page, as the resting
+  /// Info sheet shows it.
+  final PageController? pageController;
   final int pageCount;
 
   @override
   Widget build(BuildContext context) {
+    final controller = pageController;
     return AnimatedBuilder(
-      animation: pageController,
+      animation: controller ?? const AlwaysStoppedAnimation<double>(0),
       builder: (context, child) {
-        final page = pageController.hasClients
-            ? pageController.page ?? pageController.initialPage.toDouble()
-            : pageController.initialPage.toDouble();
+        final page = controller == null
+            ? 0.0
+            : controller.hasClients
+            ? controller.page ?? controller.initialPage.toDouble()
+            : controller.initialPage.toDouble();
         return SizedBox(
           height: _height,
           child: Row(

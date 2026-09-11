@@ -2,33 +2,6 @@
 
 part of 'world_sections_library.dart';
 
-class WorldDetailsLoadingContent extends StatelessWidget {
-  const WorldDetailsLoadingContent({
-    this.infoHeaderHeight = worldInfoHeaderHeight,
-    this.useCompactAction = false,
-  });
-
-  final double infoHeaderHeight;
-  final bool useCompactAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverMainAxisGroup(
-      slivers: [
-        const SliverToBoxAdapter(
-          child: SizedBox(height: worldStatsTopSpacerHeight),
-        ),
-        SliverToBoxAdapter(
-          child: WorldInfoHeaderLoadingSkeleton(
-            height: infoHeaderHeight,
-            useCompactAction: useCompactAction,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class WorldInfoHeaderLoadingSkeleton extends StatelessWidget {
   const WorldInfoHeaderLoadingSkeleton({
     this.height = worldInfoHeaderHeight,

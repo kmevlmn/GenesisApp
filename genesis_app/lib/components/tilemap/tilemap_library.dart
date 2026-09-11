@@ -402,6 +402,7 @@ class Tilemap extends StatefulWidget {
     this.preferredFocusLocationId = '',
     this.centerContentInitially = false,
     this.drillExitBottom = worldMapDrillExitBottom,
+    this.zoomControlBottom,
     this.drillExitMaxWidth,
     this.showVisualModeToggle = true,
     this.visualModeToggleTop,
@@ -433,6 +434,7 @@ class Tilemap extends StatefulWidget {
     this.preferredFocusLocationId = '',
     this.centerContentInitially = false,
     this.drillExitBottom = worldMapDrillExitBottom,
+    this.zoomControlBottom,
     this.drillExitMaxWidth,
     this.showVisualModeToggle = true,
     this.visualModeToggleTop,
@@ -463,6 +465,7 @@ class Tilemap extends StatefulWidget {
   final String preferredFocusLocationId;
   final bool centerContentInitially;
   final double drillExitBottom;
+  final double? zoomControlBottom;
   final double? drillExitMaxWidth;
   final bool showVisualModeToggle;
   final double? visualModeToggleTop;
@@ -2011,6 +2014,7 @@ class _TilemapState extends State<Tilemap> with WidgetsBindingObserver {
       locationImageFlowBlendMode: _locationImageFlowBlendMode,
       initialScale: initialScale,
       dragBoundaryPaddingTiles: _dragBoundaryPaddingTiles,
+      zoomControlBottom: widget.zoomControlBottom,
     );
   }
 

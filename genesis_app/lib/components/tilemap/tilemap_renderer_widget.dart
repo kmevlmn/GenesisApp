@@ -44,6 +44,7 @@ class TilemapRenderer extends StatefulWidget {
     this.locationImageFlowBlendMode = tilemapDefaultLocationImageFlowBlendMode,
     this.initialScale = tilemapDefaultInitialScale,
     this.dragBoundaryPaddingTiles = tilemapDefaultDragBoundaryPaddingTiles,
+    this.zoomControlBottom,
   });
 
   final TilemapConfig config;
@@ -80,6 +81,10 @@ class TilemapRenderer extends StatefulWidget {
   final TilemapLocationImageFlowBlendMode locationImageFlowBlendMode;
   final double initialScale;
   final double dragBoundaryPaddingTiles;
+
+  /// Gap from the map's bottom edge to the zoom control. Hosts that float
+  /// chrome over the map raise it clear; null keeps the legacy gap.
+  final double? zoomControlBottom;
 
   @override
   State<TilemapRenderer> createState() => _TilemapRendererState();
@@ -679,7 +684,9 @@ class _TilemapRendererState extends State<TilemapRenderer>
                 ),
                 Positioned(
                   right: legacyWorldMapZoomControlRightGap,
-                  bottom: legacyWorldMapZoomControlBottomGap,
+                  bottom:
+                      widget.zoomControlBottom ??
+                      legacyWorldMapZoomControlBottomGap,
                   child: ValueListenableBuilder<Matrix4>(
                     valueListenable: _transformationController,
                     builder: (context, matrix, child) {

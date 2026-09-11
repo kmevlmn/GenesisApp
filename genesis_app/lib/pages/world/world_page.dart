@@ -650,6 +650,7 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
           onDrillIntoLocation: _showMapTab,
           onMapTap: _recordWorldMapClick,
           onPointTap: _openChatForPoint,
+          drillExitBottom: collapsedPanelHeight + 12,
         ),
         legacy: LegacyWorldMapConfig(
           implementationKey: PageStorageKey<String>('world-map-tab-$tabIndex'),
@@ -663,6 +664,7 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
           recentChatMapLocationIds: recentMapLocationIds,
           eventMapLocationIds: eventMapLocationIds,
           initialZoomScale: pointMode ? 1 : 1.2,
+          zoomControlBottom: collapsedPanelHeight + 12,
           pointsListOuterScrollHandoff: false,
           overlayTop:
               topPadding +
@@ -685,6 +687,8 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
           visualModeToggleTop:
               topPadding + worldMapBackButtonTop + worldMapTabsHeight + 8,
           visualModeToggleRight: worldMapTopBarRightInset,
+          // Clear of the floating Info card and bubble.
+          zoomControlBottom: collapsedPanelHeight + 12,
           restorationController: _tilemapRestorationController,
           onMapTap: _recordWorldTilemapClick,
           onDisplayReadinessChanged: _handleTilemapDisplayReadinessChanged,
@@ -714,19 +718,6 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
     final canShowWorldTickProgress =
         _worldChatroom != null ||
         shouldConnectWorldChatroom(world.relationStatus);
-    final mountedSlivers = <Widget>[
-      const SliverToBoxAdapter(
-        child: SizedBox(height: worldStatsTopSpacerHeight),
-      ),
-      WorldFeedContent(
-        world: world,
-        currentUid: _currentUid,
-        worldActionRunning: _worldActionRunning,
-        onWorldAction: _runWorldAction,
-        onPullUp: () => _openWorldBottomSheet(WorldBottomSheetKind.events),
-      ),
-    ];
-
     return PopScope(
       canPop: _activeChatLocationId.isEmpty,
       onPopInvokedWithResult: (didPop, result) {
@@ -740,11 +731,12 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
         onPointerCancel: _handleWorldMainSwipePointerCancel,
         child: Stack(
           children: [
+            // The map runs to the bottom edge; the Info card and the bubble
+            // float over it instead of sitting in a panel below.
             WorldDetailsPageScaffold(
               backgroundColor: _tilemapLoadingBackgroundColor,
               panelBackgroundColor: GenesisColors.darkBackground,
-              panelTopGap: 50,
-              panelCollapsedHeightOffset: 120,
+              panelTopGap: 0,
               scrollPhysics: const NeverScrollableScrollPhysics(),
               persistentTopOverlay: _buildPersistentMapOverlay(
                 topPadding,
@@ -754,12 +746,10 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
                 subTickNo: world.subTickNo,
               ),
               map: buildWorldMapPage(0, pointMode: false),
-              fixedCollapsedPanelHeight: collapsedPanelHeight,
+              fixedCollapsedPanelHeight: 0,
               fixedCollapsedPanelHeightIncludesBottomSafeArea: true,
               contentBottomPaddingOverride: 0,
-              onPanelTopPullUp: () =>
-                  _openWorldBottomSheet(WorldBottomSheetKind.events),
-              slivers: mountedSlivers,
+              slivers: const <Widget>[],
             ),
             if (_worldMainTabIndex != 0)
               Positioned(
@@ -777,8 +767,15 @@ class _WorldPageState extends State<WorldPage> with TickerProviderStateMixin {
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),
               ),
-            _buildWorldBottomTagsOverlay(
-              collapsedPanelHeight: collapsedPanelHeight,
+            _buildWorldFloatingOverlay(
+              card: WorldFeedContent(
+                world: world,
+                currentUid: _currentUid,
+                worldActionRunning: _worldActionRunning,
+                onWorldAction: _runWorldAction,
+                onPullUp: () =>
+                    _openWorldBottomSheet(WorldBottomSheetKind.info),
+              ),
               interactive: true,
             ),
             Positioned.fill(
